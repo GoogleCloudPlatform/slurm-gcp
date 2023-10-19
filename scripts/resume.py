@@ -135,6 +135,11 @@ def instance_properties(partition, model, placement_group, labels=None):
         
         placement = util.reservation_placement(reservation)
         if placement:
+            props.scheduling = {
+                "onHostMaintenance": "TERMINATE",
+                "automaticRestart": False,
+                "maintenanceInterval": "PERIODIC",
+            }
             props.resourcePolicies = [placement]
             log.info(f"reservation {reservation_name} is being used with placement policy {placement}")
         else:
