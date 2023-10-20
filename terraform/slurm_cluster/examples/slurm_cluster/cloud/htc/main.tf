@@ -138,6 +138,7 @@ locals {
           service_account          = module.slurm_sa_iam["compute"].service_account
           shielded_instance_config = null
           spot_instance_config     = null
+          scheduling               = {}
           source_image_family      = null
           source_image_project     = null
           source_image             = null
@@ -196,6 +197,7 @@ locals {
           service_account          = module.slurm_sa_iam["compute"].service_account
           shielded_instance_config = null
           spot_instance_config     = null
+          scheduling               = {}
           source_image_family      = null
           source_image_project     = null
           source_image             = null

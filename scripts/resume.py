@@ -67,6 +67,12 @@ def instance_properties(partition, model, placement_group, labels=None):
 
     props = NSDict()
 
+    props.scheduling = {
+        **{
+            "onHostMaintenance": "TERMINATE",
+            "automaticRestart": False,
+        }, **node_group.scheduling }
+
     slurm_metadata = {
         "slurm_cluster_name": cfg.slurm_cluster_name,
         "slurm_instance_role": "compute",
@@ -102,27 +108,17 @@ def instance_properties(partition, model, placement_group, labels=None):
     props.disks = template_info.disks
 
     if placement_group:
-        props.scheduling = {
-            "onHostMaintenance": "TERMINATE",
-            "automaticRestart": False,
-        }
-        props.resourcePolicies = [
-            placement_group,
-        ]
+        props.resourcePolicies = [placement_group]
 
     # provisioningModel=SPOT not supported by perInstanceProperties?
     if node_group.enable_spot_vm:
-        util.compute = util.compute_service(version="beta")
-
+        term_act = node_group.spot_instance_config.get("termination_action", "STOP")
         props.scheduling = {
-            "automaticRestart": False,
-            "instanceTerminationAction": node_group.spot_instance_config.get(
-                "termination_action", "STOP"
-            ),
-            "onHostMaintenance": "TERMINATE",
-            "preemptible": True,
-            "provisioningModel": "SPOT",
-        }
+            **{
+                "instanceTerminationAction": term_act,
+                "preemptible": True,
+                "provisioningModel": "SPOT",
+            }, **props.scheduling }
 
     if node_group.reservation_name:
         reservation_name = node_group.reservation_name

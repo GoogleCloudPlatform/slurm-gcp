@@ -396,7 +396,7 @@ def reservation_placement(reservation):
     return None
 
 
-def compute_service(credentials=None, user_agent=USER_AGENT, version="v1"):
+def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
     """Make thread-safe compute service handle
     creates a new Http for each request
     """

@@ -339,6 +339,7 @@ EOD
       spot_instance_config = object({
         termination_action = string
       })
+      scheduling           = map(string)
       source_image_family  = string
       source_image_project = string
       source_image         = string
@@ -401,6 +402,7 @@ EOD
           service_account          = null
           shielded_instance_config = null
           spot_instance_config     = null
+          scheduling               = {}
           source_image_family      = null
           source_image_project     = null
           source_image             = null

@@ -133,6 +133,7 @@ locals {
         service_account          = module.slurm_sa_iam["compute"].service_account
         shielded_instance_config = n.shielded_instance_config
         spot_instance_config     = n.spot_instance_config
+        scheduling               = n.scheduling
         source_image_family      = n.source_image_family
         source_image_project     = n.source_image_project
         source_image             = n.source_image

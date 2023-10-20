@@ -72,6 +72,7 @@ module "slurm_partition" {
       service_account          = module.slurm_compute_sa.service_account
       shielded_instance_config = null
       spot_instance_config     = null
+      scheduling               = {}
       source_image_family      = null
       source_image_project     = null
       source_image             = null

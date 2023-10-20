@@ -73,6 +73,7 @@ module "slurm_partition0" {
       service_account          = null
       shielded_instance_config = null
       spot_instance_config     = null
+      scheduling               = {}
       source_image_family      = null
       source_image_project     = null
       source_image             = null
@@ -127,6 +128,7 @@ module "slurm_partition1" {
       service_account          = null
       shielded_instance_config = null
       spot_instance_config     = null
+      scheduling               = {}
       source_image_family      = null
       source_image_project     = null
       source_image             = null
