@@ -1,34 +1,33 @@
-## ISSUES
+# How to contribute
 
-The official issue tracker for the slurm-gcp repo is at
-https://bugs.schedmd.com/
+We'd love to accept your patches and contributions to this project.
 
-## PATCH SUBMISSION
+## Before you begin
 
-We welcome code contributions and patches, but **we do not accept Pull Requests
-through Github at this time.** Please submit patches as attachments to new bugs
-under the "C - Contributions" severity level.
+### Sign our Contributor License Agreement
 
-Please break patches up into logically separate chunks, while ensuring that each
-patch can still run without errors. (Anticipate that a developer using
-`git bisect` may pick any intermediate commit at some point.)
+Contributions to this project must be accompanied by a
+[Contributor License Agreement](https://cla.developers.google.com/about) (CLA).
+You (or your employer) retain the copyright to your contribution; this simply
+gives us permission to use and redistribute your contributions as part of the
+project.
 
-If you decided to reformat a file, please submit non-functional changes
-(spelling corrections, formatting discrepancies) in a separate patch. This makes
-reviewing substantially easier, and allows us to focus our attention on the
-functional differences.
+If you or your current employer have already signed the Google CLA (even if it
+was for a different project), you probably don't need to do it again.
 
-If you make an automated change (changing a function name, fixing a pervasive
-spelling mistake), please send the command/regex used to generate the changes
-along with the patch, or note it in the commit message.
+Visit <https://cla.developers.google.com/> to see your current agreements or to
+sign a new one.
 
-While not required, we encourage use of `git format-patch` to generate the
-patch. This ensures the relevant author line and commit message stay attached.
-Plain `diff`'d output is also okay. In either case, please attach them to the
-bug for us to review. Spelling corrections or documentation improvements can be
-suggested without attaching the patch as long as you describe their location.
+### Review our community guidelines
 
-## CODING GUIDELINES
+This project follows
+[Google's Open Source Community Guidelines](https://opensource.google/conduct/).
 
-This repo attempts to follow the PEP 8 style guide for Python
-(https://www.python.org/dev/peps/pep-0008/).
+## Contribution process
+
+### Code reviews
+
+All submissions, including submissions by project members, require review. We
+use GitHub pull requests for this purpose. Consult
+[GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
+information on using pull requests.
