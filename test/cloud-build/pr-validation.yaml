@@ -1,0 +1,13 @@
+---
+
+steps:
+- id: pre-commit
+  name: us-central1-docker.pkg.dev/$PROJECT_ID/hpc-toolkit-repo/hpc-toolkit-builder
+  entrypoint: /bin/bash
+  args:
+  - -c
+  - |
+    set -e
+    git init --quiet .
+    git add .
+    pre-commit run --all-files
