@@ -121,6 +121,24 @@ variable "bandwidth_tier" {
   }
 }
 
+variable "additional_networks" {
+  description = "Additional network interface details for GCE, if any."
+  default     = []
+  type = list(object({
+    network            = string
+    subnetwork         = string
+    subnetwork_project = string
+    network_ip         = string
+    access_config = list(object({
+      nat_ip       = string
+      network_tier = string
+    }))
+    ipv6_access_config = list(object({
+      network_tier = string
+    }))
+  }))
+}
+
 ############
 # INSTANCE #
 ############
