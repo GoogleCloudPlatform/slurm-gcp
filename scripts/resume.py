@@ -127,11 +127,19 @@ def instance_properties(nodeset, model, placement_group, labels=None):
         ]
 
     if nodeset.reservation_name:
+        reservation_name = nodeset.reservation_name
+        reservation = lkp.reservation(reservation_name)
+
         props.reservationAffinity = {
             "consumeReservationType": "SPECIFIC_RESERVATION",
             "key": "compute.googleapis.com/reservation-name",
-            "values": [nodeset.reservation_name],
+            "values": [reservation_name],
         }
+
+        props.resourcePolicies = util.reservation_resource_policies(reservation)
+        log.info(
+            f"reservation {reservation_name} is being used with policies {props.resourcePolicies}"
+        )
 
     return props
 

@@ -309,6 +309,15 @@ def blob_list(prefix="", delimiter=None, project=None):
     return [blob for blob in blobs]
 
 
+def reservation_resource_policies(reservation):
+    """
+    Inspects reservation object, returns list of resource policies names.
+    Converts policy URLs to names, e.g.:
+    projects/111111/regions/us-central1/resourcePolicies/zebra -> zebra
+    """
+    return [u.split("/")[-1] for u in reservation.get("resourcePolicies", {}).values()]
+
+
 def compute_service(credentials=None, user_agent=USER_AGENT, version="v1"):
     """Make thread-safe compute service handle
     creates a new Http for each request
@@ -1678,6 +1687,30 @@ class Lookup:
         )
         info = ensure_execute(op)
         return NSDict(info)
+
+    @lru_cache()
+    def reservation(self, name):
+        """
+        See https://cloud.google.com/compute/docs/reference/rest/v1/reservations
+        """
+        resp = ensure_execute(
+            self.compute.reservations().aggregatedList(
+                project=self.project, filter=f"name={name}"
+            )
+        )
+
+        reservation = None
+        for _, e in resp["items"].items():
+            for r in e.get("reservations", []):
+                assert (
+                    reservation is None
+                ), f"multiple reservations '{name}' found in '{self.project}'."
+                reservation = r
+
+        assert (
+            reservation is not None
+        ), f"reservation '{name}' not found in '{self.project}'."
+        return reservation
 
     @lru_cache(maxsize=1)
     def machine_types(self, project=None):
