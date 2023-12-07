@@ -334,7 +334,7 @@ def sync_placement_groups():
     keep_jobs = {
         str(job["job_id"])
         for job in json.loads(run(f"{lkp.scontrol} show jobs --json").stdout)["jobs"]
-        if job["job_state"] in keep_states
+        if (len(job["job_state"]) == 1) and (job["job_state"][0] in keep_states)
     }
 
     fields = "items.regions.resourcePolicies,nextPageToken"

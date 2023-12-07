@@ -20,7 +20,7 @@ log = logging.getLogger()
 def test_job(cluster):
     job_id = sbatch(cluster, "sbatch -N3 --wrap='srun hostname'")
     job = wait_job_state(cluster, job_id, "COMPLETED", "FAILED", "CANCELLED")
-    assert job["job_state"] == "COMPLETED"
+    assert job["job_state"][0] == "COMPLETED"
 
 
 def test_openmpi(cluster):
@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     job_id = sbatch(cluster, "sbatch -N3 --wrap='srun hello'")
     job = wait_job_state(cluster, job_id, "COMPLETED", "FAILED", "CANCELLED")
     log.info(cluster.login_get_file(f"slurm-{job_id}.out"))
-    assert job["job_state"] == "COMPLETED"
+    assert job["job_state"][0] == "COMPLETED"
 
 
 def test_gpu_job(cluster, lkp):
@@ -71,7 +71,7 @@ def test_gpu_job(cluster, lkp):
             f"sbatch --partition={part_name} --gpus=1 --wrap='srun nvidia-smi'",
         )
         job = wait_job_state(cluster, job_id, "COMPLETED", "FAILED", "CANCELLED")
-        assert job["job_state"] == "COMPLETED"
+        assert job["job_state"][0] == "COMPLETED"
         log.info(cluster.login_exec_output(f"cat slurm-{job_id}.out"))
 
 
@@ -115,7 +115,7 @@ def test_shielded(image_marker, cluster: Cluster, lkp: Lookup):
                 f"sbatch --partition={part_name} --wrap='srun hostname'",
             )
         job = wait_job_state(cluster, job_id, "COMPLETED", "FAILED", "CANCELLED")
-        assert job["job_state"] == "COMPLETED"
+        assert job["job_state"][0] == "COMPLETED"
         log.info(cluster.login_exec_output(f"cat slurm-{job_id}.out"))
 
 
@@ -167,7 +167,7 @@ def test_placement_groups(cluster, lkp):
 #        jobs.append(job_id)
 #    for job_id in jobs:
 #        job = wait_job_state(cluster, job_id, "COMPLETED", "FAILED", "CANCELLED")
-#        assert job["job_state"] == "COMPLETED"
+#        assert job["job_state"][0] == "COMPLETED"
 
 
 def test_preemption(cluster: Cluster, lkp: Lookup):
