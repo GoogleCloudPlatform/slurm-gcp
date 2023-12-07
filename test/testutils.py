@@ -93,9 +93,9 @@ def wait_job_state(cluster, job_id, *states, max_wait=None):
     states_str = "{{ {} }}".format(", ".join(states))
 
     def is_job_state():
-        state = cluster.get_job(job_id)["job_state"]
-        log.info(f"job {job_id}: {state} waiting for {states_str}")
-        return state in states
+        state_arr = cluster.get_job(job_id)["job_state"]
+        log.info(f"job {job_id}: {state_arr} waiting for {states_str}")
+        return len(state_arr) == 1 and state_arr[0] in states
 
     assert wait_until(is_job_state, max_wait=max_wait)
     return cluster.get_job(job_id)
