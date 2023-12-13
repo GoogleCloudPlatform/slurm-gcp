@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-resource "google_cloudbuild_trigger" "pr_validation" {
-  name     = "PR-validation"
+resource "google_cloudbuild_trigger" "slurm_pr_validation" {
+  name     = "Slurm-PR-validation"
   filename = "test/cloud-build/pr-validation.yaml"
 
   github {
