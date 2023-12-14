@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[5.10.0\]
+
+- Upgrade slurm to 23.02.7
+- Fix slurmsync on reconfig when removing nodes.
+
 ## \[5.9.1\]
 
 - Use reservation placement policy if placement is enabled, and a reservation is
