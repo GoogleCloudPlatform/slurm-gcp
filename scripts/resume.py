@@ -68,21 +68,6 @@ def instance_properties(nodeset, model, placement_group, labels=None):
 
     props = NSDict()
 
-    props.networkInterfaces = [
-        {
-            "subnetwork": nodeset.subnetwork,
-        }
-    ]
-
-    if nodeset.enable_public_ip:
-        props.networkInterfaces[0]["accessConfigs"] = [
-            {
-                "type": "ONE_TO_ONE_NAT",
-                "name": "External NAT",
-                "networkTier": nodeset.network_tier or None,
-            }
-        ]
-
     slurm_metadata = {
         "slurm_cluster_name": cfg.slurm_cluster_name,
         "slurm_instance_role": "compute",

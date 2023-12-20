@@ -117,6 +117,7 @@ module "instance_template" {
   tags                        = var.tags
   total_egress_bandwidth_tier = local.total_egress_bandwidth_tier
   additional_networks         = var.additional_networks
+  access_config               = var.access_config
 
   # Instance
   machine_type             = var.machine_type
