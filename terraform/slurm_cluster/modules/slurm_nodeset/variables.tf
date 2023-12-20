@@ -146,6 +146,8 @@ variable "network_tier" {
   }
 }
 
+# TODO: either remove or make use of this variable
+# tflint-ignore: terraform_unused_declarations
 variable "bandwidth_tier" {
   description = <<-EOD
     Tier 1 bandwidth increases the maximum egress bandwidth for VMs.
