@@ -68,21 +68,6 @@ def instance_properties(nodeset, model, placement_group, labels=None):
 
     props = NSDict()
 
-    props.networkInterfaces = [
-        {
-            "subnetwork": nodeset.subnetwork,
-        }
-    ]
-
-    if nodeset.enable_public_ip:
-        props.networkInterfaces[0]["accessConfigs"] = [
-            {
-                "type": "ONE_TO_ONE_NAT",
-                "name": "External NAT",
-                "networkTier": nodeset.network_tier or None,
-            }
-        ]
-
     slurm_metadata = {
         "slurm_cluster_name": cfg.slurm_cluster_name,
         "slurm_instance_role": "compute",
@@ -127,11 +112,19 @@ def instance_properties(nodeset, model, placement_group, labels=None):
         ]
 
     if nodeset.reservation_name:
+        reservation_name = nodeset.reservation_name
+        reservation = lkp.reservation(reservation_name)
+
         props.reservationAffinity = {
             "consumeReservationType": "SPECIFIC_RESERVATION",
             "key": "compute.googleapis.com/reservation-name",
-            "values": [nodeset.reservation_name],
+            "values": [reservation_name],
         }
+
+        props.resourcePolicies = util.reservation_resource_policies(reservation)
+        log.info(
+            f"reservation {reservation_name} is being used with policies {props.resourcePolicies}"
+        )
 
     return props
 
