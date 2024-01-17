@@ -519,8 +519,7 @@ if __name__ == "__main__":
     with pid_file.open("w") as fp:
         try:
             fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            main()
         except IOError:
             if not args.force:
                 sys.exit(0)
-
-    main()
