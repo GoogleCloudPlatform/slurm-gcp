@@ -46,9 +46,9 @@ locals {
 }
 
 locals {
-  snetwork_valid = var.subnetwork != null
-  snetwork       = local.snetwork_valid ? data.google_compute_subnetwork.nodeset_subnetwork[0].name : null
-  region         = join("-", slice(split("-", var.zone), 0, 2))
+  snetwork_valid = var.subnetwork_self_link != null
+  snetwork       = local.snetwork_valid ? data.google_compute_subnetwork.nodeset_subnetwork[0].self_link : null
+  region         = length(regexall("/regions/([^/]*)", local.snetwork)) > 0 ? flatten(regexall("/regions/([^/]*)", local.snetwork))[0] : null
   tpu_fam        = var.accelerator_config.version != "" ? lower(var.accelerator_config.version) : split("-", var.node_type)[0]
   #If subnetwork is specified and it does not have private_ip_google_access, we need to have public IPs on the TPU
   #if no subnetwork is specified, the default one will be used, this does not have private_ip_google_access so we need public IPs too
@@ -64,7 +64,7 @@ locals {
     node_count_dynamic_max = var.node_count_dynamic_max
     node_count_static      = var.node_count_static
     enable_public_ip       = var.enable_public_ip
-    zone                   = var.zone
+    zones                  = var.zones
     service_account        = var.service_account != null ? var.service_account : local.service_account
     preserve_tpu           = local.can_preempt ? var.preserve_tpu : false
     data_disks             = var.data_disks
@@ -91,15 +91,9 @@ data "google_compute_default_service_account" "this" {
 data "google_compute_subnetwork" "nodeset_subnetwork" {
   count = local.snetwork_valid ? 1 : 0
 
-  project = var.project_id
-  region  = local.region
-  name    = var.subnetwork
-  self_link = (
-    length(regexall("/projects/([^/]*)", var.subnetwork)) > 0
-    && length(regexall("/regions/([^/]*)", var.subnetwork)) > 0
-    ? var.subnetwork
-    : null
-  )
+  project   = var.project_id
+  region    = local.region
+  self_link = local.snetwork
 }
 
 resource "null_resource" "nodeset_tpu" {
@@ -112,11 +106,11 @@ resource "null_resource" "nodeset_tpu" {
       error_message = "Sum of node_count_dynamic_max and node_count_static must be > 0."
     }
     precondition {
-      condition     = !(var.subnetwork == null && !var.enable_public_ip)
+      condition     = !(!local.snetwork_valid && !var.enable_public_ip)
       error_message = "Using the default subnetwork for the TPU nodeset requires enable_public_ip set to true."
     }
     precondition {
-      condition     = !(var.subnetwork != null && (local.pub_need && !var.enable_public_ip))
+      condition     = !(snetwork_valid && (local.pub_need && !var.enable_public_ip))
       error_message = "The subnetwork specified does not have Private Google Access enabled. This is required when enable_public_ip is set to false."
     }
     precondition {

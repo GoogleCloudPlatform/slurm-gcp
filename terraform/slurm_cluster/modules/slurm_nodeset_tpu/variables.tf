@@ -61,14 +61,14 @@ variable "tf_version" {
   type        = string
 }
 
-variable "zone" {
-  description = "Nodes will only be created in this zone. Check https://cloud.google.com/tpu/docs/regions-zones to get zones with TPU-vm in it."
-  type        = string
-
-  validation {
-    condition     = can(coalesce(var.zone))
-    error_message = "Zone cannot be null or empty."
-  }
+variable "zones" {
+  description = <<-EOD
+    Nodes will only be created in the listed zones.
+    If none are given, all available zones for the region will be allowed.
+    NOTE: Check https://cloud.google.com/tpu/docs/regions-zones for zones where TPUs are available.
+  EOD
+  type        = set(string)
+  default     = []
 }
 
 variable "preemptible" {
@@ -123,10 +123,14 @@ variable "network" {
   default     = ""
 }
 
-variable "subnetwork" {
-  description = "The name of the subnetwork to attach the TPU-vm of this nodeset to."
+variable "subnetwork_self_link" {
+  description = "The subnetwork self_link to attach instances to."
   type        = string
-  default     = null
+
+  validation {
+    condition     = length(regexall("projects/([^/]*)", var.subnetwork_self_link)) > 0 && length(regexall("/regions/([^/]*)", var.subnetwork_self_link)) > 0
+    error_message = "Must be a self link."
+  }
 }
 
 variable "service_account" {
