@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.3.1\]
+
+- Add reserved property for nodeset_tpu
+- update lustre repository url
+
+## \[6.3.0\]
+
+- Upgrade installed Slurm to 23.02.7
+- Fix deprecation warning in google_secret_manager_secret.
+- Fix TPU delete_node API return message.
+
 ## \[6.2.0\]
 
 - Reverse logic in valid_placement_nodes

@@ -1100,7 +1100,6 @@ class TPU:
             "create": State.READY,
             "start": State.READY,
             "stop": State.STOPPED,
-            "delete": State.TERMINATED,
         }
 
         __tpu_version_mapping = {
@@ -1159,6 +1158,10 @@ class TPU:
         return self._nodeset.preemptible
 
     @property
+    def reserved(self):
+        return self._nodeset.reserved
+
+    @property
     def service_account(self):
         return self._nodeset.service_account
 
@@ -1197,6 +1200,8 @@ class TPU:
         des_state = self.__expected_states.get(op_name)
         # If the state is not in the table just print the response
         if des_state is None:
+            return False
+        if response.__class__.__name__ != "Node":  # If the response is not a node fail
             return False
         if response.state == des_state:
             return True
@@ -1285,6 +1290,7 @@ class TPU:
             node.service_account.email = self.nodeset.service_account.email
             node.service_account.scope = self.nodeset.service_account.scopes
         node.scheduling_config.preemptible = self.preemptible
+        node.scheduling_config.reserved = self.reserved
         if self.nodeset.network:
             node.network_config.network = self.nodeset.network
         if self.nodeset.subnetwork:
@@ -1310,7 +1316,7 @@ class TPU:
         try:
             resp = self._client.delete_node(request=request).result()
             if resp:
-                return self.__check_resp(resp, "delete")
+                return self.get_node(nodename=nodename) is None
             return False
         except gExceptions.NotFound:
             # log only error if vmcount is 1 as for other tpu vm count, this could be "phantom" nodes
