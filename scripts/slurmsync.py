@@ -514,12 +514,14 @@ if __name__ == "__main__":
 
     sys.excepthook = util.handle_exception
 
-    # only run one instance at a time
-    pid_file = (Path("/tmp") / Path(__file__).name).with_suffix(".pid")
-    with pid_file.open("w") as fp:
-        try:
-            fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            main()
-        except IOError:
-            if not args.force:
+    # only run one instance at a time unless --force
+    if args.force:
+        main()
+    else:
+        pid_file = (Path("/tmp") / Path(__file__).name).with_suffix(".pid")
+        with pid_file.open("w") as fp:
+            try:
+                fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                main()
+            except BlockingIOError:
                 sys.exit(0)
