@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[5.10.2\]
+
+- Fix slurmsync error on removing powered up nodes.
+
 ## \[5.10.1\]
 
 - Add maintenance_interval

@@ -112,9 +112,9 @@ def find_node_status(nodename):
         find_node_status.static_nodeset = set(util.to_hostnames(lkp.static_nodelist()))
     state = lkp.slurm_node(nodename)
     inst = lkp.instance(nodename)
-    power_flags = state.flags & frozenset(
+    power_flags = frozenset(
         ("POWER_DOWN", "POWERING_UP", "POWERING_DOWN", "POWERED_DOWN")
-    )
+    ) & (state.flags if state is not None else set())
     if inst is None:
         if "POWERING_UP" in state.flags:
             return NodeStatus.unchanged
