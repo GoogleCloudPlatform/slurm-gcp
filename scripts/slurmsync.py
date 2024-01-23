@@ -192,9 +192,9 @@ def find_node_status(nodename):
     if lkp.node_is_tpu(nodename):
         return _find_tpu_node_status(nodename, state)
     inst = lkp.instance(nodename)
-    power_flags = state.flags & frozenset(
+    power_flags = frozenset(
         ("POWER_DOWN", "POWERING_UP", "POWERING_DOWN", "POWERED_DOWN")
-    )
+    ) & (state.flags if state is not None else set())
     if inst is None:
         if "POWERING_UP" in state.flags:
             return NodeStatus.unchanged
