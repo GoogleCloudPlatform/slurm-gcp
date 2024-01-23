@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.3.2\]
+
+- Fix slurmsync error on removing powered up nodes.
+
 ## \[6.3.1\]
 
 - Add reserved property for nodeset_tpu
