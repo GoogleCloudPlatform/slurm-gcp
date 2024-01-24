@@ -1,0 +1,8 @@
+<source>
+  @type tail
+  format /^(?<time>\S+ \S+) (?<message>(?<severity>(CRITICAL|ERROR|WARNING|INFO|DEBUG))(\(\S+\))?:.*)$/
+  path /var/log/slurm/resume.log,/var/log/slurm/suspend.log,/var/log/slurm/slurmsync.log,/slurm/scripts/setup.log
+  pos_file /var/lib/google-fluentd/pos/slurm_py_script.pos
+  read_from_head true
+  tag slurm
+</source>

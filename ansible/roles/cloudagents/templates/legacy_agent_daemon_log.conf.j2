@@ -1,0 +1,8 @@
+<source>
+  @type tail
+  format /^\[(?<time>\S+)\] (?<message>((?<severity>(fatal|error|verbose|debug[0-9]?)):)?.*)$/
+  path /var/log/slurm/slurmdbd.log,/var/log/slurm/slurmrestd.log,/var/log/slurm/slurmctld.log,/var/log/slurm/slurmd-*.log
+  pos_file /var/lib/google-fluentd/pos/slurm_daemon.pos
+  read_from_head true
+  tag slurm
+</source>
