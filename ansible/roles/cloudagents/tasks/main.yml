@@ -17,3 +17,16 @@
   template:
     src: ops_agent.yaml.j2
     dest: /etc/google-cloud-ops-agent/config.yaml
+  when: monitoring_agent == "cloud-ops"
+
+- name: Install 'stackdriver' Config For Slurm Daemon Logs
+  template:
+    src: legacy_agent_daemon_log.conf.j2
+    dest: /etc/google-fluentd/config.d/slurm_daemon.conf
+  when: monitoring_agent == "legacy"
+
+- name: Install 'stackdriver' Config For Slurm Python Script Logs
+  template:
+    src: legacy_agent_py_script_log.conf.j2
+    dest: /etc/google-fluentd/config.d/slurm_py_script.conf
+  when: monitoring_agent == "legacy"
