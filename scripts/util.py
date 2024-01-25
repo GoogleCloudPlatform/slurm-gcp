@@ -1540,7 +1540,7 @@ class Lookup:
 
         cmd = (
             f"{self.scontrol} show nodes | "
-            r"grep -oP '^NodeName=\K(\S+)|State=\K(\S+)' | "
+            r"grep -oP '^NodeName=\K(\S+)|\s+State=\K(\S+)' | "
             r"paste -sd',\n'"
         )
         node_lines = run(cmd, shell=True).stdout.rstrip().splitlines()
