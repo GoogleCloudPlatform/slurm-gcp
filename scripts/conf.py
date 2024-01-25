@@ -348,9 +348,9 @@ def install_slurmdbd_conf(lkp=lkp):
             "db_port": "3306",
         }
     )
-    if lkp.cfg.cloudsql:
+    if lkp.cfg.cloudsql_secret:
         secret_name = f"{cfg.slurm_cluster_name}-slurm-secret-cloudsql"
-        payload = json.loads(access_secret_version(util.project, secret_name))
+        payload = json.loads(access_secret_version(lkp.project, secret_name))
 
         if payload["db_name"] and payload["db_name"] != "":
             conf_options.db_name = payload["db_name"]
