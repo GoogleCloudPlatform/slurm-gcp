@@ -101,6 +101,12 @@ variable "metadata" {
   default     = {}
 }
 
+variable "labels" {
+  type        = map(string)
+  description = "Labels, provided as a map. Merged and takes precedence over labels on instance template"
+  default     = {}
+}
+
 #########
 # SLURM #
 #########
