@@ -38,3 +38,5 @@ slurmrestd_user:
   uid: 982
   group: slurmrestd
   gid: 982
+
+slurmd_override_path: /etc/systemd/system/slurmd.service.d/slurmd_restart.conf
