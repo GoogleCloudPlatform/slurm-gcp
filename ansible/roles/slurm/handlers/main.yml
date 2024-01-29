@@ -68,3 +68,8 @@
     enabled: no
     state: stopped
   when: handle_services
+
+- name: Reload SystemD configuration
+  systemd:
+    daemon_reload: true
+  when: handle_services
