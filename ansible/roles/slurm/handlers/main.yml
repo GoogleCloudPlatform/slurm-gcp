@@ -48,3 +48,7 @@
     name: slurm_load_bq.timer
     enabled: no
     state: stopped
+
+- name: Reload SystemD configuration
+  systemd:
+    daemon_reload: true
