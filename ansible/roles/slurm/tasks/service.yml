@@ -50,12 +50,12 @@
 
 - name: Create slurmd override directory
   file:
-    path: "{{ slurmd_override_path | dirname }}"
+    path: '{{ slurmd_override_path | dirname }}'
     state: directory
 
 - name: Slurmd should restart upon failure
   template:
     src: systemd/slurmd_restart_override.j2
-    dest: "{{ slurmd_override_path }}"
+    dest: '{{ slurmd_override_path }}'
     mode: 0o644
   notify: Reload SystemD configuration
