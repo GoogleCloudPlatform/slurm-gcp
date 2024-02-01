@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## \[5.10.2\]
 
 - Fix slurmsync error on removing powered up nodes.
+- Configure slurmd to restart upon-failure; this typically occurs when the
+  controller is temporarily down when slurmd starts
+- Install legacy stackdriver by default instead of ops agent for improved
+  performance
+- Fix timeouts for login node startup scripts
 
 ## \[5.10.1\]
 
