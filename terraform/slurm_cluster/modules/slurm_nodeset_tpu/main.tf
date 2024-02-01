@@ -46,13 +46,12 @@ locals {
 }
 
 locals {
-  snetwork_valid = var.subnetwork != null
-  snetwork       = local.snetwork_valid ? data.google_compute_subnetwork.nodeset_subnetwork[0].name : null
-  region         = join("-", slice(split("-", var.zone), 0, 2))
-  tpu_fam        = var.accelerator_config.version != "" ? lower(var.accelerator_config.version) : split("-", var.node_type)[0]
+  snetwork = data.google_compute_subnetwork.nodeset_subnetwork.name
+  region   = join("-", slice(split("-", var.zone), 0, 2))
+  tpu_fam  = var.accelerator_config.version != "" ? lower(var.accelerator_config.version) : split("-", var.node_type)[0]
   #If subnetwork is specified and it does not have private_ip_google_access, we need to have public IPs on the TPU
   #if no subnetwork is specified, the default one will be used, this does not have private_ip_google_access so we need public IPs too
-  pub_need    = local.snetwork_valid ? !data.google_compute_subnetwork.nodeset_subnetwork[0].private_ip_google_access : true
+  pub_need    = !data.google_compute_subnetwork.nodeset_subnetwork.private_ip_google_access
   can_preempt = var.node_type != null ? contains(local.simple_nodes, var.node_type) : false
   nodeset_tpu = {
     nodeset_name           = var.nodeset_name
@@ -70,7 +69,6 @@ locals {
     preserve_tpu           = local.can_preempt ? var.preserve_tpu : false
     data_disks             = var.data_disks
     docker_image           = var.docker_image != "" ? var.docker_image : "gcr.io/schedmd-slurm-public/tpu:slurm-gcp-6-2-tf-${var.tf_version}"
-    network                = var.network
     subnetwork             = local.snetwork
   }
 
@@ -90,11 +88,10 @@ data "google_compute_default_service_account" "this" {
 }
 
 data "google_compute_subnetwork" "nodeset_subnetwork" {
-  count = local.snetwork_valid ? 1 : 0
-
-  project = var.project_id
-  region  = local.region
   name    = var.subnetwork
+  region  = local.region
+  project = var.project_id
+
   self_link = (
     length(regexall("/projects/([^/]*)", var.subnetwork)) > 0
     && length(regexall("/regions/([^/]*)", var.subnetwork)) > 0
