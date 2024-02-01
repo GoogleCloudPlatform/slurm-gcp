@@ -262,3 +262,20 @@ resource "google_storage_bucket_object" "epilog_scripts" {
   name    = format("%s/slurm-epilog-script-%s", local.bucket_dir, each.key)
   content = each.value.content
 }
+
+
+locals {
+  checksum = md5(join("", flatten([
+    google_storage_bucket_object.config.md5hash,
+    [for f in google_storage_bucket_object.devel : f.md5hash],
+    google_storage_bucket_object.slurmdbd_conf_tpl.md5hash,
+    google_storage_bucket_object.slurm_conf_tpl.md5hash,
+    google_storage_bucket_object.cgroup_conf_tpl.md5hash,
+    google_storage_bucket_object.jobsubmit_lua_tpl.md5hash,
+    [for k, f in google_storage_bucket_object.controller_startup_scripts : f.md5hash],
+    [for k, f in google_storage_bucket_object.compute_startup_scripts : f.md5hash],
+    [for k, f in google_storage_bucket_object.login_startup_scripts : f.md5hash],
+    [for k, f in google_storage_bucket_object.prolog_scripts : f.md5hash],
+    [for k, f in google_storage_bucket_object.epilog_scripts : f.md5hash]
+  ])))
+}
