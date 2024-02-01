@@ -68,6 +68,7 @@ default:
       - scripts/Pipfile
       - scripts/requirements.txt
       - ansible/**/*
+      - third_party/ansible/**/*
       - packer/**/*
 
 # skip image build and test for all except a couple images on push
@@ -86,6 +87,7 @@ default:
       - scripts/Pipfile
       - scripts/requirements.txt
       - ansible/**/*
+      - third_party/ansible/**/*
       - packer/**/*
 
 build-hpc-centos-7:
