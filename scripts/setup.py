@@ -620,8 +620,9 @@ def run_custom_scripts():
                 timeout = lkp.cfg.get("controller_startup_scripts_timeout", 300)
             elif "/compute.d/" in str(script):
                 timeout = lkp.cfg.get("compute_startup_scripts_timeout", 300)
-            elif "/login.d/" in str(script) or \
-                 (suffix is not None and f"/login_{suffix}.d/" in str(script)):
+            elif "/login.d/" in str(script) or (
+                suffix is not None and f"/login_{suffix}.d/" in str(script)
+            ):
                 timeout = lkp.cfg.get("login_startup_scripts_timeout", 300)
             elif "/partition.d/" in str(script):
                 partition_name = lkp.node_partition_name()
