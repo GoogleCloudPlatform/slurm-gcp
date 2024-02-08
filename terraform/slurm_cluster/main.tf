@@ -207,6 +207,7 @@ module "slurm_nodeset" {
   node_conf                   = each.value.node_conf
   instance_template_self_link = module.slurm_nodeset_template[each.key].self_link
   reservation_name            = each.value.reservation_name
+  maintenance_interval        = each.value.maintenance_interval
   subnetwork_self_link        = data.google_compute_subnetwork.nodeset_subnetwork[each.key].self_link
   zones                       = each.value.zones
   zone_target_shape           = each.value.zone_target_shape
