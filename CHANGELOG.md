@@ -2,9 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.3.5\]
+
+- Change slurm version to 23.11.3
+- Update cuda to 12.3.2
+- Fix slurmsync error on removing powered up nodes.
+- Fix slurmrestd address in service file
+
+## \[6.3.4\]
+
+- slurmsync.py: fix concurrent invocation protection
+
+## \[6.3.3\]
+
+- Fix in tpu nodeset module to use Cloud HPC Toolkit vpc module
+- Configure slurmd to restart upon-failure
+
 ## \[6.3.2\]
 
-- Fix slurmsync error on removing powered up nodes.
+- Fix CloudSQL configuration
+- Properly capture slurm node status when reboot is issued
+- Install legacy stackdriver by default instead of ops agent for improved
+  performance
+- TPU - fix Add reserved property for nodeset_tpu
 
 ## \[6.3.1\]
 
