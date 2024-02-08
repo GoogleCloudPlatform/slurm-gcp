@@ -121,10 +121,25 @@ def instance_properties(nodeset, model, placement_group, labels=None):
             "values": [reservation_name],
         }
 
-        props.resourcePolicies = util.reservation_resource_policies(reservation)
-        log.info(
-            f"reservation {reservation_name} is being used with policies {props.resourcePolicies}"
-        )
+        policies = util.reservation_resource_policies(reservation)
+        if policies:
+            props.scheduling = {
+                "onHostMaintenance": "TERMINATE",
+                "automaticRestart": False,
+            }
+            props.resourcePolicies = policies
+            log.info(
+                f"reservation {reservation_name} is being used with policies {props.resourcePolicies}"
+            )
+        else:
+            props.resourcePolicies = []
+            log.info(
+                f"reservation {reservation_name} is being used without any policies"
+            )
+
+    if nodeset.maintenance_interval:
+        props.scheduling = props.scheduling or {}
+        props.scheduling["maintenanceInterval"] = nodeset.maintenance_interval
 
     return props
 
