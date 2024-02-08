@@ -399,7 +399,7 @@ EOD
           on_host_maintenance      = null
           preemptible              = false
           reservation_name         = null
-          maintenance_interval     = null
+          maintenance_interval     = ""
           service_account          = null
           shielded_instance_config = null
           spot_instance_config     = null
