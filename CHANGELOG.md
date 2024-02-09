@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[5.10.3\]
+
+- Fix protection against multiple invocations of slurmsync
+- Remove unintended installation of apache2/httpd packages
+- Adopt empty string as default value for maintenance_interval
+
 ## \[5.10.2\]
 
 - Fix slurmsync error on removing powered up nodes.
