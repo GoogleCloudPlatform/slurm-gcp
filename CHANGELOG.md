@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.4.0\]
+
+- enable explicit setting of maintenance_interval to nodesets
+- Fix solution for installing Lustre drivers in Rocky Linux 8
+
 ## \[6.3.5\]
 
 - Change slurm version to 23.11.3
