@@ -23,6 +23,7 @@
     - kernel-tools
     - kernel-tools-libs
     #- kernel-tools-libs-devel
+    - '{{ ansible_distribution | lower }}-release'
     state: latest
     update_cache: yes
 
