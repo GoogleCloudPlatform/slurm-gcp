@@ -26,15 +26,6 @@ repos:
     additional_dependencies:
     - mdformat-toc
     - mdformat-tables
-- repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
-  rev: 0.2.3
-  hooks:
-  - id: yamlfmt
-    args:
-    - --mapping=2
-    - --sequence=2
-    - --offset=0
-    - --width=80
 - repo: local
   hooks:
   - id: packer_fmt
