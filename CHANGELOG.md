@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[5.10.4\]
+
+- Fix solution for installing Lustre drivers in Rocky Linux 8
+
 ## \[5.10.3\]
 
 - Fix protection against multiple invocations of slurmsync
