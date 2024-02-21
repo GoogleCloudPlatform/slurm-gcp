@@ -91,9 +91,6 @@ def conflines(cloud_parameters, lkp=lkp):
             "salloc_wait_nodes",
             "ignore_prefer_validation",
         ],
-        "CommunicationParameters": [
-            "NoAddrCache",
-        ],
         "GresTypes": [
             "gpu" if any_gpus else None,
         ],
