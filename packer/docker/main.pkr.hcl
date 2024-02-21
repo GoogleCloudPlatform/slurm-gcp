@@ -34,9 +34,9 @@ locals {
   version           = join("-", compact([local.parse_version["major"], local.parse_version["minor"]]))
   docker_version    = "${replace(var.docker_image, ":", "-")}"
   docker_tf_version = "tf-${var.tf_version}"
-  gcr_repo          = "${var.project_id}/tpu"
-  base_tag          = "slurm-gcp-${local.version}-${local.docker_version}"
-  gcr_tf_tag        = "slurm-gcp-${local.version}-${local.docker_tf_version}"
+  gcr_repo          = "${var.project_id}/${var.repo}/slurm-gcp-${local.version}"
+  base_tag          = "${local.docker_version}"
+  gcr_tf_tag        = "${local.docker_tf_version}"
 }
 
 ##########
@@ -110,7 +110,7 @@ build {
   }
   post-processors {
     post-processor "docker-tag" {
-      repository = "gcr.io/${local.gcr_repo}"
+      repository = "us-docker.pkg.dev/${local.gcr_repo}"
       tags       = [local.gcr_tf_tag]
     }
     post-processor "manifest" {

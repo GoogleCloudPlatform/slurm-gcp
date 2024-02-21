@@ -26,3 +26,9 @@ variable "docker_image" {
   type        = string
   default     = "ubuntu:20.04"
 }
+
+variable "repo" {
+  description = "The docker repository the images should go to."
+  type        = string
+  default     = "tpu-test"
+}

@@ -114,7 +114,7 @@ parser.add_argument(
     "--gcp_version",
     "-g",
     dest="slurmgcp_version",
-    default="6.3",
+    default="6.4",
     help="The slurm_gcp version to use for the image.",
 )
 parser.add_argument(
