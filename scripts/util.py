@@ -318,7 +318,7 @@ def reservation_resource_policies(reservation):
     return [u.split("/")[-1] for u in reservation.get("resourcePolicies", {}).values()]
 
 
-def compute_service(credentials=None, user_agent=USER_AGENT, version="v1"):
+def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
     """Make thread-safe compute service handle
     creates a new Http for each request
     """
