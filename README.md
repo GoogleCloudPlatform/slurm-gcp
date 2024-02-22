@@ -1,5 +1,15 @@
 # Slurm on Google Cloud Platform
 
+______________________________________________________________________
+
+> \[!CAUTION\] Terraform modules in this repo are not meant to be used directly.
+>
+> Instead,
+> [Google HPC-Toolkit](https://github.com/GoogleCloudPlatform/hpc-toolkit) is
+> the recommended way to use Slurm in GCP.
+
+______________________________________________________________________
+
 #### NOTICE
 
 ##### 5.7.3
