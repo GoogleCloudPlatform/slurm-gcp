@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.4.1\]
+
+- Fix regression in slurmsync that would cause inadvertent deletion of compact
+  placement policies right before they are used
+- Remove configuration settings that are no longer valid in Slurm 23.11
+  - CommunicationParameters: NoAddrCache
+  - CgroupAutomount
+- Use beta API for Google Compute Engine due to usage of maintenanceInterval
+  setting on VMs
+
 ## \[6.4.0\]
 
 - enable explicit setting of maintenance_interval to nodesets
