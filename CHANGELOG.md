@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.4.2\]
+
+- Fix slurmsync.py would try to delete static placement policy as it is not
+  associated with a job. This delete would fail as nodes were using the
+  placement policy, but it would cause spurious failure error messages in logs.
+
 ## \[6.4.1\]
 
 - Fix regression in slurmsync that would cause inadvertent deletion of compact
