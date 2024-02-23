@@ -336,6 +336,7 @@ def sync_placement_groups():
         for job in json.loads(run(f"{lkp.scontrol} show jobs --json").stdout)["jobs"]
         if "job_state" in job and set(job["job_state"]) & keep_states
     }
+    keep_jobs.add("0")  # Job 0 is a placeholder for static node placement
 
     fields = "items.regions.resourcePolicies,nextPageToken"
     flt = f"name={lkp.cfg.slurm_cluster_name}-*"
