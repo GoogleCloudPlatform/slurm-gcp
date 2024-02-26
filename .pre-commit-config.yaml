@@ -16,16 +16,23 @@ repos:
   - id: end-of-file-fixer
   - id: trailing-whitespace
   - id: detect-private-key
-- repo: https://github.com/executablebooks/mdformat
-  rev: 0.7.17
+- repo: https://github.com/jackdewinter/pymarkdown
+  rev: v0.9.17
   hooks:
-  - id: mdformat
-    args:
-    - --wrap=80
-    exclude: README_TF\.md
-    additional_dependencies:
-    - mdformat-toc
-    - mdformat-tables
+  - id: pymarkdown
+    # Rules at https://github.com/jackdewinter/pymarkdown/tree/main/docs/rules
+    # MD013 - Line length
+    # MD022 - Headers should be surrounded by blank lines
+    # MD033 - Inline HTML
+    # MD034 - Bare URL used
+    # MD041 - First line in file should be a top level header
+    # MD046 - Code block style
+    # MD024 - Multiple headings cannot contain the same content.
+    args: [--disable-rules, 'MD013,MD022,MD033,MD034,MD041,MD046,MD024', scan]
+    # this is a temporary hack to disable pymarkdown until all files are brought
+    # in line with its expectations
+    exclude_types:
+    - markdown
 - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
   rev: 0.2.3
   hooks:
