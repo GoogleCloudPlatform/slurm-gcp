@@ -1,24 +1,20 @@
 # Slurm on Google Cloud Platform
 
-______________________________________________________________________
+## Guidance on usage
 
-> \[!CAUTION\] Terraform modules in this repo are not meant to be used directly.
->
-> Instead,
-> [Google HPC-Toolkit](https://github.com/GoogleCloudPlatform/hpc-toolkit) is
-> the recommended way to use Slurm in GCP.
+> [!CAUTION]
+> Terraform modules in this repo are not meant to be used directly. Instead,
+> [Cloud HPC Toolkit](https://github.com/GoogleCloudPlatform/hpc-toolkit) is the
+> recommended way to use Slurm in GCP.
 
-______________________________________________________________________
+## Notices
 
-#### NOTICE
-
-##### 5.7.3
-
-The naming scheme for SchedMD published images has changed with release 5.7.3.
-This is to ensure no incompatibilities between the terraform modules and old
-images that could be in the same family as a newer release. From now on, the
-image family includes the slurm-gcp major and minor version instead of the slurm
-version.
+> [!IMPORTANT]
+> The naming scheme for SchedMD published images has changed with release 5.7.3.
+> This is to ensure no incompatibilities between the terraform modules and old
+> images that could be in the same family as a newer release. From now on, the
+> image family includes the slurm-gcp major and minor version instead of the
+> slurm version.
 
 See [Images doc](./docs/images.md#published-image-family) for the latest
 published images.
