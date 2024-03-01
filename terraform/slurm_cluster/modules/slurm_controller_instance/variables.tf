@@ -282,6 +282,15 @@ EOD
   default = []
 }
 
+variable "enable_external_prolog_epilog" {
+  description = <<EOD
+Automatically enable a script that will execute prolog and epilog scripts
+shared under /opt/apps from the controller to compute nodes.
+EOD
+  type        = bool
+  default     = false
+}
+
 variable "disable_default_mounts" {
   description = <<-EOD
     Disable default global network storage from the controller
