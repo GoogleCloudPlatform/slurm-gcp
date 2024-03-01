@@ -116,6 +116,41 @@ data "local_file" "cgroup_conf_tpl" {
   filename = local.cgroup_conf_tpl
 }
 
+###############################
+# DATA: PROLOG/EPILOG SCRIPTS #
+###############################
+
+data "local_file" "external_epilog" {
+  filename = "${path.module}/files/external_epilog.sh"
+}
+
+data "local_file" "external_prolog" {
+  filename = "${path.module}/files/external_prolog.sh"
+}
+
+data "local_file" "setup_external" {
+  filename = "${path.module}/files/setup_external.sh"
+}
+
+locals {
+  external_epilog = [{
+    filename = "z_external_epilog.sh"
+    content  = data.local_file.external_epilog.content
+  }]
+  external_prolog = [{
+    filename = "z_external_prolog.sh"
+    content  = data.local_file.external_prolog.content
+  }]
+  setup_external = [{
+    filename = "z_setup_external.sh"
+    content  = data.local_file.setup_external.content
+  }]
+
+  controller_startup_scripts = var.enable_external_prolog_epilog ? concat(local.setup_external, var.controller_startup_scripts) : var.controller_startup_scripts
+  epilog_scripts             = var.enable_external_prolog_epilog ? concat(local.external_epilog, var.epilog_scripts) : var.epilog_scripts
+  prolog_scripts             = var.enable_external_prolog_epilog ? concat(local.external_prolog, var.prolog_scripts) : var.prolog_scripts
+}
+
 ##################
 # DATA: TEMPLATE #
 ##################
@@ -264,7 +299,7 @@ resource "google_compute_project_metadata_item" "controller_startup_scripts" {
   project = var.project_id
 
   for_each = {
-    for x in var.controller_startup_scripts
+    for x in local.controller_startup_scripts
     : replace(basename(x.filename), "/[^a-zA-Z0-9-_]/", "_") => x
   }
 
@@ -300,7 +335,7 @@ resource "google_compute_project_metadata_item" "prolog_scripts" {
   project = var.project_id
 
   for_each = {
-    for x in var.prolog_scripts
+    for x in local.prolog_scripts
     : replace(basename(x.filename), "/[^a-zA-Z0-9-_]/", "_") => x
   }
 
@@ -318,7 +353,7 @@ resource "google_compute_project_metadata_item" "epilog_scripts" {
   project = var.project_id
 
   for_each = {
-    for x in var.epilog_scripts
+    for x in local.epilog_scripts
     : replace(basename(x.filename), "/[^a-zA-Z0-9-_]/", "_") => x
   }
 
@@ -509,12 +544,12 @@ module "reconfigure_critical" {
       => sha256(x.content)
     },
     {
-      for x in var.prolog_scripts
+      for x in local.prolog_scripts
       : "prolog_d_${replace(basename(x.filename), "/[^a-zA-Z0-9-_]/", "_")}"
       => sha256(x.content)
     },
     {
-      for x in var.epilog_scripts
+      for x in local.epilog_scripts
       : "epilog_d_${replace(basename(x.filename), "/[^a-zA-Z0-9-_]/", "_")}"
       => sha256(x.content)
     },
