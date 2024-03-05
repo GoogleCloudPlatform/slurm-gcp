@@ -285,7 +285,8 @@ EOD
 variable "enable_external_prolog_epilog" {
   description = <<EOD
 Automatically enable a script that will execute prolog and epilog scripts
-shared under /opt/apps from the controller to compute nodes.
+shared by NFS from the controller to compute nodes. Find more details at:
+https://github.com/GoogleCloudPlatform/slurm-gcp/blob/v5/tools/prologs-epilogs/README.md
 EOD
   type        = bool
   default     = false
