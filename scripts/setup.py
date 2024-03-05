@@ -24,7 +24,6 @@ import subprocess
 import sys
 import stat
 import time
-import socket
 from collections import defaultdict
 from concurrent.futures import as_completed
 from functools import partialmethod, lru_cache
@@ -712,7 +711,7 @@ def partition_mounts(mounts):
     def internal_mount(mount):
         # NOTE: Valid Lustre server_ip can take the form of '<IP>@tcp'
         server_ip = mount.server_ip.split("@")[0]
-        mount_addr = socket.gethostbyname(server_ip)
+        mount_addr = util.host_lookup(server_ip)
         return mount_addr == lkp.control_host_addr
 
     return separate(internal_mount, mounts)
