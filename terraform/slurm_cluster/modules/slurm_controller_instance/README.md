@@ -38,6 +38,9 @@ The controller instance run [slurmctld](../../../../docs/glossary.md#slurmctld),
 See [examples](../../examples/slurm_controller_instance/) directory for sample
 usages.
 
+For further details on the [enable_external_prolog_epilog][eepe] feature, please
+visit [prologs-epilogs](../../../../tools/prologs-epilogs/README.md).
+
 See below for a simple inclusion within your own terraform project.
 
 ```hcl
@@ -66,3 +69,5 @@ module "slurm_controller_instance" {
 
 For the terraform module API reference, please see
 [README_TF.md](./README_TF.md).
+
+[eepe]: README_TF.md#input_enable_external_prolog_epilog
