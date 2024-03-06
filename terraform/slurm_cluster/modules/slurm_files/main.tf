@@ -230,6 +230,20 @@ resource "google_storage_bucket_object" "compute_startup_scripts" {
   content = each.value.content
 }
 
+resource "google_storage_bucket_object" "nodeset_startup_scripts" {
+  for_each = { for x in flatten([
+    for nodeset, scripts in var.nodeset_startup_scripts
+    : [for s in scripts
+      : {
+        content = s.content,
+      name = format("slurm-nodeset-%s-script-%s", nodeset, replace(basename(s.filename), "/[^a-zA-Z0-9-_]/", "_")) }
+  ]]) : x.name => x.content }
+
+  bucket  = var.bucket_name
+  name    = format("%s/%s", local.bucket_dir, each.key)
+  content = each.value
+}
+
 resource "google_storage_bucket_object" "login_startup_scripts" {
   for_each = {
     for x in var.login_startup_scripts
@@ -274,6 +288,7 @@ locals {
     google_storage_bucket_object.jobsubmit_lua_tpl.md5hash,
     [for k, f in google_storage_bucket_object.controller_startup_scripts : f.md5hash],
     [for k, f in google_storage_bucket_object.compute_startup_scripts : f.md5hash],
+    [for k, f in google_storage_bucket_object.nodeset_startup_scripts : f.md5hash],
     [for k, f in google_storage_bucket_object.login_startup_scripts : f.md5hash],
     [for k, f in google_storage_bucket_object.prolog_scripts : f.md5hash],
     [for k, f in google_storage_bucket_object.epilog_scripts : f.md5hash]

@@ -137,15 +137,15 @@ def failed_motd():
     util.run(f"wall -n '{wall_msg}'", timeout=30)
 
 
-def install_custom_scripts(clean=False):
+def install_custom_scripts():
     """download custom scripts from gcs bucket"""
 
     compute_tokens = ["compute", "prolog", "epilog"]
     if lkp.instance_role == "compute":
         try:
-            compute_tokens.append(f"partition-{lkp.node_partition_name()}")
+            compute_tokens.append(f"nodeset-{lkp.node_nodeset_name()}")
         except Exception as e:
-            log.error(f"Failed to lookup node partition: {e}")
+            log.error(f"Failed to lookup nodeset: {e}")
 
     prefix_tokens = dict.get(
         {
@@ -158,12 +158,6 @@ def install_custom_scripts(clean=False):
     )
     prefixes = [f"slurm-{tok}-script" for tok in prefix_tokens]
     blobs = list(chain.from_iterable(blob_list(prefix=p) for p in prefixes))
-
-    if clean:
-        path = Path(dirs.custom_scripts)
-        if path.exists() and path.is_dir():
-            # rm -rf custom_scripts
-            shutil.rmtree(path)
 
     script_pattern = re.compile(r"slurm-(?P<path>\S+)-script-(?P<name>\S+)")
     for blob in blobs:
@@ -194,8 +188,8 @@ def run_custom_scripts():
         # controller has all scripts, but only runs controller.d
         custom_dirs = [custom_dir / "controller.d"]
     elif lkp.instance_role == "compute":
-        # compute setup with compute.d and partition.d
-        custom_dirs = [custom_dir / "compute.d", custom_dir / "partition.d"]
+        # compute setup with compute.d and nodeset.d
+        custom_dirs = [custom_dir / "compute.d", custom_dir / "nodeset.d"]
     elif lkp.instance_role == "login":
         # login setup with only login.d
         custom_dirs = [custom_dir / "login.d"]
@@ -215,7 +209,7 @@ def run_custom_scripts():
         for script in custom_scripts:
             if "/controller.d/" in str(script):
                 timeout = lkp.cfg.get("controller_startup_scripts_timeout", 300)
-            elif "/compute.d/" in str(script):
+            elif "/compute.d/" in str(script) or "/nodeset.d/" in str(script):
                 timeout = lkp.cfg.get("compute_startup_scripts_timeout", 300)
             elif "/login.d/" in str(script):
                 timeout = lkp.cfg.get("login_startup_scripts_timeout", 300)
