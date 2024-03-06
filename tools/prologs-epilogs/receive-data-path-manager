@@ -1,0 +1,73 @@
+#!/bin/bash
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# do not invoke RxDM on non-A3 machines
+/usr/bin/curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/machine-type | grep -q "/a3-highgpu-8g$"
+IS_A3=$?
+if [[ "${IS_A3}" -ne 0 ]]; then
+	exit 0
+fi
+
+# do not invoke RxDM on 1-node jobs
+if [[ "${SLURM_JOB_NUM_NODES}" -eq 1 ]]; then
+	exit 0
+fi
+
+# path at which RxDM sockets will be created
+UDS_PATH="/run/tcpx-${SLURM_JOB_ID}"
+
+RXDM_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/tcpgpudmarxd-dev:v2.0.9
+if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
+	# Install the TCPX NCCL Plugin
+	docker run --rm -v /var/lib:/var/lib \
+		us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/nccl-plugin-gpudirecttcpx-dev:v3.1.7 install
+
+	# Start TCPX receive-datapath-manager
+	GPU_NIC_TOPOLOGY=/opt/tcpdirect_benchmark/gpu_rxq_configuration.textproto
+	GPU_NIC_TOPOLOGY_DIR=$(dirname ${GPU_NIC_TOPOLOGY})
+	if [ ! -f "${GPU_NIC_TOPOLOGY}" ]; then
+		echo "GPU_NIC_TOPOLOGY file ${GPU_NIC_TOPOLOGY} must exist!"
+		exit 1
+	fi
+
+	docker run \
+		--pull=always \
+		--detach \
+		--rm \
+		--name receive-datapath-manager-"${SLURM_JOB_ID}" \
+		--cap-add=NET_ADMIN \
+		--network=host \
+		--privileged \
+		--gpus all \
+		--volume /var/lib/nvidia/lib64:/usr/local/nvidia/lib64 \
+		--volume "${GPU_NIC_TOPOLOGY_DIR}":"${GPU_NIC_TOPOLOGY_DIR}" \
+		--volume "${UDS_PATH}":"${UDS_PATH}" \
+		--env LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/run/tcpx:/usr/lib/lib32:/usr/lib/x86_64-linux-gnu/ \
+		--entrypoint /tcpgpudmarxd/build/app/tcpgpudmarxd \
+		${RXDM_IMAGE} \
+		--gpu_nic_preset manual \
+		--gpu_nic_topology ${GPU_NIC_TOPOLOGY} \
+		--gpu_shmem_type fd \
+		--uds_path "${UDS_PATH}"
+
+	# Give some time for tcpgpudmarxd to come up
+	sleep 10s
+
+elif [[ ${SLURM_SCRIPT_CONTEXT} == "epilog_slurmd" ]]; then
+	# Shut down rxdm container
+	docker container list --filter "name=receive-datapath-manager-${SLURM_JOB_ID}" --quiet | xargs --no-run-if-empty docker container stop
+	docker container prune --force
+	rm -rf "${UDS_PATH}"
+fi
