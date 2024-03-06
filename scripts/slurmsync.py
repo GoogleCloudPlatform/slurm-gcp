@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import argparse
+import datetime
 import fcntl
 import logging
 import re
@@ -144,12 +145,38 @@ def find_node_status(nodename):
         if not state.base.startswith("DOWN"):
             return NodeStatus.terminated
     elif (state is None or "POWERED_DOWN" in state.flags) and inst.status == "RUNNING":
+        log.info("%s is potential orphan node", nodename)
+        log.info("%s state: %s", nodename, state)
+        age_threshold_seconds = 90
+        inst_seconds_old = _seconds_since_timestamp(inst.creationTimestamp)
+        if inst_seconds_old < age_threshold_seconds:
+            log.info(
+                "%s not marked as orphan, it started less than %ds ago (%0.1fs)",
+                nodename,
+                age_threshold_seconds,
+                inst_seconds_old,
+            )
+            return NodeStatus.unchanged
         return NodeStatus.orphan
     elif state is None:
         # if state is None here, the instance exists but it's not in Slurm
         return NodeStatus.unknown
 
     return NodeStatus.unchanged
+
+
+def _seconds_since_timestamp(timestamp):
+    """Returns duration in seconds since a timestamp
+
+    Args:
+        timestamp: A formatted timestamp string (%Y-%m-%dT%H:%M:%S.%f%z)
+    Returns:
+        number of seconds that have past since the timestamp (float)
+    """
+    if timestamp[-3] == ":":  # python 36 datetime does not support the colon
+        timestamp = timestamp[:-3] + timestamp[-2:]
+    creation_dt = datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%f%z")
+    return datetime.datetime.now().timestamp() - creation_dt.timestamp()
 
 
 def do_node_update(status, nodes):
