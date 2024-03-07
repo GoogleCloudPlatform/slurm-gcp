@@ -34,7 +34,7 @@ import tempfile
 from collections import defaultdict, namedtuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
-from functools import lru_cache, reduce, partialmethod
+from functools import lru_cache, reduce, partialmethod, wraps
 from itertools import chain, compress, islice
 from pathlib import Path
 from time import sleep, time
@@ -615,6 +615,44 @@ def cached_property(f):
     return property(lru_cache()(f))
 
 
+def retry(max_retries: int, init_wait_time: float, warn_msg: str, exc_type: Exception):
+    """Retries functions that raises the exception exc_type.
+    Retry time is increased by a factor of two for every iteration.
+
+    Args:
+        max_retries (int): Maximum number of retries
+        init_wait_time (float): Initial wait time in secs
+        warn_msg (str): Message to print during retries
+        exc_type (Exception): Exception type to check for
+    """
+
+    if max_retries <= 0:
+        raise ValueError("Incorrect value for max_retries, must be >= 1")
+    if init_wait_time <= 0.0:
+        raise ValueError("Invalid value for init_wait_time, must be > 0.0")
+
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            retry = 0
+            secs = init_wait_time
+            captured_exc = None
+            while retry < max_retries:
+                try:
+                    return f(*args, **kwargs)
+                except exc_type as e:
+                    captured_exc = e
+                    log.warn(f"{warn_msg}, retrying in {secs}")
+                    sleep(secs)
+                    retry += 1
+                    secs *= 2
+            raise captured_exc
+
+        return wrapper
+
+    return decorator
+
+
 def separate(pred, coll):
     """filter into 2 lists based on pred returning True or False
     returns ([False], [True])
@@ -1073,6 +1111,16 @@ def getThreadsPerCore(template):
         return 2
 
 
+@retry(
+    max_retries=9,
+    init_wait_time=1,
+    warn_msg="Temporary failure in name resolution",
+    exc_type=socket.gaierror,
+)
+def host_lookup(host_name: str) -> str:
+    return socket.gethostbyname(host_name)
+
+
 class Dumper(yaml.SafeDumper):
     """Add representers for pathlib.Path and NSDict for yaml serialization"""
 
@@ -1372,7 +1420,7 @@ class Lookup:
 
     @cached_property
     def control_host_addr(self):
-        return socket.gethostbyname(self.cfg.slurm_control_host)
+        return host_lookup(self.cfg.slurm_control_host)
 
     @property
     def control_host_port(self):
