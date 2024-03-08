@@ -1034,6 +1034,7 @@ def machine_type_sockets(template):
         {
             "h3": 2,
             "c2d": 2 if guestCpus > 56 else 1,
+            "a3": 2,
         },
         family,
         1,  # assume 1 socket for all other families
