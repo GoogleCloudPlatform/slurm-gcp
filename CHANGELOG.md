@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[5.10.6\]
+
+- Automatically set correct socket count for new A3 VM family
+
+## \[5.10.5\]
+
+- Add PMIx support by default in new Slurm images
+- Retry DNS lookups at startup in case of transient DNS issues
+- Hold back marking a node as orphan if it was created in the last 90s
+- Add support ofr external prolog/epilog scripts to be manually staged by user
+- Add sample epilog / prolog scripts
+
 ## \[5.10.4\]
 
 - Fix solution for installing Lustre drivers in Rocky Linux 8
