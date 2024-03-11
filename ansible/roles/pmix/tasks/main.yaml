@@ -1,0 +1,27 @@
+---
+
+- name: Include OS Family Dependent Vars
+  ansible.builtin.include_vars: '{{ item }}'
+  with_first_found:
+  - '{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml'
+  - '{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml'
+  - '{{ ansible_distribution|lower }}.yml'
+  - '{{ ansible_os_family|lower }}-{{ ansible_distribution_version }}.yml'
+  - '{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml'
+  - '{{ ansible_os_family|lower }}.yml'
+
+- name: Wait for DPKG Locks
+  ansible.builtin.shell: >
+    while fuser /var/lib/dpkg/{{ item }} >/dev/null 2>&1; do
+      sleep 5
+    done
+  with_items:
+  - lock
+  - lock-frontend
+  when:
+  - ansible_os_family == 'Debian'
+
+- name: Install PMIx libraries and headers
+  ansible.builtin.package:
+    name: '{{ pmix_packages }}'
+    state: present

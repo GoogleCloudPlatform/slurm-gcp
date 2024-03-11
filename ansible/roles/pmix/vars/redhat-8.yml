@@ -1,0 +1,4 @@
+---
+
+pmix_packages:
+- pmix-devel
