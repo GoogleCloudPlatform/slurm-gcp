@@ -345,6 +345,7 @@ nodeset_tpu = [
     # Options
     preemptible  = true
     preserve_tpu = true
+    reserved     = false
   },
 ]
 

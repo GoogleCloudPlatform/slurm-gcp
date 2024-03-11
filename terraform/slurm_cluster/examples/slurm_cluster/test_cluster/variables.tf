@@ -431,6 +431,7 @@ variable "nodeset_tpu" {
     tf_version   = string
     preemptible  = optional(bool, false)
     preserve_tpu = optional(bool, true)
+    reserved     = optional(bool, false)
     zone         = string
     data_disks   = optional(list(string), [])
     docker_image = optional(string, "")
