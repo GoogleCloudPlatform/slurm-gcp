@@ -46,6 +46,7 @@ locals {
       zone                   = var.zone
       preemptible            = true
       preserve_tpu           = true
+      reserved               = false
       enable_public_ip       = true
       node_count_dynamic_max = 20
       node_count_static      = 0
