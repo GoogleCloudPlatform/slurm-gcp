@@ -1,14 +1,22 @@
 ---
 
+- name: Check PMIx OS Compatibility
+  assert:
+    that: not ( install_pmix and ansible_distribution == "CentOS" and ansible_distribution_major_version|int
+      <= 7 )
+    msg: PMIx is not available on CentOS 7
+
 - name: Include OS Family Dependent Vars
   ansible.builtin.include_vars: '{{ item }}'
   with_first_found:
-  - '{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml'
-  - '{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml'
-  - '{{ ansible_distribution|lower }}.yml'
-  - '{{ ansible_os_family|lower }}-{{ ansible_distribution_version }}.yml'
-  - '{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml'
-  - '{{ ansible_os_family|lower }}.yml'
+  - files:
+    - '{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml'
+    - '{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml'
+    - '{{ ansible_distribution|lower }}.yml'
+    - '{{ ansible_os_family|lower }}-{{ ansible_distribution_version }}.yml'
+    - '{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml'
+    - '{{ ansible_os_family|lower }}.yml'
+    skip: true
 
 - name: Wait for DPKG Locks
   ansible.builtin.shell: >

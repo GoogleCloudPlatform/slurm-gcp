@@ -78,7 +78,8 @@
     - install_cuda
     - ansible_architecture == "x86_64"
   - role: pmix
-    when: install_pmix
+    when:
+    - install_pmix
   - nfs
   - cgroups
   - munge
