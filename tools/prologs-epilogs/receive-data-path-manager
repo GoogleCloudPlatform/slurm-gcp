@@ -28,11 +28,11 @@ fi
 # path at which RxDM sockets will be created
 UDS_PATH="/run/tcpx-${SLURM_JOB_ID}"
 
-RXDM_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/tcpgpudmarxd-dev:v2.0.9
+RXDM_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/tcpgpudmarxd-dev:v2.0.12
 if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 	# Install the TCPX NCCL Plugin
 	docker run --rm -v /var/lib:/var/lib \
-		us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/nccl-plugin-gpudirecttcpx-dev:v3.1.7 install
+		us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/nccl-plugin-gpudirecttcpx-dev:v3.1.8 install
 
 	# Start TCPX receive-datapath-manager
 	GPU_NIC_TOPOLOGY=/opt/tcpdirect_benchmark/gpu_rxq_configuration.textproto
@@ -56,6 +56,7 @@ if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 		--volume "${UDS_PATH}":"${UDS_PATH}" \
 		--env LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/run/tcpx:/usr/lib/lib32:/usr/lib/x86_64-linux-gnu/ \
 		--entrypoint /tcpgpudmarxd/build/app/tcpgpudmarxd \
+		--ulimit memlock=-1 \
 		${RXDM_IMAGE} \
 		--gpu_nic_preset manual \
 		--gpu_nic_topology ${GPU_NIC_TOPOLOGY} \
