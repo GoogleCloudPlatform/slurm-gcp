@@ -8,6 +8,8 @@ A typical approach is to stage these files to `/opt/apps/adm/slurm/scripts/` on
 the controller and then use symbolic links pointing from the directories that
 are iterated over by the `slurm_mux` external epilog and prolog feature.
 
+## Directory pattern
+
 For example, if the following symbolic links are created:
 
 ```
@@ -24,6 +26,23 @@ partition-specific directories. In the example below, the partition is named
 ```
 /opt/apps/adm/slurm/partition-a3-prolog_slurmd.d/start-rxdm.prolog_slurmd -> ../scripts/receive-data-path-manager
 /opt/apps/adm/slurm/partition-a3-epilog_slurmd.d/stop-rxdm.epilog_slurmd -> ../scripts/receive-data-path-manager
+```
+
+## Example implementation
+
+The following sequence of commands will install the global prolog and epilog
+shown above. It will download the script from the latest Slurm-GCP v5 release.
+`v5` can be replaced with a specific tagged version if preferred.
+
+```shell
+#!/bin/bash
+mkdir -p /opt/apps/adm/slurm/prolog_slurmd.d
+mkdir -p /opt/apps/adm/slurm/epilog_slurmd.d
+curl -s --create-dirs -o /opt/apps/adm/slurm/scripts/receive-data-path-manager \
+    https://raw.githubusercontent.com/GoogleCloudPlatform/slurm-gcp/v5/tools/prologs-epilogs/receive-data-path-manager
+chmod 0755 /opt/apps/adm/slurm/scripts/receive-data-path-manager
+ln -s /opt/apps/adm/slurm/scripts/receive-data-path-manager /opt/apps/adm/slurm/prolog_slurmd.d/start-rxdm.prolog_slurmd
+ln -s /opt/apps/adm/slurm/scripts/receive-data-path-manager /opt/apps/adm/slurm/epilog_slurmd.d/stop-rxdm.epilog_slurmd
 ```
 
 [epe]: ../../terraform/slurm_cluster/modules/slurm_controller_instance/README_TF.md#input_enable_external_prolog_epilog
