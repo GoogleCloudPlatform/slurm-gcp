@@ -25,7 +25,7 @@
 
 - name: Install lua dependencies
   ansible.builtin.package:
-    name: '{{ lua_dpeendencies }}'
+    name: '{{ lua_dependencies }}'
     state: present
 
 - name: Download lua
