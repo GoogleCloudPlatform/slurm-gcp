@@ -126,7 +126,6 @@ variable "data_disks" {
 variable "subnetwork" {
   description = "The name of the subnetwork to attach the TPU-vm of this nodeset to."
   type        = string
-  default     = null
 }
 
 variable "service_account" {
