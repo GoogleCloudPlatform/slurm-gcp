@@ -1,0 +1,6 @@
+---
+
+pmix_version: 4.2.9
+sha1_v429: 912c70f567098dd0a7c0a03a816c5e6ecfaf1962
+# This is set separate from path.installation as slurm searches /usr and /usr/local for pmix
+pmix_installation_path: /usr/local

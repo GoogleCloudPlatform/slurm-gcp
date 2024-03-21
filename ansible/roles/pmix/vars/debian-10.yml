@@ -14,5 +14,6 @@
 
 ---
 
-pmix_packages:
-- libpmix-dev
+pmix_dependencies:
+- libevent-dev
+- libhwloc-dev

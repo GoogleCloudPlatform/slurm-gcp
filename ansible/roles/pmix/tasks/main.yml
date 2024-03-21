@@ -35,7 +35,25 @@
   when:
   - ansible_os_family == 'Debian'
 
-- name: Install PMIx libraries and headers
+- name: Install PMIx dependencies
   ansible.builtin.package:
-    name: '{{ pmix_packages }}'
+    name: '{{ pmix_dependencies }}'
     state: present
+
+- name: Download PMIX
+  ansible.builtin.get_url:
+    url: https://github.com/openpmix/openpmix/releases/download/v{{ pmix_version }}/pmix-{{
+      pmix_version }}.tar.gz
+    dest: /tmp/pmix-{{ pmix_version }}.tar.gz
+    checksum: sha1:{{ sha1_v429 }}
+
+- name: Build PMIx
+  ansible.builtin.shell: |
+    cd /tmp
+    tar xzf pmix-{{ pmix_version }}.tar.gz
+    cd pmix-{{ pmix_version }}
+    ./configure --prefix={{ pmix_installation_path }} >> conf.txt
+    make -j {{ ansible_processor_vcpus }} all >> make_res.txt
+    make install
+  args:
+    creates: '{{ pmix_installation_path }}/lib/libpmix.so'
