@@ -1,5 +1,4 @@
----
-# Copyright (C) SchedMD LLC.
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+---
 
-dependencies:
-- role: common
-- role: lua
+- name: Download lua
+  ansible.builtin.get_url:
+    url: '{{ lua_tar_url }}'
+    dest: /tmp/pmix-{{ lua_version }}.tar.gz
+    checksum: sha256:{{ lua_sha256_536 }}
+
+- name: Install lua
+  ansible.builtin.shell: |
+    cd /tmp
+    tar xzf lua-{{ lua_version }}.tar.gz
+    cd lua-{{ lua_version }}
+    make -j {{ ansible_processor_vcpus }} all >> make_res.txt
+    make install
