@@ -13,6 +13,21 @@
 # limitations under the License.
 ---
 
+- name: Include OS Family Dependent Vars
+  ansible.builtin.include_vars: '{{ item }}'
+  with_first_found:
+  - '{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml'
+  - '{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml'
+  - '{{ ansible_distribution|lower }}.yml'
+  - '{{ ansible_os_family|lower }}-{{ ansible_distribution_version }}.yml'
+  - '{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml'
+  - '{{ ansible_os_family|lower }}.yml'
+
+- name: Install lua dependencies
+  ansible.builtin.package:
+    name: '{{ lua_dpeendencies }}'
+    state: present
+
 - name: Download lua
   ansible.builtin.get_url:
     url: '{{ lua_tar_url }}'
