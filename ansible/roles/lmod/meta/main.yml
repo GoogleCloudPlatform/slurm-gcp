@@ -16,3 +16,4 @@
 dependencies:
 - role: common
 - role: lua
+  lua_version: 5.3.6

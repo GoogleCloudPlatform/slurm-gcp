@@ -16,7 +16,7 @@
 - name: Download lua
   ansible.builtin.get_url:
     url: '{{ lua_tar_url }}'
-    dest: /tmp/pmix-{{ lua_version }}.tar.gz
+    dest: /tmp/lua-{{ lua_version }}.tar.gz
     checksum: sha256:{{ lua_sha256_536 }}
 
 - name: Install lua
