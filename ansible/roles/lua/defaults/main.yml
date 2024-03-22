@@ -13,5 +13,6 @@
 # limitations under the License.
 ---
 lua_version: 5.3.6
-lua_tar_url: https://www.lua.org/ftp/lua-{{ lua_version }}.tar.gz
-lua_sha256_536: fc5fd69bb8736323f026672b1b7235da613d7177e72558893a0bdcd320466d60
+lua_dir: lua-{{ lua_version }}
+lua_tar: '{{ lua_dir }}.tar.gz'
+lua_tar_url: https://www.lua.org/ftp/{{ lua_tar }}

@@ -16,13 +16,13 @@
 - name: Download luarocks
   ansible.builtin.get_url:
     url: '{{ luarocks_tar_url }}'
-    dest: '{{ paths.build }}/lua-{{ luarocks_version }}.tar.gz'
+    dest: '{{ paths.build }}/{{ luarocks_tar }}'
 
 - name: Install luarocks
   ansible.builtin.shell: |
     cd {{ paths.build }}
-    tar xzf luarocks-{{ lua_version }}.tar.gz
-    cd luarocks-{{ lua_version }}
+    tar xzf {{ luarocks_tar }}
+    cd {{ luarocks_dir }}
     ./configure --prefix={{ paths.install }} --lua-version={{ lua_version }} --with-lua-bin={{ paths.install }}/bin
     make -j {{ ansible_processor_vcpus }} > /dev/null
     make install > /dev/null

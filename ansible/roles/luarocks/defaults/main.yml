@@ -13,4 +13,6 @@
 # limitations under the License.
 ---
 luarocks_version: 3.11.0
-luarocks_tar_url: https://luarocks.github.io/luarocks/releases/luarocks-{{ luarocks_version }}.tar.gz
+luarocks_dir: luarocks-{{ luarocks_version }}
+luarocks_tar: '{{ luarocks_dir }}.tar.gz'
+luarocks_tar_url: https://luarocks.github.io/luarocks/releases/{{ luarocks_tar }}.tar.gz
