@@ -1,5 +1,4 @@
----
-# Copyright (C) SchedMD LLC.
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+---
 
-dependencies:
-- role: common
-- role: lua
-  lua_version: 5.3.6
-- role: luaposix
+- name: Install luaposix
+  ansible.builtin.shell: >
+    luarocks install luaposix
+  args:
+    creates: "{{paths.install}}/lib/lua/{{ lua_version.split('.')[:2]|join('.') }}/posix"

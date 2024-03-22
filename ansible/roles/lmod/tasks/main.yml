@@ -49,6 +49,7 @@
       {{lmod_paths.src}}/configure
       --prefix={{paths.apps}}
       --with-ModulePathInit={{paths.apps}}/lmod/.modulespath
+      --with-luaSuffix={{paths.install}}
       > /dev/null
     chdir: '{{lmod_paths.src}}'
 

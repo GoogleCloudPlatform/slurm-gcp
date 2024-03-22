@@ -39,8 +39,5 @@
     cd /tmp
     tar xzf lua-{{ lua_version }}.tar.gz
     cd lua-{{ lua_version }}
-    ./configure --prefix={{ paths.install }}
     make -j {{ ansible_processor_vcpus }} linux >> make_res.txt
     make install
-  args:
-    creates: "{{paths.install}/bin/luac"
