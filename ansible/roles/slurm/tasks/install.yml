@@ -52,8 +52,11 @@
       --sysconfdir={{slurm_paths.etc}}
       --with-jwt={{slurm_paths.install}}
       --with-systemdsystemunitdir=/usr/lib/systemd/system/
-      > /dev/null
+      > ~/configure_out.txt
     chdir: '{{slurm_paths.build}}'
+  environment:
+    lua_CFLAGS: -I{{ paths.install }}/include/lua
+    lua_LIBS: -L{{ paths.install }} -llua
 
 - name: Make Install Slurm
   shell:

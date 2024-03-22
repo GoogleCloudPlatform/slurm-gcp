@@ -14,3 +14,4 @@
 ---
 
 luaposix: luaposix
+lua_major_minor: "{{ lua_version.split('.')[:2]|join('.') }}"

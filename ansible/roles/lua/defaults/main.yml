@@ -13,6 +13,9 @@
 # limitations under the License.
 ---
 lua_version: 5.3.6
-lua_dir: lua-{{ lua_version }}
-lua_tar: '{{ lua_dir }}.tar.gz'
+lua_paths:
+  base: lua-{{ lua_version }}
+  full: '{{ paths.build }}/lua-{{ lua_version }}'
+lua_tar: '{{ lua_paths.base }}.tar.gz'
 lua_tar_url: https://www.lua.org/ftp/{{ lua_tar }}
+lua_major_minor: "{{ lua_version.split('.')[:2]|join('.') }}"

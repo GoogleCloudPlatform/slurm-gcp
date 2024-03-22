@@ -15,6 +15,6 @@
 
 - name: Install luaposix
   ansible.builtin.shell: >
-    luarocks install {{ luaposix }}
+    {{ paths.install }}/bin/luarocks install {{ luaposix }}
   args:
-    creates: "{{paths.install}}/lib/lua/{{ lua_version.split('.')[:2]|join('.') }}/posix"
+    creates: "{{ paths.install }}/lib/lua/{{ lua_major_minor }}/posix"

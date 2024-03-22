@@ -18,11 +18,31 @@
     url: '{{ luarocks_tar_url }}'
     dest: '{{ paths.build }}/{{ luarocks_tar }}'
 
+- name: Extract luarocks source
+  ansible.builtin.unarchive:
+    src: '{{ paths.build }}/{{ luarocks_tar }}'
+    dest: '{{ paths.build }}'
+
+- name: Configure luarocks
+  ansible.builtin.shell:
+    cmd: ./configure --prefix={{ paths.install }} --lua-version={{ lua_major_minor }} > /dev/null
+    chdir: '{{ luarocks_path.full }}'
+
+- name: Make luarocks
+  ansible.builtin.shell:
+    cmd: make -j {{ ansible_processor_vcpus }} > /dev/null
+    chdir: '{{ luarocks_path.full }}'
+
 - name: Install luarocks
-  ansible.builtin.shell: |
-    cd {{ paths.build }}
-    tar xzf {{ luarocks_tar }}
-    cd {{ luarocks_dir }}
-    ./configure --prefix={{ paths.install }} --lua-version={{ lua_version }} --with-lua-bin={{ paths.install }}/bin
-    make -j {{ ansible_processor_vcpus }} > /dev/null
-    make install > /dev/null
+  ansible.builtin.shell:
+    cmd: make install > /dev/null
+    chdir: '{{ luarocks_path.full }}'
+  args:
+    creates: /usr/local/bin/luarocks
+
+- name: Update system variables
+  ansible.builtin.blockinfile:
+    path: /etc/environment
+    block: |
+      LUA_PATH="{{ paths.install }}/share/lua/{{ lua_major_minor }}/?.lua;{{ paths.install }}/share/lua/{{ lua_major_minor }}/?/init.lua;;"
+      LUA_CPATH="{{ paths.install }}/lib/lua/{{ lua_major_minor }}/?.so;;"

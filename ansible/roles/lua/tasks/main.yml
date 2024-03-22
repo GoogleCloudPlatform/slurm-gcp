@@ -33,13 +33,19 @@
     url: '{{ lua_tar_url }}'
     dest: '{{ paths.build }}/{{ lua_tar }}'
 
+- name: Extract lua source
+  ansible.builtin.unarchive:
+    src: '{{ paths.build }}/{{ lua_tar }}'
+    dest: '{{ paths.build }}'
+
+- name: Make lua
+  ansible.builtin.shell:
+    cmd: make -j {{ ansible_processor_vcpus }} linux >> make_res.txt
+    chdir: '{{ lua_paths.full }}'
+
 - name: Install lua
-  ansible.builtin.shell: |
-    cd {{ paths.build }}
-    tar xzf {{ lua_tar }}
-    cd {{ lua_dir }}
-    ./configure --prefix={{ paths.install }}
-    make -j {{ ansible_processor_vcpus }} linux >> make_res.txt
-    make install
+  ansible.builtin.shell:
+    cmd: make install INSTALL_TOP={{ paths.install }}
+    chdir: '{{ lua_paths.full }}'
   args:
-    creates: '{{ paths.install }}/bin/luac'
+    creates: '{{ paths.install }}/share/lua/{{ lua_major_minor }}'
