@@ -31,16 +31,16 @@
 - name: Download lua
   ansible.builtin.get_url:
     url: '{{ lua_tar_url }}'
-    dest: /tmp/lua-{{ lua_version }}.tar.gz
+    dest: '{{ paths.build }}/lua-{{ lua_version }}.tar.gz'
     checksum: sha256:{{ lua_sha256_536 }}
 
 - name: Install lua
   ansible.builtin.shell: |
-    cd /tmp
+    cd {{ paths.build }}
     tar xzf lua-{{ lua_version }}.tar.gz
     cd lua-{{ lua_version }}
     ./configure --prefix={{ paths.install }}
     make -j {{ ansible_processor_vcpus }} linux >> make_res.txt
     make install
   args:
-    creates: "{{ paths.install }}/bin/luac"
+    creates: '{{ paths.install }}/bin/luac'

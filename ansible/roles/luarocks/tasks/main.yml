@@ -13,19 +13,14 @@
 # limitations under the License.
 ---
 
-- name: Install luarocks dependencies
-  ansible.builtin.package:
-    name: '{{ luarocks_dependencies }}'
-    state: present
-
 - name: Download luarocks
   ansible.builtin.get_url:
     url: '{{ luarocks_tar_url }}'
-    dest: /tmp/lua-{{ luarocks_version }}.tar.gz
+    dest: '{{ paths.build }}/lua-{{ luarocks_version }}.tar.gz'
 
 - name: Install luarocks
   ansible.builtin.shell: |
-    cd /tmp
+    cd {{ paths.build }}
     tar xzf luarocks-{{ lua_version }}.tar.gz
     cd luarocks-{{ lua_version }}
     ./configure --prefix={{ paths.install }} --lua-version={{ lua_version }} --with-lua-bin={{ paths.install }}/bin
