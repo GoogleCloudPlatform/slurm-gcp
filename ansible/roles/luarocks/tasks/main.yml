@@ -23,21 +23,21 @@
   - '{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml'
   - '{{ ansible_os_family|lower }}.yml'
 
-- name: Install lua dependencies
+- name: Install luarocks dependencies
   ansible.builtin.package:
-    name: '{{ lua_dependencies }}'
+    name: '{{ luarocks_dependencies }}'
     state: present
 
-- name: Download lua
+- name: Download luarocks
   ansible.builtin.get_url:
-    url: '{{ lua_tar_url }}'
-    dest: /tmp/lua-{{ lua_version }}.tar.gz
-    checksum: sha256:{{ lua_sha256_536 }}
+    url: '{{ luarocks_tar_url }}'
+    dest: /tmp/lua-{{ luarocks_version }}.tar.gz
 
-- name: Install lua
+- name: Install luarocks
   ansible.builtin.shell: |
     cd /tmp
-    tar xzf lua-{{ lua_version }}.tar.gz
-    cd lua-{{ lua_version }}
-    make -j {{ ansible_processor_vcpus }} linux >> make_res.txt
-    make install
+    tar xzf luarocks-{{ lua_version }}.tar.gz
+    cd luarocks-{{ lua_version }}
+    ./configure --prefix={{ paths.install }} --lua-version={{ lua_version }} --with-lua-bin={{ paths.install }}/bin
+    make -j {{ ansible_processor_vcpus }} > /dev/null
+    make install > /dev/null
