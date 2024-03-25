@@ -33,15 +33,10 @@ repos:
     # in line with its expectations
     exclude_types:
     - markdown
-- repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
-  rev: 0.2.3
+- repo: https://github.com/google/yamlfmt
+  rev: v0.11.0
   hooks:
   - id: yamlfmt
-    args:
-    - --mapping=2
-    - --sequence=2
-    - --offset=0
-    - --width=80
 - repo: local
   hooks:
   - id: packer_fmt
@@ -73,7 +68,6 @@ repos:
   hooks:
   - id: flake8
     exclude: ^dm/
-
 - repo: https://github.com/codespell-project/codespell
   rev: v2.2.5
   hooks:
