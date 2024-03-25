@@ -25,8 +25,7 @@
   - include_tasks: install_runfile.yml
     when: cuda_use_runfile
 
-  - name: Install CUDA packages (1.5-2GB download, also restarts if cuda_restart_node_on_install
-      is set to True)
+  - name: Install CUDA packages (1.5-2GB download, also restarts if cuda_restart_node_on_install is set to True)
     package:
       name: '{{ item }}'
       state: fixed

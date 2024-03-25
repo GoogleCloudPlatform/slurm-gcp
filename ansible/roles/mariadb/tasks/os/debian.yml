@@ -19,7 +19,6 @@
     - libmariadb-dev
     state: present
 
-
 - name: Install {{ansible_os_family}} Family Server
   apt:
     name:
