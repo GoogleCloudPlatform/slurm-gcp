@@ -11,8 +11,7 @@ cache:
   pip: true
 
 before_cache:
-- sudo mkdir $HOME/lxc && sudo tar cf $HOME/lxc/cache.tar /var/cache/lxc/ && sudo
-  chown $USER. $HOME/lxc/cache.tar
+- sudo mkdir $HOME/lxc && sudo tar cf $HOME/lxc/cache.tar /var/cache/lxc/ && sudo chown $USER. $HOME/lxc/cache.tar
 
 install:
 - sudo tar xf $HOME/lxc/cache.tar -C / || true
@@ -26,24 +25,21 @@ install:
 - ansible-playbook -vvv tests/install.yml -i tests/inventory
 
 script:
-  # Validates your deployment playbook's syntax, which should contain your role
+# Validates your deployment playbook's syntax, which should contain your role
 - ansible-playbook -i tests/inventory tests/deploy.yml --syntax-check
 
-  # Runs the deployment playbook
+# Runs the deployment playbook
 - ansible-playbook -i tests/inventory -v tests/deploy.yml
 
-  # Basic role syntax check
+# Basic role syntax check
 - ansible-playbook tests/test.yml -i tests/inventory --syntax-check
 
-  # Perform a test run with the playbook
+# Perform a test run with the playbook
 - travis_wait ansible-playbook tests/test.yml -i tests/inventory
 
-  # Perform a another test run with the playbook to check for idempotency
-- unbuffer ansible-playbook tests/test.yml -i tests/inventory >/tmp/idempotency.log
-  2>&1
-- 'grep -A1 "PLAY RECAP" /tmp/idempotency.log | grep -qP "changed=0.*failed=0" &&
-  (echo "Idempotence: PASS"; exit 0) || (echo "Idempotence: FAIL"; cat /tmp/idempotency.log;
-  exit 1)'
+# Perform a another test run with the playbook to check for idempotency
+- unbuffer ansible-playbook tests/test.yml -i tests/inventory >/tmp/idempotency.log 2>&1
+- 'grep -A1 "PLAY RECAP" /tmp/idempotency.log | grep -qP "changed=0.*failed=0" && (echo "Idempotence: PASS"; exit 0) || (echo "Idempotence: FAIL"; cat /tmp/idempotency.log; exit 1)'
 
 notifications:
   email: false

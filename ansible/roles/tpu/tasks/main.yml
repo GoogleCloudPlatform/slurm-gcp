@@ -21,8 +21,7 @@
 
 - name: Calculate python310 variable
   set_fact:
-    python310: "{{ tf_version.split('.')[1] | int >= 13 or (tf_version.split('.')[1]\
-      \ | int == 12 and tf_version.split('.')[2] | int >= 1) }}"
+    python310: "{{ tf_version.split('.')[1] | int >= 13 or (tf_version.split('.')[1] | int == 12 and tf_version.split('.')[2] | int >= 1) }}"
 
 - name: Generate wheel variable
   set_fact:

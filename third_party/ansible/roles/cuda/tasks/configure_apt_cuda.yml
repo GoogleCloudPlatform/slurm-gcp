@@ -15,7 +15,6 @@
     name: dkms
     selection: hold
 
-
 - name: lookup cuda driver version
   shell: |
     apt-cache madison cuda-drivers | awk '{print $3}' | sort -r | while read line; do
