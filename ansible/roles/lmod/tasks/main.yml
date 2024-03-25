@@ -64,5 +64,5 @@
     state: link
   with_items:
   - {src: '{{lmod_paths.build}}/init/profile', dest: /etc/profile.d/z00_lmod.sh}
-  - {src: '{{lmod_paths.build}}/init/cshrc', dest: /etc/profile.d/z00_lmod.csh}
-    # - { src: "{{lmod_paths.build}}/init/profile.fish", dest: "/etc/fish/conf.d/z00_lmod.fish" }
+  - {src: '{{lmod_paths.build}}/init/cshrc', dest: /etc/profile.d/z00_lmod.csh,}
+  # - { src: "{{lmod_paths.build}}/init/profile.fish", dest: "/etc/fish/conf.d/z00_lmod.fish" }

@@ -11,8 +11,7 @@
 
 - name: Determine kernel version
   set_fact:
-    cuda_driver_kernel_version: '{{ cuda_driver_kernel_version | default(cuda_driver_kernel_running.stdout,
-      true) }}'
+    cuda_driver_kernel_version: '{{ cuda_driver_kernel_version | default(cuda_driver_kernel_running.stdout, true) }}'
 
 - name: Ensure kernel headers are installed (yum)
   yum:
@@ -58,8 +57,7 @@
   set_fact:
     cuda_driver_installed: '{{ cuda_driver_kernel_module_find.matched > 0 }}'
     cuda_toolkit_installed: '{{ cuda_toolkit_path.stat.exists }}'
-    cuda_runfile_checksum_url: "{{ cuda_runfile_checksum_url | default(cuda_runfile_url\
-      \ | regex_replace('local_installers/.*', 'docs/sidebar/md5sum.txt'), true) }}"
+    cuda_runfile_checksum_url: "{{ cuda_runfile_checksum_url | default(cuda_runfile_url | regex_replace('local_installers/.*', 'docs/sidebar/md5sum.txt'), true) }}"
 
 - name: Print information about installed features
   debug:
@@ -91,10 +89,8 @@
 
 - name: Get checksums from dict
   set_fact:
-    cuda_runfile_valid_checksum: '{{checksums.dict[ cuda_runfile_sh ].checksum}} ==
-      cuda_runtime_file.stat.checksum'
+    cuda_runfile_valid_checksum: '{{checksums.dict[ cuda_runfile_sh ].checksum}} == cuda_runtime_file.stat.checksum'
   when: cuda_runtime_file.stat.exists
-
 
 - name: Obtain runfile
   block:
@@ -116,9 +112,7 @@
       dest: /tmp/cuda_runfile/{{ cuda_runfile_sh }}
     when: cuda_runfile_download
 
-  when: not (cuda_runtime_file.stat.exists and cuda_runfile_valid_checksum) and ((cuda_runfile_toolkit
-    and not cuda_toolkit_installed) or (cuda_runfile_driver and not cuda_driver_installed))
-
+  when: not (cuda_runtime_file.stat.exists and cuda_runfile_valid_checksum) and ((cuda_runfile_toolkit and not cuda_toolkit_installed) or (cuda_runfile_driver and not cuda_driver_installed))
 
 - name: Run installer for toolkit
   command: bash /tmp/cuda_runfile/{{ cuda_runfile_sh }} --silent --toolkit
@@ -150,8 +144,7 @@
 
   - name: Print information about driver
     debug:
-      msg: Building driver {{ cuda_driver_runfile }} for kernel {{ cuda_driver_kernel_version
-        }}
+      msg: Building driver {{ cuda_driver_runfile }} for kernel {{ cuda_driver_kernel_version }}
 
   - name: Install driver
     command: >
