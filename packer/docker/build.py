@@ -114,7 +114,7 @@ parser.add_argument(
     "--gcp_version",
     "-g",
     dest="slurmgcp_version",
-    default="6.3",
+    default="6.4",
     help="The slurm_gcp version to use for the image.",
 )
 parser.add_argument(
@@ -161,29 +161,20 @@ tmp_file = tempfile.NamedTemporaryFile(mode="w+t", delete=False, suffix=".pkvars
 tmp_file.write(data)
 tmp_file.close()
 
-dock_build_data = {}
-base_images = []
+print("Building base_image ubuntu:22.04")
+try:
+    run(
+        f'packer build -var-file={tmp_file.name} -var "docker_image=ubuntu:22.04" -only "base.*" .'
+    )
+except subprocess.CalledProcessError as e:
+    print_exception(e)
+    exit(e.returncode)
+
 for tf_version in args.tf_versions:
-    docker_image = "ubuntu:22.04" if calculate_python310(tf_version) else "ubuntu:20.04"
-    if docker_image not in base_images:
-        base_images.append(docker_image)
-    dock_build_data[tf_version] = docker_image
-
-for base_image in base_images:
-    print(f"Building base_image {base_image}")
+    print(f"Build tf image {tf_version}")
     try:
         run(
-            f'packer build -var-file={tmp_file.name} -var "docker_image={base_image}" -only "base.*" .'
-        )
-    except subprocess.CalledProcessError as e:
-        print_exception(e)
-        exit(e.returncode)
-
-for tf_version, docker_image in dock_build_data.items():
-    print(f"Build tf image {tf_version} using base_image {docker_image}")
-    try:
-        run(
-            f'packer build -var-file={tmp_file.name} -var "docker_image={docker_image}" -var "tf_version={tf_version}" -only "tensorflow.*" .'
+            f'packer build -var-file={tmp_file.name} -var "docker_image=ubuntu:22.04" -var "tf_version={tf_version}" -only "tensorflow.*" .'
         )
     except subprocess.CalledProcessError as e:
         print_exception(e)
@@ -204,7 +195,5 @@ for tf_version, docker_image in dock_build_data.items():
                 print("Skipping to next tf_version")
                 continue
         else:
-            print(
-                f"Error retrieving the docker image name for docker_image={docker_image} tf_version={tf_version}"
-            )
+            print(f"Error retrieving the docker image name for tf_version={tf_version}")
 os.remove(tmp_file.name)

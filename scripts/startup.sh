@@ -122,7 +122,8 @@ function tpu_setup {
 	cat << EOF > /root/.docker/config.json
 {
   "credHelpers": {
-    "gcr.io": "gcloud"
+    "gcr.io": "gcloud",
+	"us-docker.pkg.dev": "gcloud"
   }
 }
 EOF
