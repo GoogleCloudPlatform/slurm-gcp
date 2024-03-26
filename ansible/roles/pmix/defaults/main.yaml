@@ -1,3 +1,4 @@
+---
 # Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
----
-
 pmix_version: 4.2.9
 pmix_dir: pmix-{{ pmix_version }}
 pmix_tar: '{{ pmix_dir }}.tar.gz'
-pmix_url: https://github.com/openpmix/openpmix/releases/download/v{{ pmix_version
-  }}/{{ pmix_tar }}
+pmix_url: https://github.com/openpmix/openpmix/releases/download/v{{ pmix_version }}/{{ pmix_tar }}
 # This is set separate from path.installation as slurm searches /usr and /usr/local for pmix
 pmix_installation_path: /usr/local
