@@ -56,7 +56,7 @@
     chdir: '{{slurm_paths.build}}'
   environment:
     lua_CFLAGS: -I{{ paths.install }}/include/lua
-    lua_LIBS: -L{{ paths.install }} -llua
+    lua_LIBS: -L{{ paths.install }} -llua{{ lua_major_minor }}
 
 - name: Make Install Slurm
   shell:
