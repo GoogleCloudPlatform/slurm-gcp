@@ -29,6 +29,7 @@
     install_ompi: true
     install_lustre: true
     install_gcsfuse: true
+    install_pmix: true
 
   pre_tasks:
   - name: Supported OS Check
@@ -76,6 +77,9 @@
     when:
     - install_cuda
     - ansible_architecture == "x86_64"
+  - role: pmix
+    when:
+    - install_pmix
   - nfs
   - cgroups
   - munge

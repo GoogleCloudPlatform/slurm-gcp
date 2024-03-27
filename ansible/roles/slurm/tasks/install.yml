@@ -50,6 +50,9 @@
       {{slurm_paths.src}}/configure
       --prefix={{slurm_paths.install}}
       --sysconfdir={{slurm_paths.etc}}
+      {% if install_pmix -%}
+      --with-pmix
+      {% endif -%}
       --with-jwt={{slurm_paths.install}}
       --with-systemdsystemunitdir=/usr/lib/systemd/system/
       > /dev/null

@@ -1,0 +1,56 @@
+---
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- name: Include OS Family Dependent Vars
+  ansible.builtin.include_vars: '{{ item }}'
+  with_first_found:
+  - '{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml'
+  - '{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml'
+  - '{{ ansible_distribution|lower }}.yml'
+  - '{{ ansible_os_family|lower }}-{{ ansible_distribution_version }}.yml'
+  - '{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml'
+  - '{{ ansible_os_family|lower }}.yml'
+
+- name: Wait for DPKG Locks
+  ansible.builtin.shell: >
+    while fuser /var/lib/dpkg/{{ item }} >/dev/null 2>&1; do
+      sleep 5
+    done
+  with_items:
+  - lock
+  - lock-frontend
+  when:
+  - ansible_os_family == 'Debian'
+
+- name: Install PMIx dependencies
+  ansible.builtin.package:
+    name: '{{ pmix_dependencies }}'
+    state: present
+
+- name: Download PMIX
+  ansible.builtin.get_url:
+    url: '{{ pmix_url }}'
+    dest: '{{ paths.build }}/{{ pmix_tar }}'
+
+- name: Build PMIx
+  ansible.builtin.shell: |
+    cd {{ paths.build }}
+    tar xzf {{ pmix_tar }}
+    cd {{ pmix_dir }}
+    ./configure --prefix={{ pmix_installation_path }} > /dev/null
+    make -j {{ ansible_processor_vcpus }} all > /dev/null
+    make install
+  args:
+    creates: '{{ pmix_installation_path }}/lib/libpmix.so'
