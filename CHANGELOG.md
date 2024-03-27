@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[5.10.7\]
+
+- Improve PMIx support by installing from latest source release (4.2.9) on all
+  Linux distributions
+- Add missing PMIx support for CentOS 7 (RPM package was outdated)
+- Update receive-data-path-manager prolog/epilog solution for A3 VM family
+
 ## \[5.10.6\]
 
 - Automatically set correct socket count for new A3 VM family
