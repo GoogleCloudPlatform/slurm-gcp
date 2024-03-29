@@ -42,7 +42,7 @@
 
 - name: Update system variables
   ansible.builtin.blockinfile:
-    path: /etc/environment
+    dest: /etc/environment
     block: |
       LUA_PATH="{{ paths.install }}/share/lua/{{ lua_major_minor }}/?.lua;{{ paths.install }}/share/lua/{{ lua_major_minor }}/?/init.lua;;"
       LUA_CPATH="{{ paths.install }}/lib/lua/{{ lua_major_minor }}/?.so;;"
