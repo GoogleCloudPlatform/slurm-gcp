@@ -26,14 +26,13 @@ from util import (
     groupby_unsorted,
     log_api_request,
     run,
-    execute_with_futures,
     batch_execute,
     ensure_execute,
-    subscription_delete,
     to_hostlist,
     wait_for_operations,
     separate,
     is_exclusive_node,
+    delete_subscriptions,
 )
 from util import lkp, cfg, compute
 
@@ -80,7 +79,7 @@ def delete_instances(instances):
     if lkp.cfg.enable_reconfigure:
         count = len(valid)
         log.info("delete {} subscriptions ({})".format(count, valid_hostlist))
-        execute_with_futures(subscription_delete, valid)
+        delete_subscriptions(valid)
 
     requests = {inst: delete_instance_request(inst) for inst in valid}
 

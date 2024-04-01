@@ -18,10 +18,9 @@ import logging
 from pathlib import Path
 from util import (
     config_root_logger,
-    execute_with_futures,
     parse_self_link,
-    subscription_delete,
     subscription_list,
+    delete_subscriptions,
 )
 
 logger_name = Path(__file__).name
@@ -37,7 +36,7 @@ def main(args):
         )
     )
     subscriptions = [parse_self_link(s).subscription for s in subscriptions]
-    execute_with_futures(subscription_delete, subscriptions)
+    delete_subscriptions(subscriptions)
 
 
 if __name__ == "__main__":

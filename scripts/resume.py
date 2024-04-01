@@ -37,12 +37,11 @@ from util import (
     chunked,
     separate,
     batch_execute,
-    execute_with_futures,
     is_exclusive_node,
-    subscription_create,
     to_hostlist,
     trim_self_link,
     wait_for_operation,
+    create_subscriptions,
 )
 from util import cfg, lkp, NSDict
 
@@ -359,7 +358,7 @@ def resume_nodes(nodelist, placement_groups=None, exclusive_job=None):
         count = len(started_nodes)
         hostlist = util.to_hostlist(started_nodes)
         log.info("create {} subscriptions ({})".format(count, hostlist))
-        execute_with_futures(subscription_create, nodelist)
+        create_subscriptions(nodelist)
 
 
 def update_job_comment(nodelist, comment):

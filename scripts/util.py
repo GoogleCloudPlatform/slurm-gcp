@@ -301,17 +301,63 @@ def subscription_list(project_id=None, page_size=None, slurm_cluster_name=None):
     return subscriptions
 
 
-def subscription_create(subscription_id, project_id=None):
-    """Create pub/sub subscription"""
+def delete_subscriptions(seq):
+    """Deletes a list of subscriptions
+    API calls are made in parallel from thread pool
+    """
     from google.cloud import pubsub_v1
+
+    with ThreadPoolExecutor() as exe:
+        futures = []
+        for i in seq:
+            subscriber = pubsub_v1.SubscriberClient()
+            future = exe.submit(_delete_subscription, i, subscriber)
+            futures.append(future)
+        for future in as_completed(futures):
+            result = future.exception()
+            if result is not None:
+                raise result
+
+
+def _delete_subscription(subscription_id, subscriber):
+    """Delete pub/sub subscription"""
     from google.api_core import exceptions
 
-    if project_id is None:
-        project_id = lkp.project
-    topic_id = lkp.cfg.pubsub_topic_id
+    project_id = lkp.project
+    subscription_path = subscriber.subscription_path(project_id, subscription_id)
+    with subscriber:
+        try:
+            subscriber.delete_subscription(request={"subscription": subscription_path})
+            log.info(f"Subscription deleted: {subscription_path}.")
+        except exceptions.NotFound:
+            log.info(f"Subscription '{subscription_path}' not found!")
 
-    publisher = pubsub_v1.PublisherClient()
-    subscriber = pubsub_v1.SubscriberClient()
+
+def create_subscriptions(seq):
+    """Creates a list of subscriptions
+    API calls are made in parallel from thread pool
+    """
+    from google.cloud import pubsub_v1
+
+    with ThreadPoolExecutor() as exe:
+        futures = []
+        for i in seq:
+            publisher = pubsub_v1.PublisherClient()
+            subscriber = pubsub_v1.SubscriberClient()
+            future = exe.submit(_create_subscription, i, publisher, subscriber)
+            futures.append(future)
+        for future in as_completed(futures):
+            result = future.exception()
+            if result is not None:
+                raise result
+
+
+def _create_subscription(subscription_id, publisher, subscriber):
+    """Create pub/sub subscription"""
+    from google.api_core import exceptions
+
+    project_id = lkp.project
+    topic_id = lkp.cfg.pubsub_topic_id
     topic_path = publisher.topic_path(project_id, topic_id)
     subscription_path = subscriber.subscription_path(project_id, subscription_id)
 
@@ -330,37 +376,6 @@ def subscription_create(subscription_id, project_id=None):
             log_subscriptions.debug(f"{subscription}")
         except exceptions.AlreadyExists:
             log.info(f"Subscription '{subscription_path}' already exists!")
-
-
-def subscription_delete(subscription_id, project_id=None):
-    """Delete pub/sub subscription"""
-    from google.cloud import pubsub_v1
-    from google.api_core import exceptions
-
-    if project_id is None:
-        project_id = lkp.project
-
-    subscriber = pubsub_v1.SubscriberClient()
-    subscription_path = subscriber.subscription_path(project_id, subscription_id)
-
-    with subscriber:
-        try:
-            subscriber.delete_subscription(request={"subscription": subscription_path})
-            log.info(f"Subscription deleted: {subscription_path}.")
-        except exceptions.NotFound:
-            log.info(f"Subscription '{subscription_path}' not found!")
-
-
-def execute_with_futures(func, seq):
-    with ThreadPoolExecutor() as exe:
-        futures = []
-        for i in seq:
-            future = exe.submit(func, i)
-            futures.append(future)
-        for future in as_completed(futures):
-            result = future.exception()
-            if result is not None:
-                raise result
 
 
 def map_with_futures(func, seq):
