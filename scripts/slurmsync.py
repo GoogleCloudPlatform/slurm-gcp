@@ -27,14 +27,13 @@ import yaml
 
 import util
 from util import (
-    execute_with_futures,
     run,
     separate,
     batch_execute,
-    subscription_create,
-    subscription_delete,
     to_hostlist,
     with_static,
+    create_subscriptions,
+    delete_subscriptions,
 )
 from util import lkp, cfg, compute
 from suspend import delete_instances
@@ -323,12 +322,12 @@ def do_subscription_update(status, subscriptions):
     def subscriptions_create():
         """create subscriptions"""
         log.info("Creating {} subcriptions ({})".format(count, hostlist))
-        execute_with_futures(subscription_create, subscriptions)
+        create_subscriptions(subscriptions)
 
     def subscriptions_delete():
         """delete subscriptions"""
         log.info("Deleting {} subcriptions ({})".format(count, hostlist))
-        execute_with_futures(subscription_delete, subscriptions)
+        delete_subscriptions(subscriptions)
 
     update = dict.get(
         {
