@@ -307,16 +307,18 @@ def delete_subscriptions(seq):
     """
     from google.cloud import pubsub_v1
 
-    with ThreadPoolExecutor() as exe:
-        futures = []
-        for i in seq:
-            subscriber = pubsub_v1.SubscriberClient()
-            future = exe.submit(_delete_subscription, i, subscriber)
-            futures.append(future)
-        for future in as_completed(futures):
-            result = future.exception()
-            if result is not None:
-                raise result
+    subscriber = pubsub_v1.SubscriberClient()
+
+    with subscriber:
+        with ThreadPoolExecutor() as exe:
+            futures = []
+            for i in seq:
+                future = exe.submit(_delete_subscription, i, subscriber)
+                futures.append(future)
+            for future in as_completed(futures):
+                result = future.exception()
+                if result is not None:
+                    raise result
 
 
 def _delete_subscription(subscription_id, subscriber):
@@ -325,12 +327,11 @@ def _delete_subscription(subscription_id, subscriber):
 
     project_id = lkp.project
     subscription_path = subscriber.subscription_path(project_id, subscription_id)
-    with subscriber:
-        try:
-            subscriber.delete_subscription(request={"subscription": subscription_path})
-            log.info(f"Subscription deleted: {subscription_path}.")
-        except exceptions.NotFound:
-            log.info(f"Subscription '{subscription_path}' not found!")
+    try:
+        subscriber.delete_subscription(request={"subscription": subscription_path})
+        log.info(f"Subscription deleted: {subscription_path}.")
+    except exceptions.NotFound:
+        log.info(f"Subscription '{subscription_path}' not found!")
 
 
 def create_subscriptions(seq):
@@ -339,17 +340,19 @@ def create_subscriptions(seq):
     """
     from google.cloud import pubsub_v1
 
-    with ThreadPoolExecutor() as exe:
-        futures = []
-        for i in seq:
-            publisher = pubsub_v1.PublisherClient()
-            subscriber = pubsub_v1.SubscriberClient()
-            future = exe.submit(_create_subscription, i, publisher, subscriber)
-            futures.append(future)
-        for future in as_completed(futures):
-            result = future.exception()
-            if result is not None:
-                raise result
+    publisher = pubsub_v1.PublisherClient()
+    subscriber = pubsub_v1.SubscriberClient()
+
+    with subscriber:
+        with ThreadPoolExecutor() as exe:
+            futures = []
+            for i in seq:
+                future = exe.submit(_create_subscription, i, publisher, subscriber)
+                futures.append(future)
+            for future in as_completed(futures):
+                result = future.exception()
+                if result is not None:
+                    raise result
 
 
 def _create_subscription(subscription_id, publisher, subscriber):
@@ -361,21 +364,20 @@ def _create_subscription(subscription_id, publisher, subscriber):
     topic_path = publisher.topic_path(project_id, topic_id)
     subscription_path = subscriber.subscription_path(project_id, subscription_id)
 
-    with subscriber:
-        request = {
-            "name": subscription_path,
-            "topic": topic_path,
-            "ack_deadline_seconds": 60,
-            "labels": {
-                "slurm_cluster_name": cfg.slurm_cluster_name,
-            },
-        }
-        try:
-            subscription = subscriber.create_subscription(request=request)
-            log.info(f"Subscription created: {subscription_path}")
-            log_subscriptions.debug(f"{subscription}")
-        except exceptions.AlreadyExists:
-            log.info(f"Subscription '{subscription_path}' already exists!")
+    request = {
+        "name": subscription_path,
+        "topic": topic_path,
+        "ack_deadline_seconds": 60,
+        "labels": {
+            "slurm_cluster_name": cfg.slurm_cluster_name,
+        },
+    }
+    try:
+        subscription = subscriber.create_subscription(request=request)
+        log.info(f"Subscription created: {subscription_path}")
+        log_subscriptions.debug(f"{subscription}")
+    except exceptions.AlreadyExists:
+        log.info(f"Subscription '{subscription_path}' already exists!")
 
 
 def map_with_futures(func, seq):
