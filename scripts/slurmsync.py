@@ -226,9 +226,9 @@ def find_node_status(nodename):
             return NodeStatus.terminated
     elif (state is None or "POWERED_DOWN" in state.flags) and inst.status == "RUNNING":
         log.info("%s is potential orphan node", nodename)
-        log.info("%s state: %s", nodename, state)
         age_threshold_seconds = 90
         inst_seconds_old = _seconds_since_timestamp(inst.creationTimestamp)
+        log.info("%s state: %s, age: %0.1fs", nodename, state, inst_seconds_old)
         if inst_seconds_old < age_threshold_seconds:
             log.info(
                 "%s not marked as orphan, it started less than %ds ago (%0.1fs)",
