@@ -301,9 +301,12 @@ def subscription_list(project_id=None, page_size=None, slurm_cluster_name=None):
     return subscriptions
 
 
-def delete_subscriptions(seq):
+def delete_subscriptions(subscription_ids):
     """Deletes a list of subscriptions
     API calls are made in parallel from thread pool
+
+    Args:
+      subscription_ids: Iterable of strings containing subscription IDs
     """
     from google.cloud import pubsub_v1
 
@@ -312,8 +315,8 @@ def delete_subscriptions(seq):
     with subscriber:
         with ThreadPoolExecutor() as exe:
             futures = []
-            for i in seq:
-                future = exe.submit(_delete_subscription, i, subscriber)
+            for subscription_id in subscription_ids:
+                future = exe.submit(_delete_subscription, subscription_id, subscriber)
                 futures.append(future)
             for future in as_completed(futures):
                 result = future.exception()
@@ -334,9 +337,12 @@ def _delete_subscription(subscription_id, subscriber):
         log.info(f"Subscription '{subscription_path}' not found!")
 
 
-def create_subscriptions(seq):
+def create_subscriptions(subscription_ids):
     """Creates a list of subscriptions
     API calls are made in parallel from thread pool
+
+    Args:
+      subscription_ids: Iterable of strings containing subscription IDs
     """
     from google.cloud import pubsub_v1
 
@@ -346,8 +352,10 @@ def create_subscriptions(seq):
     with subscriber:
         with ThreadPoolExecutor() as exe:
             futures = []
-            for i in seq:
-                future = exe.submit(_create_subscription, i, publisher, subscriber)
+            for subscription_id in subscription_ids:
+                future = exe.submit(
+                    _create_subscription, subscription_id, publisher, subscriber
+                )
                 futures.append(future)
             for future in as_completed(futures):
                 result = future.exception()
