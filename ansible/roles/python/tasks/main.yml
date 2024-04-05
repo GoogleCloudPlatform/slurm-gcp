@@ -37,7 +37,7 @@
   pip:
     name:
     - pip
-    extra_args: --upgrade
+    extra_args: --upgrade {{ extra_pip_args }}
     executable: pip3
     state: present
 
@@ -56,11 +56,11 @@
 
 - name: Install pyyaml workaround
   shell:
-    cmd: pip3 install "Cython<3.0" pyyaml --no-build-isolation
+    cmd: pip3 install "Cython<3.0" pyyaml --no-build-isolation {{ extra_pip_args }}
 
 - name: Install Pip Packages
   pip:
     requirements: '{{ requirements_file.results[0].dest }}'
-    extra_args: --upgrade --ignore-installed
+    extra_args: --upgrade --ignore-installed {{ extra_pip_args }}
     executable: pip3
     state: present

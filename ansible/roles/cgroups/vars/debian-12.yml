@@ -1,5 +1,5 @@
 ---
-# Copyright (C) SchedMD LLC.
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,5 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python38_installed: false
-extra_pip_args: ''
+cgroup_packages:
+- libcgroup2
+- libcgroup-dev
+- libpam-cgroup
+- libdbus-1-dev
+
+cgroup_grub_cmdline_linux:
+- systemd.unified_cgroup_hierarchy=1
+- cgroup_enable=memory
+- swapaccount=1

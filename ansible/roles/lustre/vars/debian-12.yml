@@ -1,5 +1,5 @@
 ---
-# Copyright (C) SchedMD LLC.
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,5 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python38_installed: false
-extra_pip_args: ''
+lustre_repo_url: https://downloads.whamcloud.com/public/lustre/latest-feature-release/ubuntu2004/client
+
+lustre_packages:
+- lustre-client-modules
+- lustre-client-utils
+
+# disable lustre install because it's not compatible right now
+lustre_install: false
