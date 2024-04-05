@@ -115,7 +115,7 @@
   when: not (cuda_runtime_file.stat.exists and cuda_runfile_valid_checksum) and ((cuda_runfile_toolkit and not cuda_toolkit_installed) or (cuda_runfile_driver and not cuda_driver_installed))
 
 - name: Run installer for toolkit
-  command: bash /tmp/cuda_runfile/{{ cuda_runfile_sh }} --silent --toolkit
+  command: bash /tmp/cuda_runfile/{{ cuda_runfile_sh }} --silent --toolkit{% if use_open_drivers | bool %} -m=kernel-open{% endif %}
   register: cuda_toolkit_install_out
   when: cuda_runfile_toolkit and not cuda_toolkit_installed
 
