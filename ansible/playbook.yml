@@ -18,6 +18,11 @@
 
   vars:
     min_ansible_version: 2.7
+    supported_distributions:
+    - CentOS
+    - Rocky
+    - Debian
+    - Ubuntu
     paths:
       install: /usr/local
       src: /usr/local/src
@@ -32,31 +37,36 @@
     install_pmix: true
 
   pre_tasks:
-  - name: Supported OS Check
-    assert:
-      that: >
-        ( ansible_distribution == "CentOS" and
-          ansible_distribution_major_version is version('7', '==')
-        ) or
-        ( ansible_distribution == "Rocky" and
-          ansible_distribution_major_version is version('8', '==')
-        ) or
-        ( ansible_distribution == "Debian" and
-          (ansible_distribution_major_version is version('10', '==') or
-          ansible_distribution_major_version is version('11', '=='))
-        ) or
-        ( ansible_distribution == "Ubuntu" and
-          (ansible_distribution_version is version('20.04', '==') or
-          ansible_distribution_version is version('22.04', '=='))
-        )
-      msg: >
-        OS ansible_distribution version ansible_distribution_major_version is not
-        supported.
-        Please use a supported OS in list:
-          - CentOS 7
-          - Rocky 8
-          - Debian 10, 11
-          - Ubuntu 20.04, 22.04
+  - name: Check Supported Distribution
+    ansible.builtin.assert:
+      that: ansible_distribution in supported_distributions
+      fail_msg: |
+        {{ ansible_distribution }} is not supported. Use one of these distributions:
+          {{ supported_distributions }}
+  - name: Check Support on CentOS
+    when: ansible_distribution == "CentOS"
+    ansible.builtin.assert:
+      that: ansible_distribution_major_version is version('7', '==')
+      fail_msg: |
+        When building Slurm-GCP on CentOS, use release 7
+  - name: Check Support on Rocky Linux
+    when: ansible_distribution == "Rocky"
+    ansible.builtin.assert:
+      that: ansible_distribution_major_version is version('8', '==')
+      fail_msg: |
+        When building Slurm-GCP on Rocky Linux, use release 8
+  - name: Check Support on Debian
+    when: ansible_distribution == "Debian"
+    ansible.builtin.assert:
+      that: ansible_distribution_major_version is version('10', '>=')
+      fail_msg: |
+        When building Slurm-GCP on Debian, use release 10 or above
+  - name: Check Support on Ubuntu
+    when: ansible_distribution == "Ubuntu"
+    ansible.builtin.assert:
+      that: ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '==')
+      fail_msg: |
+        When building Slurm-GCP on Ubuntu, use release 20.04 or 22.04
   - name: Minimum Ansible Version Check
     assert:
       that: ansible_version.full is version_compare({{min_ansible_version}}, '>=')
