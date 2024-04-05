@@ -169,6 +169,17 @@ variable "install_gcsfuse" {
   default     = true
 }
 
+variable "monitoring_agent" {
+  description = "Select which agent to install"
+  type        = string
+  default     = "legacy"
+
+  validation {
+    condition     = contains(["cloud-ops", "legacy", "none"], var.monitoring_agent)
+    error_message = "Set var.monitoring_agent to \"cloud-ops\", \"legacy\", or \"none\"."
+  }
+}
+
 ######################
 # BUILD VM VARIABLES #
 ######################
