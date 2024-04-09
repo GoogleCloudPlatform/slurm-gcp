@@ -19,4 +19,7 @@ python_packages:
 - python3-setuptools
 - python3-virtualenv
 
+# Debian 12 disallows you from installing pip packages in system-wide (/usr)
+# locations. Until we implement a virtual environment based solution, we must
+# force system-wide installation using the arguments below.
 extra_pip_args: --break-system-packages
