@@ -818,7 +818,7 @@ def mount_fstab(mounts):
 def munge_mount_handler():
     if not cfg.munge_mount:
         log.error("Missing munge_mount in cfg")
-    elif lkp.control_host == lkp.hostname:
+    elif lkp.instance_role == "controller":
         return
 
     mount = cfg.munge_mount
