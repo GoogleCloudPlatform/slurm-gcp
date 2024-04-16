@@ -25,7 +25,7 @@
   when: ansible_pkg_mgr in ["yum", "dnf"]
 
 - name: Ensure kernel headers are installed (apt)
-  apt:
+  ansible.builtin.apt:
     name:
     - linux-headers-{{ ansible_kernel }}
     - build-essential

@@ -13,7 +13,7 @@
     when: ansible_pkg_mgr == 'apt' and (not cuda_runfile_driver or not cuda_runfile_toolkit)
 
   - name: Install NVIDIA driver
-    apt:
+    ansible.builtin.apt:
       name: '{{ nvidia_packages }}'
       state: present
       update_cache: true
