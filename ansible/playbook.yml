@@ -30,6 +30,11 @@
 - hosts: all
   become: yes
 
+  module_defaults:
+    ansible.builtin.apt:
+      update_cache: true
+      cache_valid_time: 3600
+
   vars:
     min_ansible_version: 2.7
     supported_distributions:
