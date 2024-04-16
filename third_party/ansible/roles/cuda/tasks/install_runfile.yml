@@ -20,6 +20,7 @@
     - kernel-devel-{{ cuda_driver_kernel_version }}*
     - '@Development tools'
     - which
+    - dkms
     state: present
     update_cache: true
   when: ansible_pkg_mgr in ["yum", "dnf"]
@@ -29,6 +30,7 @@
     name:
     - linux-headers-{{ ansible_kernel }}
     - build-essential
+    - dkms
     state: present
   when: ansible_pkg_mgr == "apt"
 
