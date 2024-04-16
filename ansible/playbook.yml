@@ -57,6 +57,7 @@
     install_lustre: true
     install_gcsfuse: true
     install_pmix: true
+    allow_kernel_upgrades: true
 
   pre_tasks:
   - name: Minimum Ansible Version Check
@@ -93,7 +94,9 @@
   - name: Check Support on Debian
     when: ansible_distribution == "Debian"
     ansible.builtin.assert:
-      that: ansible_distribution_major_version is version('10', '>=') and ansible_distribution_major_version is version('12', '<=')
+      that:
+      - ansible_distribution_major_version is version('10', '>=')
+      - ansible_distribution_major_version is version('12', '<=')
       fail_msg: |
         When building Slurm-GCP on Debian, use release 10 or above
   - name: Check Support on Ubuntu
@@ -102,6 +105,11 @@
       that: ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '==')
       fail_msg: |
         When building Slurm-GCP on Ubuntu, use release 20.04 or 22.04
+  - name: Freeze kernel before running playbook
+    when: ansible_os_family == "Debian"
+    ansible.builtin.dpkg_selections:
+      name: "{{ debian_family_kernel_package | default('linux-image-cloud-amd64') }}"
+      selection: hold
 
   roles:
   - motd
@@ -147,3 +155,12 @@
   - role: ldap
     when: ansible_os_family != 'Debian'
   - scripts
+
+  post_tasks:
+  - name: Re-enable kernel upgrades by apt-get upgrade
+    when:
+    - ansible_os_family == "Debian"
+    - allow_kernel_upgrades
+    ansible.builtin.dpkg_selections:
+      name: "{{ debian_family_kernel_package | default('linux-image-cloud-amd64') }}"
+      selection: install

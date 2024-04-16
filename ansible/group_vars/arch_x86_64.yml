@@ -13,4 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+debian_family_kernel_package: linux-image-cloud-amd64
 debian_family_kernel_headers_package: linux-headers-cloud-amd64
