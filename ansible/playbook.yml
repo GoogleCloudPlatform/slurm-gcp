@@ -37,6 +37,9 @@
 
   vars:
     min_ansible_version: 2.7
+    supported_architectures:
+    - x86_64
+    - aarch64
     supported_distributions:
     - CentOS
     - Rocky
@@ -56,12 +59,25 @@
     install_pmix: true
 
   pre_tasks:
+  - name: Minimum Ansible Version Check
+    assert:
+      that: ansible_version.full is version_compare({{min_ansible_version}}, '>=')
+      msg: Update Ansible to at least {{min_ansible_version}} to use this playbook.
   - name: Check Supported Distribution
     ansible.builtin.assert:
       that: ansible_distribution in supported_distributions
       fail_msg: |
-        {{ ansible_distribution }} is not supported. Use one of these distributions:
+        OS {{ ansible_distribution }} is not supported. Use one of these distributions:
           {{ supported_distributions }}
+  - name: Check Supported Architectures
+    ansible.builtin.assert:
+      that: ansible_architecture in supported_architectures
+      fail_msg: |
+        Architecture {{ ansible_architecture }} is not supported. Use one of these architectures:
+          {{ supported_architectures }}
+  - name: Classify hosts by architecture
+    group_by:
+      key: arch_{{ ansible_architecture }}
   - name: Check Support on CentOS
     when: ansible_distribution == "CentOS"
     ansible.builtin.assert:
@@ -86,10 +102,6 @@
       that: ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '==')
       fail_msg: |
         When building Slurm-GCP on Ubuntu, use release 20.04 or 22.04
-  - name: Minimum Ansible Version Check
-    assert:
-      that: ansible_version.full is version_compare({{min_ansible_version}}, '>=')
-      msg: Update Ansible to at least {{min_ansible_version}} to use this playbook.
 
   roles:
   - motd
