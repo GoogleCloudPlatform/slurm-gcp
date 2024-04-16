@@ -1,14 +1,13 @@
 ---
 # tasks file for ansible-role-cuda
 - name: Trust packaging key for Nvidia repositories (apt)
-  apt:
+  ansible.builtin.apt:
     deb: '{{ cuda_repo_url }}/{{ cuda_repo_subfolder }}/x86_64/cuda-keyring_1.0-1_all.deb'
 
-- name: Update apt cache and remove dkms
-  apt:
+- name: Remove dkms
+  ansible.builtin.apt:
     name: dkms
     state: absent
-    update_cache: true
 
 - name: Hold dkms
   ansible.builtin.dpkg_selections:
