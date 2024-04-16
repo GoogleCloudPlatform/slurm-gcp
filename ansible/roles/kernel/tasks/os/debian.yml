@@ -30,24 +30,12 @@
 - block:
   - name: Reboot
     reboot:
-
   - name: Gather facts after reboot
     setup:
-
   when: reboot
 
-- name: Install {{ansible_os_family}} Family Kernel Packages
+- name: Install current and future kernel headers
   ansible.builtin.apt:
     name:
     - linux-headers-{{ansible_kernel}}
-    state: latest
-    update_cache: yes
-  when: reboot
-
-- name: Install {{ansible_os_family}} Family Kernel Packages
-  ansible.builtin.apt:
-    name:
-    - linux-headers-generic
-    state: latest
-    update_cache: yes
-  when: not reboot
+    - "{{ debian_family_kernel_headers_package | default('linux-headers-cloud-amd64') }}"
