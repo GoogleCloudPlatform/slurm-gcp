@@ -60,6 +60,11 @@ data "local_file" "startup" {
 #############
 # INSTANCES #
 #############
+resource "null_resource" "replace_trigger" {
+  triggers = {
+    trigger = var.replace_trigger
+  }
+}
 
 resource "google_compute_instance_from_template" "slurm_instance" {
   count   = local.num_instances
@@ -104,4 +109,8 @@ resource "google_compute_instance_from_template" "slurm_instance" {
       VmDnsSetting        = "GlobalOnly"
     },
   )
+
+  lifecycle {
+    replace_triggered_by = [null_resource.replace_trigger.id]
+  }
 }

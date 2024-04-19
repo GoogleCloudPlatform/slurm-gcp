@@ -126,3 +126,10 @@ variable "slurm_cluster_name" {
   description = "Cluster name, used for resource naming."
   type        = string
 }
+
+
+variable "replace_trigger" {
+  description = "Trigger value to replace the instances."
+  type        = string
+  default     = ""
+}
