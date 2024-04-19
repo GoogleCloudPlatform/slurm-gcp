@@ -21,8 +21,12 @@
 
 - name: Enable CentOS 8 PowerTools Repository
   command: dnf config-manager --set-enabled powertools
+  when: ansible_distribution == "Rocky"
+
+- name: Enable RHEL 8 CodeReady Repository
+  command: 'dnf config-manager --set-enabled *appstream* *baseos* *codeready-builder*'
+  when: ansible_distribution == "RedHat"
 
 - name: Install epel-release Repository
   yum:
-    name: epel-release
-    state: present
+    name: "{{ epel_release_package | default('epel-release') }}"

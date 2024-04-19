@@ -43,6 +43,7 @@
     supported_distributions:
     - CentOS
     - Rocky
+    - RedHat
     - Debian
     - Ubuntu
     paths:
@@ -91,6 +92,12 @@
       that: ansible_distribution_major_version is version('8', '==')
       fail_msg: |
         When building Slurm-GCP on Rocky Linux, use release 8
+  - name: Check Support on RedHat Linux
+    when: ansible_distribution == "RedHat"
+    ansible.builtin.assert:
+      that: ansible_distribution_major_version is version('8', '==')
+      fail_msg: |
+        When building Slurm-GCP on RedHat Linux, use release 8
   - name: Check Support on Debian
     when: ansible_distribution == "Debian"
     ansible.builtin.assert:
