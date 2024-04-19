@@ -12,6 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 - hosts: all
   become: no
@@ -48,7 +62,8 @@
           ansible_distribution_version is version('22.04', '=='))
         ) or
         ( ansible_distribution == "RedHat" and
-          ansible_distribution_major_version is version('8', '==')
+          (ansible_distribution_major_version is version('8', '==') or
+          ansible_distribution_major_version is version('9', '=='))
         )
       msg: >
         OS ansible_distribution version ansible_distribution_major_version is not
@@ -56,9 +71,9 @@
         Please use a supported OS in list:
           - CentOS 7
           - Rocky 8
+          - RedHat 8, 9
           - Debian 10, 11
           - Ubuntu 20.04, 22.04
-          - RedHat 8
   - name: Minimum Ansible Version Check
     assert:
       that: ansible_version.full is version_compare({{min_ansible_version}}, '>=')
