@@ -486,7 +486,7 @@ def tpu_nodeset_switch_lines(lkp=lkp):
     return "\n".join(filter(None, lines))
 
 
-def nodeset_switch_lines(nodeset, lkp=lkp):
+def nodeset_switch_lines(lkp=lkp):
     lines = []
 
     for nodeset in lkp.cfg.nodeset.values():
