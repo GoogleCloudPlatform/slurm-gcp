@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.4.4\]
+
+- Add `replace_trigger` to `_slurm_instance` for fine-grained control over
+  instance replacement
+- Add support for installing NVIDIA open drivers
+- Add support for PMIx to image building solution (images published after this release will contain PMIx)
+- Support specifying monitoring agent in Packer
+- TPU: update supported docker images list
+- Fix: prevent controller from mounting munge key by NFS
+- Fix: retry DNS lookups during early setup process
+- Fix: ensure VM always boots into kernel against which NVIDIA drivers were built
+- Fix: resolve bug in `enable_configure` by removing unused parameter from `nodeset_switch_lines` function
+- Enable building Slurm on Debian 12 images (not yet officially supported or tested)
+
+## \[6.4.3\]
+
+- Add support for nodeset-specific startup scripts
+
 ## \[6.4.2\]
 
 - Fix slurmsync.py would try to delete static placement policy as it is not
