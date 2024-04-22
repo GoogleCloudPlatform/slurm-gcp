@@ -210,7 +210,7 @@ resource "google_storage_bucket_object" "jobsubmit_lua_tpl" {
 
 resource "google_storage_bucket_object" "controller_startup_scripts" {
   for_each = {
-    for x in var.controller_startup_scripts
+    for x in local.controller_startup_scripts
     : replace(basename(x.filename), "/[^a-zA-Z0-9-_]/", "_") => x
   }
 
@@ -257,7 +257,7 @@ resource "google_storage_bucket_object" "login_startup_scripts" {
 
 resource "google_storage_bucket_object" "prolog_scripts" {
   for_each = {
-    for x in var.prolog_scripts
+    for x in local.prolog_scripts
     : replace(basename(x.filename), "/[^a-zA-Z0-9-_]/", "_") => x
   }
 
@@ -268,7 +268,7 @@ resource "google_storage_bucket_object" "prolog_scripts" {
 
 resource "google_storage_bucket_object" "epilog_scripts" {
   for_each = {
-    for x in var.epilog_scripts
+    for x in local.epilog_scripts
     : replace(basename(x.filename), "/[^a-zA-Z0-9-_]/", "_") => x
   }
 
@@ -277,6 +277,21 @@ resource "google_storage_bucket_object" "epilog_scripts" {
   content = each.value.content
 }
 
+################################
+# DATA: EXTERNAL PROLOG/EPILOG #
+################################
+
+data "local_file" "external_epilog" {
+  filename = "${path.module}/files/external_epilog.sh"
+}
+
+data "local_file" "external_prolog" {
+  filename = "${path.module}/files/external_prolog.sh"
+}
+
+data "local_file" "setup_external" {
+  filename = "${path.module}/files/setup_external.sh"
+}
 
 locals {
   checksum = md5(join("", flatten([
@@ -293,4 +308,23 @@ locals {
     [for k, f in google_storage_bucket_object.prolog_scripts : f.md5hash],
     [for k, f in google_storage_bucket_object.epilog_scripts : f.md5hash]
   ])))
+
+  external_epilog = [{
+    filename = "z_external_epilog.sh"
+    content  = data.local_file.external_epilog.content
+  }]
+  external_prolog = [{
+    filename = "z_external_prolog.sh"
+    content  = data.local_file.external_prolog.content
+  }]
+  setup_external = [{
+    filename = "z_setup_external.sh"
+    content  = data.local_file.setup_external.content
+  }]
+
+  prolog_scripts             = var.enable_external_prolog_epilog ? concat(local.external_prolog, var.prolog_scripts) : var.prolog_scripts
+  epilog_scripts             = var.enable_external_prolog_epilog ? concat(local.external_epilog, var.epilog_scripts) : var.epilog_scripts
+  controller_startup_scripts = var.enable_external_prolog_epilog ? concat(local.setup_external, var.controller_startup_scripts) : var.controller_startup_scripts
+
+
 }
