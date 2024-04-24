@@ -20,7 +20,7 @@ grpcio==1.56.0
 grpcio-status==1.56.0
 httplib2==0.22.0
 idna==3.7
-ipython==7.16.3
+ipython>=8.10
 jedi==0.17.2
 more-executors==2.11.4
 packaging==23.1
