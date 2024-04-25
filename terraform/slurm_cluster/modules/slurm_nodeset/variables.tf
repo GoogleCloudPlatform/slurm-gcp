@@ -179,3 +179,15 @@ variable "bandwidth_tier" {
     error_message = "Allowed values for bandwidth_tier are 'platform_default', 'virtio_enabled', 'gvnic_enabled', or 'tier_1_enabled'."
   }
 }
+
+variable "network_storage" {
+  description = "An array of network attached storage mounts to be configured on nodes."
+  type = list(object({
+    server_ip     = string,
+    remote_mount  = string,
+    local_mount   = string,
+    fs_type       = string,
+    mount_options = string,
+  }))
+  default = []
+}

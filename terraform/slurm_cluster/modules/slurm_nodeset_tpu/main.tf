@@ -70,6 +70,7 @@ locals {
     data_disks             = var.data_disks
     docker_image           = var.docker_image != "" ? var.docker_image : "us-docker.pkg.dev/schedmd-slurm-public/tpu/slurm-gcp-6-4:tf-${var.tf_version}"
     subnetwork             = local.snetwork
+    network_storage        = var.network_storage
   }
 
   service_account = {
