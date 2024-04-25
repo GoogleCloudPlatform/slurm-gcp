@@ -33,7 +33,7 @@ Then perform the following commands on the
 
 ## Dependencies
 
-- [ansible](../docs/glossary.md#ansible)
+- [ansible](https://docs.ansible.com/ansible/)
   - Install as a system package, to the user (see below), or in a
     [virtualenv](https://virtualenv.pypa.io/en/latest/)
   - `pip3 install -r requirements.txt --user`
