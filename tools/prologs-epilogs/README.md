@@ -40,6 +40,7 @@ mkdir -p /opt/apps/adm/slurm/prolog_slurmd.d
 mkdir -p /opt/apps/adm/slurm/epilog_slurmd.d
 curl -s --create-dirs -o /opt/apps/adm/slurm/scripts/receive-data-path-manager \
     https://raw.githubusercontent.com/GoogleCloudPlatform/slurm-gcp/v5/tools/prologs-epilogs/receive-data-path-manager
+chmod 0755 /opt/apps/adm/slurm/scripts/
 chmod 0755 /opt/apps/adm/slurm/scripts/receive-data-path-manager
 ln -s /opt/apps/adm/slurm/scripts/receive-data-path-manager /opt/apps/adm/slurm/prolog_slurmd.d/start-rxdm.prolog_slurmd
 ln -s /opt/apps/adm/slurm/scripts/receive-data-path-manager /opt/apps/adm/slurm/epilog_slurmd.d/stop-rxdm.epilog_slurmd
