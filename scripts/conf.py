@@ -402,7 +402,7 @@ def gen_cloud_gres_conf(lkp=lkp):
     """generate cloud_gres.conf"""
 
     gpu_nodes = defaultdict(list)
-    for nodeset in cfg.nodeset.values():
+    for nodeset in lkp.cfg.nodeset.values():
         template_info = lkp.template_info(nodeset.instance_template)
         gpu_count = template_info.gpu_count
         if gpu_count == 0:
