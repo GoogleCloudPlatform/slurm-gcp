@@ -63,11 +63,7 @@ locals {
 
   slurm_instance_role = var.slurm_instance_role != null ? lower(var.slurm_instance_role) : null
 
-  name_prefix = (
-    local.slurm_instance_role != null
-    ? "${var.slurm_cluster_name}-${local.slurm_instance_role}-${var.name_prefix}"
-    : "${var.slurm_cluster_name}-${var.name_prefix}"
-  )
+  name_prefix = "${var.slurm_cluster_name}-${var.name_prefix}"
 
   total_egress_bandwidth_tier = var.bandwidth_tier == "tier_1_enabled" ? "TIER_1" : "DEFAULT"
 
