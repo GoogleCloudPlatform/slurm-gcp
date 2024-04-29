@@ -1,0 +1,42 @@
+---
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- name: Wait for DPKG Locks
+  ansible.builtin.shell: |
+    set -e -o pipefail
+    ### Setting up Enroot
+    if ! dpkg -l enroot &>/dev/null; then
+        arch=\$(dpkg --print-architecture)
+        curl -fSsL -O https://github.com/NVIDIA/enroot/releases/download/v3.4.1/enroot_3.4.1-1_${arch}.deb
+        curl -fSsL -O https://github.com/NVIDIA/enroot/releases/download/v3.4.1/enroot+caps_3.4.1-1_${arch}.deb # optional
+        apt-get update
+        apt-get install --assume-yes ./*.deb
+        rm enroot*.deb
+    fi
+    # configure enroot
+    # use single quotes around EOT to avoid shell interpolation
+    cat <<'EOT' > /etc/enroot/enroot.conf
+    ENROOT_RUNTIME_PATH    /mnt/localssd/${UID}/enroot/runtime
+    ENROOT_CONFIG_PATH     /mnt/localssd/${UID}/enroot/config
+    ENROOT_CACHE_PATH      /mnt/localssd/${UID}/enroot/cache
+    ENROOT_DATA_PATH       /mnt/localssd/${UID}/enroot/data
+    EOT
+    ### Install Pyxis
+    if [ ! -f "/usr/local/lib/slurm/spank_pyxis.so" ]; then
+        git clone --depth 1 https://github.com/NVIDIA/pyxis.git
+        cd pyxis && make install && cd -
+        rm -rf pyxis
+        echo "required /usr/local/lib/slurm/spank_pyxis.so" > /etc/slurm/plugstack.conf
+    fi
