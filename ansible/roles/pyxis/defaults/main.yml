@@ -13,10 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Install Enroot
-  ansible.builtin.dnf:
-    name:
-    - epel-release
-    - 'https://github.com/NVIDIA/enroot/releases/download/v3.4.1/enroot-3.4.1-1.el8.{{ ansible_architecture }}.rpm'
-    - 'https://github.com/NVIDIA/enroot/releases/download/v3.4.1/enroot+caps-3.4.1-1.el8.{{ ansible_architecture }}.rpm'
-    state: present
+pyxis_ver: 0.19.0
