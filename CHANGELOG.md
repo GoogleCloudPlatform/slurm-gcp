@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.4.5\]
+
+- Add support for externally-managed prolog/epilog scripts
+- Add example receive-data-path-manager prolog/epilog
+- Fix installation of NVIDIA open drivers in image building solution
+- Remove slurmd restart cronjob (implemented using SystemD in abb487f1)
+- write Slurm node configurations with SocketsPerBoard rather than Sockets, to
+  align with recommendation in 23.11 documentation
+
 ## \[6.4.4\]
 
 - Add `replace_trigger` to `_slurm_instance` for fine-grained control over
