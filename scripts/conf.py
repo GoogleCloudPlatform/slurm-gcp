@@ -139,13 +139,15 @@ def nodeset_lines(nodeset, lkp=lkp):
     template_info = lkp.template_info(nodeset.instance_template)
     machine_conf = lkp.template_machine_conf(nodeset.instance_template)
 
+    # follow https://slurm.schedmd.com/slurm.conf.html#OPT_Boards
+    # by setting Boards, SocketsPerBoard, CoresPerSocket, and ThreadsPerCore
     node_def = dict_to_conf(
         {
             "NodeName": "DEFAULT",
             "State": "UNKNOWN",
             "RealMemory": machine_conf.memory,
             "Boards": machine_conf.boards,
-            "Sockets": machine_conf.sockets,
+            "SocketsPerBoard": machine_conf.sockets_per_board,
             "CoresPerSocket": machine_conf.cores_per_socket,
             "ThreadsPerCore": machine_conf.threads_per_core,
             "CPUs": machine_conf.cpus,
