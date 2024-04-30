@@ -335,11 +335,22 @@ def delete_placement_groups(placement_groups):
         pg.name: delete_placement_request(pg["name"], util.trim_self_link(pg["region"]))
         for pg in placement_groups
     }
-    done, failed = batch_execute(requests)
+
+    def swallow_err(_: str) -> None:
+        pass
+
+    done, failed = batch_execute(requests, log_err=swallow_err)
     if failed:
-        failed_pg = [f"{n}: {e}" for n, (_, e) in failed.items()]
-        log.error(f"some placement groups failed to delete: {failed_pg}")
-    log.info(f"deleted {len(done)} placement groups ({to_hostlist(done.keys())})")
+        # Filter out resourceInUseByAnotherResource errors , they are expected to happen
+        def ignore_err(e) -> bool:
+            return "resourceInUseByAnotherResource" in str(e)
+
+        failures = [f"{n}: {e}" for n, (_, e) in failed.items() if not ignore_err(e)]
+        if failures:
+            log.error(f"some placement groups failed to delete: {failures}")
+    log.info(
+        f"deleted {len(done)} of {len(placement_groups)} placement groups ({to_hostlist(done.keys())})"
+    )
 
 
 def sync_placement_groups():
