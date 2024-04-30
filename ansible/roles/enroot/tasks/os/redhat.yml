@@ -13,9 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Install Enroot
-  ansible.builtin.apt:
-    deb:
-    - 'https://github.com/NVIDIA/enroot/releases/download/v3.4.1/enroot-3.4.1-1_{{ ansible_architecture }}.deb'
-    - 'https://github.com/NVIDIA/enroot/releases/download/v3.4.1/enroot+caps-3.4.1-1_{{ ansible_architecture }}.deb'
+- name: Install Runtime Dependencies
+  ansible.builtin.yum:
+    name:
+    - jq
+    - squashfs-tools
+    - parallel
+    state: present
+
+- name: Install Enroot Packages
+  ansible.builtin.yum:
+    name:
+    - https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_ver }}/{{ enroot_rh }}
+    - https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_ver }}/{{ enroot_caps_rh }}
+    disable_gpg_check: True
     state: present

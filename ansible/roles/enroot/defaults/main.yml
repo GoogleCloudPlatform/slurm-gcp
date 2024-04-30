@@ -13,18 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Clone pyxis
-  ansible.builtin.git:
-    repo: 'https://github.com/NVIDIA/pyxis.git'
-    dest: /tmp/pyxis
-    version: 'v{{ pyxis_ver }}'
-
-- name: Build and install pyxis
-  ansible.builtin.shell:
-    cmd: make install
-    chdir: /tmp/pyxis
-
-- name: Add line to plugstack conf
-  ansible.builtin.copy:
-    content: 'required /usr/local/lib/slurm/spank_pyxis.so'
-    dest: /etc/slurm/plugstack.conf
+enroot_ver: 3.4.1
+enroot_pkg_ver: 1
+enroot_deb: enroot_{{ enroot_ver }}-{{ enroot_pkg_ver }}_{{ deb_architecture.stdout }}.deb
+enroot_caps_deb: enroot+caps_{{ enroot_ver }}-{{ enroot_pkg_ver }}_{{ deb_architecture.stdout }}.deb
+enroot_rh: enroot-{{ enroot_ver }}-{{ enroot_pkg_ver }}.el8.{{ ansible_architecture }}.rpm
+enroot_caps_rh: enroot+caps-{{ enroot_ver }}-{{ enroot_pkg_ver }}.el8.{{ ansible_architecture }}.rpm

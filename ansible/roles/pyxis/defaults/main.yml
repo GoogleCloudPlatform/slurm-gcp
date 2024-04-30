@@ -14,3 +14,5 @@
 # limitations under the License.
 
 pyxis_ver: 0.19.0
+enroot_ver: 3.4.1
+enroot_pkg_ver: 1

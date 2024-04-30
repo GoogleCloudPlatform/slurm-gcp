@@ -15,3 +15,5 @@
 
 dependencies:
 - role: common
+- role: enroot
+- role: slurm

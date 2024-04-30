@@ -130,9 +130,6 @@
   - role: pmix
     when:
     - install_pmix
-  - role: pyxis
-    when:
-    - install_pyxis
   - nfs
   - cgroups
   - munge
@@ -141,6 +138,9 @@
   - lmod
   - slurm
   - slurmcmd
+  - role: pyxis
+    when:
+    - install_pyxis
   - role: ompi
     when: install_ompi
   - role: lustre
