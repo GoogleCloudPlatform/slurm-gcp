@@ -59,6 +59,10 @@ from conf import (
     install_cgroup_conf,
     install_topology_conf,
 )
+from setup_network_storage import (
+    setup_network_storage,
+    setup_nfs_exports,
+)
 
 filename = Path(__file__).name
 LOGFILE = (Path(cfg.slurm_log_dir if cfg else ".") / filename).with_suffix(".log")
@@ -482,6 +486,8 @@ def reconfigure_slurm():
             install_gres_conf(lkp)
             install_cgroup_conf(lkp)
             install_topology_conf(lkp)
+            setup_network_storage(log)
+            setup_nfs_exports()
             log.info("Restarting slurmctld to make changes take effect.")
             try:
                 run("sudo systemctl restart slurmctld.service", check=False)
@@ -491,6 +497,7 @@ def reconfigure_slurm():
             util.run(f"wall '{update_msg}'", timeout=30)
             log.debug("Done.")
         elif lkp.instance_role_safe in ["compute", "login"]:
+            setup_network_storage(log)
             log.info("Restarting slurmd to make changes take effect.")
             run("systemctl restart slurmd")
             util.run(f"wall '{update_msg}'", timeout=30)
