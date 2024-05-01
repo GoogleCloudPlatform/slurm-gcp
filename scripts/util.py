@@ -1826,7 +1826,8 @@ class Lookup:
         machine_conf = NSDict()
         machine_conf.boards = 1  # No information, assume 1
         machine_conf.sockets = machine_type_sockets(template)
-        machine_conf.sockets_per_board = machine_conf.sockets / machine_conf.boards
+        # the value below for SocketsPerBoard must be type int
+        machine_conf.sockets_per_board = machine_conf.sockets // machine_conf.boards
         machine_conf.threads_per_core = 1
         _div = 2 if getThreadsPerCore(template) == 1 else 1
         machine_conf.cpus = (
