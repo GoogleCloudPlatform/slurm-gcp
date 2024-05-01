@@ -24,7 +24,7 @@ import sys
 import stat
 import time
 from concurrent.futures import as_completed
-from functools import partialmethod, lru_cache
+from functools import partialmethod
 from itertools import chain
 from pathlib import Path
 
@@ -235,63 +235,57 @@ def run_custom_scripts():
         raise e
 
 
-def local_mounts(mountlist):
-    """convert network_storage list of mounts to dict of mounts,
-    local_mount as key
-    """
-    return {str(Path(m.local_mount).resolve()): m for m in mountlist}
+def mounts_by_local(mounts):
+    """convert list of mounts to dict of mounts, local_mount as key"""
+    return {str(Path(m.local_mount).resolve()): m for m in mounts}
 
 
-@lru_cache(maxsize=None)
-def resolve_network_storage(partition_name=None):
+def resolve_network_storage(nodeset=None):
     """Combine appropriate network_storage fields to a single list"""
 
     if lkp.instance_role == "compute":
         try:
-            partition_name = lkp.node_partition_name()
+            nodeset = lkp.node_nodeset()
         except Exception:
-            # External nodename, skip partition lookup
-            partition_name = None
-    partition = cfg.partitions[partition_name] if partition_name else None
-
-    default_mounts = (
-        dirs.home,
-        dirs.apps,
-    )
-
-    # create dict of mounts, local_mount: mount_info
-    CONTROL_NFS = {
-        "server_ip": lkp.control_addr or lkp.control_host,
-        "remote_mount": "none",
-        "local_mount": "none",
-        "fs_type": "nfs",
-        "mount_options": "defaults,hard,intr",
-    }
+            # External nodename, skip lookup
+            nodeset = None
 
     # seed mounts with the default controller mounts
-    mounts = (
-        local_mounts(
-            [
-                NSDict(CONTROL_NFS, local_mount=str(path), remote_mount=str(path))
-                for path in default_mounts
-            ]
-        )
-        if not cfg.disable_default_mounts
-        else {}
-    )
+    if cfg.disable_default_mounts:
+        default_mounts = []
+    else:
+        default_mounts = [
+            NSDict(
+                {
+                    "server_ip": lkp.control_addr or lkp.control_host,
+                    "remote_mount": str(path),
+                    "local_mount": str(path),
+                    "fs_type": "nfs",
+                    "mount_options": "defaults,hard,intr",
+                }
+            )
+            for path in (
+                dirs.home,
+                dirs.apps,
+            )
+        ]
+
+    # create dict of mounts, local_mount: mount_info
+    mounts = mounts_by_local(default_mounts)
+
     # On non-controller instances, entries in network_storage could overwrite
     # default exports from the controller. Be careful, of course
-    mounts.update(local_mounts(cfg.network_storage))
-    if partition is None:
-        mounts.update(local_mounts(cfg.login_network_storage))
+    mounts.update(mounts_by_local(cfg.network_storage))
+    if lkp.instance_role in ("login", "controller"):
+        mounts.update(mounts_by_local(cfg.login_network_storage))
 
-    if partition is not None:
-        mounts.update(local_mounts(partition.network_storage))
+    if nodeset is not None:
+        mounts.update(mounts_by_local(nodeset.network_storage))
     return list(mounts.values())
 
 
-def partition_mounts(mounts):
-    """partition into cluster-external and internal mounts"""
+def separate_extenral_internal_mounts(mounts):
+    """separate into cluster-external and internal mounts"""
 
     def internal_mount(mount):
         # NOTE: Valid Lustre server_ip can take the form of '<IP>@tcp'
@@ -308,10 +302,12 @@ def setup_network_storage():
     # filter mounts into two dicts, cluster-internal and external mounts
 
     all_mounts = resolve_network_storage()
-    ext_mounts, int_mounts = partition_mounts(all_mounts)
-    mounts = ext_mounts
-    if lkp.instance_role != "controller":
-        mounts.extend(int_mounts)
+    ext_mounts, int_mounts = separate_extenral_internal_mounts(all_mounts)
+
+    if lkp.instance_role == "controller":
+        mounts = ext_mounts
+    else:
+        mounts = ext_mounts + int_mounts
 
     # Determine fstab entries and write them out
     fstab_entries = []
@@ -362,7 +358,7 @@ def setup_network_storage():
             f.write(entry)
             f.write("\n")
 
-    mount_fstab(local_mounts(mounts))
+    mount_fstab(mounts_by_local(mounts))
     munge_mount_handler()
 
 
@@ -493,15 +489,14 @@ def setup_nfs_exports():
         )
     )
     # controller mounts
-    _, con_mounts = partition_mounts(mounts)
+    _, con_mounts = separate_extenral_internal_mounts(mounts)
     con_mounts = {m.remote_mount: m for m in con_mounts}
-    for part in cfg.partitions:
-        # get internal mounts for each partition by calling
-        # prepare_network_mounts as from a node in each partition
-        part_mounts = resolve_network_storage(part)
-        _, p_mounts = partition_mounts(part_mounts)
-        part_mounts = {m.remote_mount: m for m in p_mounts}
-        con_mounts.update(part_mounts)
+    for nodeset in cfg.nodeset.values():
+        # get internal mounts for each nodeset by calling
+        # resolve_network_storage as from a node in each nodeset
+        ns_mounts = resolve_network_storage(nodeset=nodeset)
+        _, int_mounts = separate_extenral_internal_mounts(ns_mounts)
+        con_mounts.update({m.remote_mount: m for m in int_mounts})
 
     # export path if corresponding selector boolean is True
     exports = []

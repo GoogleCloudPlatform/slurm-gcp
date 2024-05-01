@@ -394,7 +394,9 @@ def new_config(config):
         (
             *cfg.network_storage,
             *cfg.login_network_storage,
-            *chain.from_iterable(p.network_storage for p in cfg.partitions.values()),
+            *chain.from_iterable(ns.network_storage for ns in cfg.nodeset.values()),
+            *chain.from_iterable(ns.network_storage for ns in cfg.nodeset_dyn.values()),
+            *chain.from_iterable(ns.network_storage for ns in cfg.nodeset_tpu.values()),
         ),
     )
     for netstore in network_storage_iter:
