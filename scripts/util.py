@@ -882,7 +882,7 @@ def ensure_execute(request):
         break
 
 
-def batch_execute(requests, compute=compute, retry_cb=None):
+def batch_execute(requests, compute=compute, retry_cb=None, log_err=log.error):
     """execute list or dict<req_id, request> as batch requests
     retry if retry_cb returns true
     """
@@ -897,7 +897,7 @@ def batch_execute(requests, compute=compute, retry_cb=None):
     def batch_callback(rid, resp, exc):
         nonlocal rate_limited
         if exc is not None:
-            log.error(f"compute request exception {rid}: {exc}")
+            log_err(f"compute request exception {rid}: {exc}")
             if retry_exception(exc):
                 rate_limited = True
             else:
