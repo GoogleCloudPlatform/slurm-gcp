@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.4.7\]
+
+- Support nodeset-specific network_storage
+- Suppress noisy error message when fail to delete used resource policies
+
+## \[6.4.6\]
+
+- Fix SocketPerBoard computation
+
 ## \[6.4.5\]
 
 - Add support for externally-managed prolog/epilog scripts
