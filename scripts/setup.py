@@ -732,7 +732,6 @@ def setup_login(args):
     if lkp.control_addr:
         slurmctld_host = f"{lkp.control_host}({lkp.control_addr})"
     slurmd_options = [
-        f"-N {lkp.hostname}",
         f'--conf-server="{slurmctld_host}:{lkp.control_host_port}"',
         f'--conf="Feature={login_nodeset}"',
         "-Z",
@@ -765,7 +764,6 @@ def setup_compute(args):
     if lkp.control_addr:
         slurmctld_host = f"{lkp.control_host}({lkp.control_addr})"
     slurmd_options = [
-        f"-N {lkp.hostname}",
         f'--conf-server="{slurmctld_host}:{lkp.control_host_port}"',
     ]
     if args.slurmd_feature is not None:
