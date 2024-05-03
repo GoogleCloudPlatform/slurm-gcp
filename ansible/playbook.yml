@@ -58,6 +58,7 @@
     install_lustre: true
     install_gcsfuse: true
     install_pmix: true
+    install_pyxis: true
     allow_kernel_upgrades: true
 
   pre_tasks:
@@ -144,6 +145,9 @@
   - lmod
   - slurm
   - slurmcmd
+  - role: pyxis
+    when:
+    - install_pyxis
   - role: ompi
     when: install_ompi
   - role: lustre

@@ -15,3 +15,4 @@
 
 debian_family_kernel_package: linux-image-cloud-arm64
 debian_family_kernel_headers_package: linux-headers-cloud-arm64
+deb_arch: arm64

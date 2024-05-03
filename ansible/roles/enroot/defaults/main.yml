@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-debian_family_kernel_package: linux-image-cloud-amd64
-debian_family_kernel_headers_package: linux-headers-cloud-amd64
-deb_arch: amd64
+enroot_ver: 3.4.1
+enroot_pkg_ver: 1
+enroot_hardened: false
+root_enroot: enroot{{ "-hardened" if enroot_hardened else "" }}
+enroot_deb: '{{ root_enroot }}_{{ enroot_ver }}-{{ enroot_pkg_ver }}_{{ deb_arch }}.deb'
+enroot_caps_deb: '{{ root_enroot }}+caps_{{ enroot_ver }}-{{ enroot_pkg_ver }}_{{ deb_arch }}.deb'
+enroot_rpm: '{{ root_enroot }}-{{ enroot_ver }}-{{ enroot_pkg_ver }}.el8.{{ ansible_architecture }}.rpm'
+enroot_caps_rpm: '{{ root_enroot }}+caps-{{ enroot_ver }}-{{ enroot_pkg_ver }}.el8.{{ ansible_architecture }}.rpm'

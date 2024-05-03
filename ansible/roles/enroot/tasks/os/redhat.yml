@@ -13,6 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-debian_family_kernel_package: linux-image-cloud-amd64
-debian_family_kernel_headers_package: linux-headers-cloud-amd64
-deb_arch: amd64
+- name: Install Runtime Dependencies
+  ansible.builtin.yum:
+    name:
+    - jq
+    - squashfs-tools
+    - parallel
+    state: present
+
+- name: Install Enroot Packages
+  ansible.builtin.yum:
+    name:
+    - https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_ver }}/{{ enroot_rpm }}
+    - https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_ver }}/{{ enroot_caps_rpm }}
+    disable_gpg_check: True
+    state: present
