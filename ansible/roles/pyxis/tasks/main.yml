@@ -13,18 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Clone pyxis
-  ansible.builtin.git:
-    repo: 'https://github.com/NVIDIA/pyxis.git'
-    dest: /tmp/pyxis
-    version: 'v{{ pyxis_ver }}'
+- name: Check if pyxis is installed
+  stat:
+    path: /usr/local/lib/slurm/spank_pyxis.so
+  register: pyxis_installed
 
-- name: Build and install pyxis
-  ansible.builtin.shell:
-    cmd: make install
-    chdir: /tmp/pyxis
+- block:
+  - name: Clone pyxis
+    ansible.builtin.git:
+      repo: 'https://github.com/NVIDIA/pyxis.git'
+      dest: /tmp/pyxis
+      version: 'v{{ pyxis_ver }}'
 
-- name: Add line to plugstack conf
-  ansible.builtin.copy:
-    content: 'required /usr/local/lib/slurm/spank_pyxis.so'
-    dest: /etc/slurm/plugstack.conf
+  - name: Build and install pyxis
+    ansible.builtin.shell:
+      cmd: make install
+      chdir: /tmp/pyxis
+
+  - name: Add line to plugstack conf
+    ansible.builtin.lineinfile:
+      create: True
+      path: /etc/slurm/plugstack.conf
+      regexp: '\s*required\s+/usr/local/lib/slurm/spank_pyxis.so\s*'
+      line: 'required /usr/local/lib/slurm/spank_pyxis.so'
+  when: not pyxis_installed.stat.exists

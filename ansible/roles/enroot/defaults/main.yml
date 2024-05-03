@@ -15,7 +15,9 @@
 
 enroot_ver: 3.4.1
 enroot_pkg_ver: 1
-enroot_deb: enroot_{{ enroot_ver }}-{{ enroot_pkg_ver }}_{{ deb_architecture.stdout }}.deb
-enroot_caps_deb: enroot+caps_{{ enroot_ver }}-{{ enroot_pkg_ver }}_{{ deb_architecture.stdout }}.deb
-enroot_rh: enroot-{{ enroot_ver }}-{{ enroot_pkg_ver }}.el8.{{ ansible_architecture }}.rpm
-enroot_caps_rh: enroot+caps-{{ enroot_ver }}-{{ enroot_pkg_ver }}.el8.{{ ansible_architecture }}.rpm
+enroot_hardened: false
+root_enroot: enroot{{ "-hardened" if enroot_hardened else "" }}
+enroot_deb: '{{ root_enroot }}_{{ enroot_ver }}-{{ enroot_pkg_ver }}_{{ deb_arch }}.deb'
+enroot_caps_deb: '{{ root_enroot }}+caps_{{ enroot_ver }}-{{ enroot_pkg_ver }}_{{ deb_arch }}.deb'
+enroot_rpm: '{{ root_enroot }}-{{ enroot_ver }}-{{ enroot_pkg_ver }}.el8.{{ ansible_architecture }}.rpm'
+enroot_caps_rpm: '{{ root_enroot }}+caps-{{ enroot_ver }}-{{ enroot_pkg_ver }}.el8.{{ ansible_architecture }}.rpm'

@@ -24,7 +24,7 @@
 - name: Install Enroot Packages
   ansible.builtin.yum:
     name:
-    - https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_ver }}/{{ enroot_rh }}
-    - https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_ver }}/{{ enroot_caps_rh }}
+    - https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_ver }}/{{ enroot_rpm }}
+    - https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_ver }}/{{ enroot_caps_rpm }}
     disable_gpg_check: True
     state: present

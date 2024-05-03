@@ -13,13 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Get debian architecture
-  shell: dpkg --print-architecture
-  register: deb_architecture
-
 - name: Install Runtime Dependencies
   ansible.builtin.apt:
-    update_cache: yes
     name:
     - curl
     - gawk
@@ -36,12 +31,10 @@
     url: https://github.com/NVIDIA/enroot/releases/download/v{{ enroot_ver }}/{{ enroot_caps_deb }}
     dest: /tmp/{{ enroot_caps_deb }}
 
-- name: Install Enroot
+- name: Install Enroot Packages
   ansible.builtin.apt:
-    deb: /tmp/{{ enroot_deb }}
+    deb: '{{ item }}'
     state: present
-
-- name: Install Enroot Caps
-  ansible.builtin.apt:
-    deb: /tmp/{{ enroot_caps_deb }}
-    state: present
+  with_items:
+  - /tmp/{{ enroot_deb }}
+  - /tmp/{{ enroot_caps_deb }}
