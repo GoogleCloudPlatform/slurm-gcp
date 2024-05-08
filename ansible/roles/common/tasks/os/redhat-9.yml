@@ -27,6 +27,11 @@
   command: 'dnf config-manager --set-enabled *appstream* *baseos* *codeready-builder*'
   when: ansible_distribution == "RedHat"
 
+- name: Install epel-gpgkey
+  ansible.builtin.rpm_key:
+    state: present
+    key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9
+
 - name: Install epel-release Repository
   yum:
     name: "{{ epel_release_package | default('epel-release') }}"
