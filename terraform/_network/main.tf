@@ -20,7 +20,7 @@
 
 module "network" {
   source  = "terraform-google-modules/network/google"
-  version = "~> 4.0"
+  version = "~> 7.5"
 
   project_id                             = var.project_id
   description                            = var.description

@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## \[5.10.8\]
+## \[5.11.0\]
 
 - Remove TGP 5.0 restriction
 - Minor README update
