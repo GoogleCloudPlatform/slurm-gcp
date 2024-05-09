@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[5.11.0\]
+
+- Remove TGP 5.0 restriction
+- Minor README update
+- Remove all .terraform.lock.hcl files from repository
+- Migrate `google_secret_manager_secret` usage to TPG5
+
 ## \[5.10.7\]
 
 - Improve PMIx support by installing from latest source release (4.2.9) on all

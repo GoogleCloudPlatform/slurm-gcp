@@ -32,7 +32,7 @@ limitations under the License.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_instance_template"></a> [instance\_template](#module\_instance\_template) | github.com/terraform-google-modules/terraform-google-vm//modules/instance_template | 84fbd1f |
+| <a name="module_instance_template"></a> [instance\_template](#module\_instance\_template) | terraform-google-modules/vm/google//modules/instance_template | 10.1.1 |
 
 ## Resources
 

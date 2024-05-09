@@ -87,7 +87,8 @@ data "local_file" "startup" {
 ############
 
 module "instance_template" {
-  source = "github.com/terraform-google-modules/terraform-google-vm//modules/instance_template?ref=84fbd1f"
+  source  = "terraform-google-modules/vm/google//modules/instance_template"
+  version = "10.1.1"
 
   project_id = var.project_id
 
