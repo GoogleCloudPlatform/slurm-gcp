@@ -229,23 +229,19 @@ def nodeset_dyn_lines(nodeset, lkp: Lookup = lkp):
     )
 
 
-def partitionlines(partition, lkp=lkp):
+def partitionlines(partition, lkp=lkp) -> str:
     """Make a partition line for the slurm.conf"""
-    part_name = partition.partition_name
-    lines = []
     MIN_MEM_PER_CPU = 100
-    defmem: int = MIN_MEM_PER_CPU
-    part_is_tpu = len(partition.partition_nodeset_tpu) > 0
 
-    def defmempercpu(template_link):
-        machine_conf = lkp.template_machine_conf(template_link)
-        return max(MIN_MEM_PER_CPU, machine_conf.memory // machine_conf.cpus)
+    def defmempercpu(nodeset: str) -> int:
+        template = lkp.cfg.nodeset.get(nodeset).instance_template
+        machine = lkp.template_machine_conf(template)
+        return max(MIN_MEM_PER_CPU, machine.memory // machine.cpus)
 
-    if len(partition.partition_nodeset) > 0:
-        defmem = min(
-            defmempercpu(lkp.cfg.nodeset.get(nodeset_name).instance_template)
-            for nodeset_name in partition.partition_nodeset
-        )
+    defmem = min(
+        map(defmempercpu, partition.partition_nodeset), default=MIN_MEM_PER_CPU
+    )
+
     nodesets = list(
         chain(
             partition.partition_nodeset,
@@ -253,39 +249,55 @@ def partitionlines(partition, lkp=lkp):
             partition.partition_nodeset_tpu,
         )
     )
+
+    is_tpu = len(partition.partition_nodeset_tpu) > 0
+    is_dyn = len(partition.partition_nodeset_dyn) > 0
+
+    oversub_exlusive = partition.enable_job_exclusive or is_tpu
+    power_down_on_idle = partition.enable_job_exclusive and not is_dyn
+
     line_elements = {
-        "PartitionName": part_name,
+        "PartitionName": partition.partition_name,
         "Nodes": ",".join(nodesets),
         "State": "UP",
         "DefMemPerCPU": defmem,
         "SuspendTime": 300,
-        "Oversubscribe": "Exclusive"
-        if partition.enable_job_exclusive or part_is_tpu
-        else None,
-        "PowerDownOnIdle": "YES" if partition.enable_job_exclusive else None,
+        "Oversubscribe": "Exclusive" if oversub_exlusive else None,
+        "PowerDownOnIdle": "YES" if power_down_on_idle else None,
         **partition.partition_conf,
     }
-    lines.extend([dict_to_conf(line_elements)])
 
-    return "\n".join(lines)
+    return dict_to_conf(line_elements)
+
+
+def suspend_exc_lines(lkp):
+    static_nodes = ",".join(lkp.static_nodelist())
+    suspend_exc_nodes = {
+        "SuspendExcNodes": static_nodes,
+    }
+
+    dyn_parts = [
+        p.partition_name
+        for p in lkp.cfg.partitions.values()
+        if len(p.partition_nodeset_dyn) > 0
+    ]
+    suspend_exc_parts = {"SuspendExcParts": [login_nodeset, *dyn_parts]}
+
+    return list(
+        filter(
+            None,
+            [
+                dict_to_conf(suspend_exc_nodes) if static_nodes else None,
+                dict_to_conf(suspend_exc_parts),
+            ],
+        )
+    )
 
 
 def make_cloud_conf(lkp=lkp, cloud_parameters=None):
     """generate cloud.conf snippet"""
     if cloud_parameters is None:
         cloud_parameters = lkp.cfg.cloud_parameters
-
-    static_nodes = ",".join(lkp.static_nodelist())
-    suspend_exc_nodes = {
-        "SuspendExcNodes": static_nodes,
-    }
-    suspend_exc_parts = {
-        "SuspendExcParts": login_nodeset,
-    }
-    suspend_exc = [
-        dict_to_conf(suspend_exc_nodes) if static_nodes else None,
-        dict_to_conf(suspend_exc_parts),
-    ]
 
     lines = [
         FILE_PREAMBLE,
@@ -295,7 +307,7 @@ def make_cloud_conf(lkp=lkp, cloud_parameters=None):
         *(nodeset_dyn_lines(n, lkp) for n in lkp.cfg.nodeset_dyn.values()),
         *(nodeset_tpu_lines(n, lkp) for n in lkp.cfg.nodeset_tpu.values()),
         *(partitionlines(p, lkp) for p in lkp.cfg.partitions.values()),
-        *(suspend_exc),
+        *(suspend_exc_lines(lkp)),
     ]
     return "\n\n".join(filter(None, lines))
 
