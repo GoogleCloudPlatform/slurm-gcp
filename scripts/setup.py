@@ -294,8 +294,9 @@ def setup_nss_slurm():
 def setup_sudoers():
     content = """
 # Allow SlurmUser to manage the slurm daemons
-slurm ALL= NOPASSWD: /usr/bin/systemctl restart slurmd.service
-slurm ALL= NOPASSWD: /usr/bin/systemctl restart slurmctld.service
+slurm ALL=(root:root) NOPASSWD: /usr/bin/systemctl restart slurmd.service
+slurm ALL=(root:root) NOPASSWD: /usr/bin/systemctl restart slurmctld.service
+slurm ALL=(root:root) NOPASSWD: /slurm/scripts/network_wrapper.sh
 """
     sudoers_file = Path("/etc/sudoers.d/slurm")
     sudoers_file.write_text(content)
@@ -435,7 +436,7 @@ def setup_controller(args):
     run("systemctl enable nfs-server", timeout=30)
     run("systemctl start nfs-server", timeout=30)
 
-    setup_nfs_exports()
+    setup_nfs_exports(log)
     run("systemctl enable --now slurmcmd.timer", timeout=30)
 
     log.info("Check status of cluster services")

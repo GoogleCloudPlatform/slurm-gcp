@@ -487,7 +487,7 @@ def reconfigure_slurm():
             install_cgroup_conf(lkp)
             install_topology_conf(lkp)
             setup_network_storage(log)
-            setup_nfs_exports()
+            setup_nfs_exports(log)
             log.info("Restarting slurmctld to make changes take effect.")
             try:
                 run("sudo systemctl restart slurmctld.service", check=False)
