@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[5.11.1\]
+
+- Update NVIDIA driver to match latest v6 release
+  - Resolves problem building driver on latest Debian 11
+- Drop support for K80 images due to EOL of hardware on Google Cloud
+
 ## \[5.11.0\]
 
 - Remove TGP 5.0 restriction
