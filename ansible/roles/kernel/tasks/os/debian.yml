@@ -37,5 +37,5 @@
 - name: Install current and future kernel headers
   ansible.builtin.apt:
     name:
-    - linux-headers-{{ansible_kernel}}
-    - "{{ debian_family_kernel_headers_package | default('linux-headers-cloud-amd64') }}"
+    - linux-headers-{{ ansible_kernel }}
+    - "{{ kernel_headers_package }}"

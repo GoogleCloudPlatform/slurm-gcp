@@ -13,4 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-deb_arch: arm64
+kernel_package: linux-image-gcp
+kernel_headers_package: linux-headers-gcp
