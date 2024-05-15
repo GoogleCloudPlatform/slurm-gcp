@@ -76,7 +76,6 @@ state we will also include if it is tested or not.
 | schedmd-slurm-public | slurm-gcp-6-4-hpc-rocky-linux-8     | x86_64 | Tested      |
 | schedmd-slurm-public | slurm-gcp-6-4-ubuntu-2004-lts       | x86_64 | Untested    |
 | schedmd-slurm-public | slurm-gcp-6-4-ubuntu-2204-lts-arm64 | ARM64  | Untested    |
-| schedmd-slurm-public | slurm-gcp-6-4-hpc-centos-7-k80      | x86_64 | Unsupported |
 | schedmd-slurm-public | slurm-gcp-6-4-hpc-centos-7          | x86_64 | Unsupported |
 
 ## Terraform
