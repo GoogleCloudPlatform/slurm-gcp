@@ -49,8 +49,6 @@ can be created and used instead.
 - [cuda](https://developer.nvidia.com/cuda-toolkit)
   - Limited to x86_64 only
   - Latest CUDA and NVIDIA
-  - NVIDIA 470 and CUDA 11.4.4 installed on hpc-centos-7-k80 variant image for
-    compatibility with K80 GPUs.
 - [lustre](https://www.lustre.org/)
   - Only supports x86_64
   - Client version 2.12-2.15 depending on the package available for the image
@@ -75,7 +73,6 @@ that are minimal viable images for deploying
 | schedmd-slurm-public | slurm-gcp-5-11-hpc-rocky-linux-8     | x86_64 | Supported      |
 | schedmd-slurm-public | slurm-gcp-5-11-ubuntu-2004-lts       | x86_64 | Supported      |
 | schedmd-slurm-public | slurm-gcp-5-11-ubuntu-2204-lts-arm64 | ARM64  | Supported      |
-| schedmd-slurm-public | slurm-gcp-5-11-hpc-centos-7-k80      | x86_64 | EOL 2024-05-01 |
 | schedmd-slurm-public | slurm-gcp-5-11-hpc-centos-7          | x86_64 | EOL 2024-01-01 |
 
 ## Custom Image
