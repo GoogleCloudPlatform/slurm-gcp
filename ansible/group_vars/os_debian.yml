@@ -13,4 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-deb_arch: arm64
+kernel_package: linux-image-cloud-{{ deb_arch }}
+kernel_headers_package: linux-headers-cloud-{{ deb_arch }}

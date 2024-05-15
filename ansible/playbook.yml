@@ -81,6 +81,9 @@
   - name: Classify hosts by architecture
     group_by:
       key: arch_{{ ansible_architecture }}
+  - name: Classify hosts by Linux distribution
+    group_by:
+      key: os_{{ ansible_distribution | lower }}
   - name: Check Support on CentOS
     when: ansible_distribution == "CentOS"
     ansible.builtin.assert:
@@ -116,7 +119,7 @@
   - name: Freeze kernel before running playbook
     when: ansible_os_family == "Debian"
     ansible.builtin.dpkg_selections:
-      name: "{{ debian_family_kernel_package | default('linux-image-cloud-amd64') }}"
+      name: "{{ kernel_package }}"
       selection: hold
 
   roles:
@@ -173,5 +176,5 @@
     - ansible_os_family == "Debian"
     - allow_kernel_upgrades
     ansible.builtin.dpkg_selections:
-      name: "{{ debian_family_kernel_package | default('linux-image-cloud-amd64') }}"
+      name: "{{ kernel_package }}"
       selection: install
