@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.5.2\]
+
+- Address image building failure on CentOS 7 and derivatives
+
+## \[6.5.1\]
+
+- Address image building failure on Ubuntu OSes
+
+## \[6.5.0\]
+
+- NVIDIA K80 variant image is no longer published because the hardware has
+  reached EOL on Google Cloud
+- Add ability to build Slurm on RedHat Enterprise 8 and 9
+  - not yet tested or supported configuration
+- Terraform modules are now compatible with google provider 5.x
+- Do not hardcode hostname (slurmd -N) argument when slurmd attempts to pull
+  configuration from controller; instead rely on automatic detection. Resolves
+  issue with hostname temporarily set to FQDN on some hosts
+
 ## \[6.4.7\]
 
 - Support nodeset-specific network_storage
