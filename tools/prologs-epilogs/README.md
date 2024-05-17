@@ -12,6 +12,11 @@ are iterated over by the `slurm_mux` external epilog and prolog feature.
 
 - [receive-data-path-manager](receive-data-path-manager): implements the Receive
   Data Path Manager solution for Google Cloud VM type a3-highgpu-8g
+- [receive-data-path-manager-mega](receive-data-path-manager-mega): implements
+  the Receive Data Path Manager solution for Google Cloud VM type a3-megagpu-8g
+  - _WARNING_: This solution is in Public Preview and may be modified
+    significantly or renamed as a3-megagpu-8g becomes Generally Available.
+    Please review the [CHANGELOG](../../CHANGELOG.md) for announcements.
 - [sudo-oslogin](sudo-oslogin): ensures that users who are configured with the
   [OS Admin Login role][os-admin-login] can run sudo during Slurm jobs
 - [sudo-all-jobs-users](sudo-all-jobs-users): ensures that every job can run
