@@ -1,0 +1,37 @@
+#!/bin/bash
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This script will grant _every_ Slurm job the privilege to run sudo for the
+# duration of the job. This configuration is not recommended, however may be
+# useful for debugging or development scenarios. A solution that queries the OS
+# Login API and grants sudo access on a user-by-user basis according to their
+# IAM roles is available in this directory: "sudo-oslogin"
+
+if [[ -z "$SLURM_SCRIPT_CONTEXT" ||
+	-z "$SLURM_JOB_USER" ||
+	-z "$SLURM_JOB_ID" ]]; then
+	echo "This script must be run within a Slurm prolog or epilog environment,"
+	exit 0
+fi
+
+SUDOERDIR="/etc/sudoers.d"
+SUDOERFILE="${SUDOERDIR}/slurm-${SLURM_JOB_USER}-${SLURM_JOB_ID}"
+if [[ "$SLURM_SCRIPT_CONTEXT" == "prolog_slurmd" && -d "$SUDOERDIR" ]]; then
+	# ensure that older Slurm NSS configurations are removed
+	sed -i 's,slurm ,,' /etc/nsswitch.conf
+	echo "$SLURM_JOB_USER ALL=(ALL) NOPASSWD: ALL" >"$SUDOERFILE"
+elif [[ "$SLURM_SCRIPT_CONTEXT" == "epilog_slurmd" && -f "$SUDOERFILE" ]]; then
+	rm -f "$SUDOERFILE"
+fi

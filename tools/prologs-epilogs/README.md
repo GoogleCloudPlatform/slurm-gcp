@@ -8,6 +8,15 @@ A typical approach is to stage these files to `/opt/apps/adm/slurm/scripts/` on
 the controller and then use symbolic links pointing from the directories that
 are iterated over by the `slurm_mux` external epilog and prolog feature.
 
+## Included scripts
+
+- [receive-data-path-manager](receive-data-path-manager): implements the Receive
+  Data Path Manager solution for Google Cloud VM type a3-highgpu-8g
+- [sudo-oslogin](sudo-oslogin): ensures that users who are configured with the
+  [OS Admin Login role][os-admin-login] can run sudo during Slurm jobs
+- [sudo-all-jobs-users](sudo-all-jobs-users): ensures that every job can run
+  sudo; _this configuration is recommended only for debugging purposes_.
+
 ## Directory pattern
 
 For example, if the following symbolic links are created:
@@ -47,3 +56,4 @@ ln -s /opt/apps/adm/slurm/scripts/receive-data-path-manager /opt/apps/adm/slurm/
 ```
 
 [epe]: ../../terraform/slurm_cluster/modules/slurm_files/README_TF.md#input_enable_external_prolog_epilog
+[os-admin-login]: https://cloud.google.com/compute/docs/oslogin/set-up-oslogin#configure_users
