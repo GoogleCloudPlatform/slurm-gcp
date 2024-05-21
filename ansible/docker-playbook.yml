@@ -110,11 +110,17 @@
       that: ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '==')
       fail_msg: |
         When building Slurm-GCP on Ubuntu, use release 20.04 or 22.04
+  - name: Read avail packages
+    ansible.builtin.command: apt list *linux-headers-cloud*
+    register: packages
+  - name: Print avail packages
+    ansible.builtin.command: uname -r
   - name: Freeze kernel before running playbook
     when: ansible_os_family == "Debian"
-    ansible.builtin.dpkg_selections:
-      name: "{{ kernel_package }}"
-      selection: hold
+    ansible.builtin.command: apt-mark hold {{ item }}
+    with_items:
+    - linux-headers*
+    - linux-image*
 
   roles:
   - motd
@@ -167,6 +173,7 @@
     when:
     - ansible_os_family == "Debian"
     - allow_kernel_upgrades
-    ansible.builtin.dpkg_selections:
-      name: "{{ kernel_package }}"
-      selection: install
+    ansible.builtin.command: apt-mark unhold {{ item }}
+    with_items:
+    - linux-headers*
+    - linux-image*

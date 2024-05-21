@@ -34,8 +34,20 @@
     setup:
   when: reboot
 
+- name: Check for kernel headers
+  ansible.builtin.command: apt list search linux-headers-{{ ansible_kernel }}
+  register: apt_res
+
 - name: Install current and future kernel headers
   ansible.builtin.apt:
-    name:
-    - linux-headers-{{ ansible_kernel }}
-    - "{{ kernel_headers_package }}"
+    name: "linux-headers-{{ ansible_kernel }}"
+  when: "{{ apt_res.stdout_lines|length > 1 }}"
+
+- name: Check for kernel headers
+  ansible.builtin.command: apt list search "{{ kernel_headers_package }}"
+  register: apt_res
+
+- name: Install current and future kernel headers
+  ansible.builtin.apt:
+    name: "{{ kernel_headers_package }}"
+  when: "{{ apt_res.stdout_lines|length > 1 }}"
