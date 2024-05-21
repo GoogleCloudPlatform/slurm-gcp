@@ -52,6 +52,7 @@
     install_lustre: true
     install_gcsfuse: true
     install_pmix: true
+    install_pyxis: true
 
   pre_tasks:
   - name: Minimum Ansible Version Check
@@ -129,6 +130,9 @@
       install_server: false
   - libjwt
   - lmod
+  - role: pyxis
+    when:
+    - install_pyxis
   - role: pmix
     when:
     - install_pmix
