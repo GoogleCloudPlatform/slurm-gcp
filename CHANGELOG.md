@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.5.3\]
+
+- Address Docker image building failures for TPU use cases
+- Refactor network storage from setup script to separate script
+- Relax node name pattern matching to accommodate MIG instances (experimental)
+
 ## \[6.5.2\]
 
 - Address image building failure on CentOS 7 and derivatives
