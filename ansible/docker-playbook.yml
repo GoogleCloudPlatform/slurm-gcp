@@ -51,6 +51,7 @@
     install_ompi: true
     install_lustre: true
     install_gcsfuse: true
+    install_pmix: true
 
   pre_tasks:
   - name: Minimum Ansible Version Check
@@ -128,6 +129,9 @@
       install_server: false
   - libjwt
   - lmod
+  - role: pmix
+    when:
+    - install_pmix
   - role: slurm
     vars:
       handle_services: false
