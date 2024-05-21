@@ -1389,18 +1389,6 @@ class TPU:
 class Lookup:
     """Wrapper class for cached data access"""
 
-    regex = (
-        r"^(?P<prefix>"
-        r"(?P<cluster>[^\s\-]+)"
-        r"-(?P<nodeset>\S+)"
-        r")"
-        r"-(?P<node>"
-        r"(?P<index>\d+)|"
-        r"(?P<range>\[[\d,-]+\])"
-        r")$"
-    )
-    node_desc_regex = re.compile(regex)
-
     def __init__(self, cfg=None):
         self._cfg = cfg or NSDict()
         self.template_cache_path = Path(__file__).parent / "template_info.cache"
@@ -1489,6 +1477,10 @@ class Lookup:
     def enable_job_exclusive(self):
         return bool(self.cfg.enable_job_exclusive or self.cfg.enable_placement)
 
+    node_desc_regex = re.compile(
+        r"^(?P<prefix>(?P<cluster>[^\s\-]+)-(?P<nodeset>\S+))-(?P<node>(?P<suffix>\w+)|(?P<range>\[[\d,-]+\]))$"
+    )
+
     @lru_cache(maxsize=None)
     def _node_desc(self, node_name):
         """Get parts from node name"""
@@ -1497,19 +1489,13 @@ class Lookup:
         m = self.node_desc_regex.match(node_name)
         if not m:
             raise Exception(f"node name {node_name} is not valid")
-        return NSDict(m.groupdict())
+        return m.groupdict()
 
     def node_prefix(self, node_name=None):
-        return self._node_desc(node_name).prefix
-
-    def node_cluster_name(self, node_name=None):
-        return self._node_desc(node_name).cluster
+        return self._node_desc(node_name)["prefix"]
 
     def node_nodeset_name(self, node_name=None):
-        return self._node_desc(node_name).nodeset
-
-    def node_index(self, node_name=None):
-        return int(self._node_desc(node_name).index)
+        return self._node_desc(node_name)["nodeset"]
 
     def node_nodeset(self, node_name=None):
         nodeset_name = self.node_nodeset_name(node_name)
@@ -1521,6 +1507,10 @@ class Lookup:
     def node_is_tpu(self, node_name=None):
         nodeset_name = self.node_nodeset_name(node_name)
         return self.cfg.nodeset_tpu.get(nodeset_name) is not None
+
+    def node_is_dyn(self, node_name=None) -> bool:
+        nodeset = self.node_nodeset_name(node_name)
+        return self.cfg.nodeset_dyn.get(nodeset) is not None
 
     def chunk_tpu_nodes(self, tpu_nodes):
         model = tpu_nodes[0]
@@ -1536,10 +1526,6 @@ class Lookup:
     def node_region(self, node_name=None):
         nodeset = self.node_nodeset(node_name)
         return parse_self_link(nodeset.subnetwork).region
-
-    def node_is_static(self, node_name=None):
-        nodeset = self.node_nodeset(node_name)
-        return self.node_index(node_name) < nodeset.node_count_static
 
     def nodeset_prefix(self, nodeset_name):
         return f"{self.cfg.slurm_cluster_name}-{nodeset_name}"

@@ -560,7 +560,7 @@ def create_nodeset_placement_groups(node_list: list, job_id=0):
     nodeset = lkp.node_nodeset(model)
     if not nodeset.enable_placement:
         return {None: node_list}
-    if not valid_placement_nodes(job_id, node_list):
+    if not valid_placement_nodes(node_list):
         return {None: node_list}
     region = lkp.node_region(model)
 
@@ -618,22 +618,16 @@ def create_nodeset_placement_groups(node_list: list, job_id=0):
     return groups
 
 
-def valid_placement_nodes(job_id, nodelist):
-    machine_types = {
-        lkp.node_prefix(node): lkp.node_template_info(node).machineType
-        for node in nodelist
-    }
-    fail = False
-    invalid_types = ["e2", "t2d", "n1", "t2a", "m1", "m2", "m3"]
-    for prefix, machine_type in machine_types.items():
-        if machine_type.split("-")[0] in invalid_types:
-            log.warn(f"Unsupported machine type for placement policy: {machine_type}.")
-            fail = True
-    if fail:
-        log.warn(
-            f"Please do not use any the following machine types with placement policy: ({','.join(invalid_types)})"
-        )
-        return False
+def valid_placement_nodes(nodelist):
+    invalid_types = frozenset(["e2", "t2d", "n1", "t2a", "m1", "m2", "m3"])
+    for node in nodelist:
+        mt = lkp.node_template_info(node).machineType
+        if mt.split("-")[0] in invalid_types:
+            log.warn(f"Unsupported machine type for placement policy: {mt}.")
+            log.warn(
+                f"Please do not use any the following machine types with placement policy: ({','.join(invalid_types)})"
+            )
+            return False
     return True
 
 

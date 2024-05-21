@@ -111,6 +111,13 @@ def start_instances(node_list):
     execute_with_futures(start_tpu, tpu_start_data)
 
 
+def _find_dynamic_node_status() -> NodeStatus:
+    # TODO: cover more cases:
+    # * delete dead dynamic nodes
+    # * delete orhpaned instances
+    return NodeStatus.unchanged  # don't touch dynamic nodes
+
+
 def _find_tpu_node_status(nodename, state):
     ns = lkp.node_nodeset(nodename)
     tpuobj = TPU(ns)
@@ -189,13 +196,20 @@ def find_node_status(nodename):
     """Determine node/instance status that requires action"""
     if find_node_status.static_nodeset is None:
         find_node_status.static_nodeset = set(util.to_hostnames(lkp.static_nodelist()))
+
     state = lkp.slurm_node(nodename)
+
+    if lkp.node_is_dyn(nodename):
+        return _find_dynamic_node_status()
+
     if lkp.node_is_tpu(nodename):
         return _find_tpu_node_status(nodename, state)
+
     inst = lkp.instance(nodename)
     power_flags = frozenset(
         ("POWER_DOWN", "POWERING_UP", "POWERING_DOWN", "POWERED_DOWN")
     ) & (state.flags if state is not None else set())
+
     if inst is None:
         if "POWERING_UP" in state.flags:
             return NodeStatus.unchanged
@@ -304,7 +318,7 @@ def do_node_update(status, nodes):
         log.error(f"{count} nodes have unexpected status: ({hostlist})")
         first = next(iter(nodes))
         state = lkp.slurm_node(first)
-        state = "{}+{}".format(state.base, "+".join(state.flags))
+        state = "{}+{}".format(state.base, "+".join(state.flags)) if state else "None"
         inst = lkp.instance(first)
         log.error(f"{first} state: {state}, instance status:{inst.status}")
 
@@ -411,11 +425,8 @@ def sync_slurm():
     compute_instances = [
         name for name, inst in lkp.instances().items() if inst.role == "compute"
     ]
-    slurm_nodes = list(
-        name
-        for name, state in lkp.slurm_nodes().items()
-        if "DYNAMIC_NORM" not in state.flags
-    )
+    slurm_nodes = list(lkp.slurm_nodes().keys())
+
     all_nodes = list(
         set(
             chain(
