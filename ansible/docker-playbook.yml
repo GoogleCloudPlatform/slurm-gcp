@@ -116,6 +116,7 @@
   - role: kernel
     vars:
       reboot: false
+      tpu_docker_image: true
   - role: selinux
     vars:
       reboot: false
