@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.5.4\]
+
+- Fix bug introduced in #134 mis-ordering tasks in Docker image building
+
 ## \[6.5.3\]
 
 - Address Docker image building failures for TPU use cases
