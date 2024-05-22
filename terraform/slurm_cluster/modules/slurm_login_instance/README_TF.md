@@ -40,6 +40,7 @@ No resources.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_additional_networks"></a> [additional\_networks](#input\_additional\_networks) | Additional network interface details for GCE, if any. | <pre>list(object({<br>    access_config = optional(list(object({<br>      nat_ip       = string<br>      network_tier = string<br>    })), [])<br>    alias_ip_range = optional(list(object({<br>      ip_cidr_range         = string<br>      subnetwork_range_name = string<br>    })), [])<br>    ipv6_access_config = optional(list(object({<br>      network_tier = string<br>    })), [])<br>    network            = optional(string)<br>    network_ip         = optional(string, "")<br>    nic_type           = optional(string)<br>    queue_count        = optional(number)<br>    stack_type         = optional(string)<br>    subnetwork         = optional(string)<br>    subnetwork_project = optional(string)<br>  }))</pre> | `[]` | no |
 | <a name="input_enable_public_ip"></a> [enable\_public\_ip](#input\_enable\_public\_ip) | Enables IP address to access the Internet. | `bool` | `false` | no |
 | <a name="input_instance_template"></a> [instance\_template](#input\_instance\_template) | Instance template self\_link used to create compute instances. | `string` | n/a | yes |
 | <a name="input_network"></a> [network](#input\_network) | Network to deploy to. Only one of network or subnetwork should be specified. | `string` | `""` | no |
