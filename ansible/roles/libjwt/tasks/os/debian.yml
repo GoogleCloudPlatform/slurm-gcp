@@ -14,7 +14,5 @@
 # limitations under the License.
 
 - name: Install {{ansible_os_family}} Family Dependencies
-  apt:
-    name: '{{item}}'
-  loop:
-  - libjansson-dev
+  ansible.builtin.apt:
+    name: libjansson-dev
