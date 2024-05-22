@@ -34,6 +34,25 @@ locals {
 #################
 
 locals {
+  network_interfaces = [for index in range(local.num_instances) :
+    concat([
+      {
+        access_config      = var.access_config
+        alias_ip_range     = []
+        ipv6_access_config = []
+        network            = var.network
+        network_ip         = length(var.static_ips) == 0 ? "" : element(local.static_ips, index)
+        nic_type           = null
+        queue_count        = null
+        stack_type         = null
+        subnetwork         = var.subnetwork
+        subnetwork_project = var.subnetwork_project
+      }
+      ],
+      var.additional_networks
+    )
+  ]
+
   slurm_instance_role = lower(var.slurm_instance_role)
 
   scripts_dir = abspath("${path.module}/../../../../scripts")
@@ -75,22 +94,7 @@ resource "google_compute_instance_from_template" "slurm_instance" {
   allow_stopping_for_update = true
 
   dynamic "network_interface" {
-    for_each = concat([
-      {
-        access_config      = var.access_config
-        alias_ip_range     = []
-        ipv6_access_config = []
-        network            = var.network
-        network_ip         = length(var.static_ips) == 0 ? "" : element(local.static_ips, count.index)
-        nic_type           = null
-        queue_count        = null
-        stack_type         = null
-        subnetwork         = var.subnetwork
-        subnetwork_project = var.subnetwork_project
-      }
-      ],
-      var.additional_networks
-    )
+    for_each = local.network_interfaces[count.index]
     iterator = nic
     content {
       dynamic "access_config" {
