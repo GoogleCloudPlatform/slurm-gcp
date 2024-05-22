@@ -33,8 +33,10 @@
 
 - name: Install Enroot Packages
   ansible.builtin.apt:
-    deb: '{{ item }}'
+    deb: '{{ enroot_pkg }}'
     state: present
-  with_items:
+  loop:
   - /tmp/{{ enroot_deb }}
   - /tmp/{{ enroot_caps_deb }}
+  loop_control:
+    loop_var: enroot_pkg

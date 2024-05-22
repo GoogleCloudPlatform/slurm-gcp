@@ -120,6 +120,9 @@
   - role: selinux
     vars:
       reboot: false
+  - role: pmix
+    when:
+    - install_pmix
   - role: cgroups
     vars:
       change_grub: false
@@ -131,16 +134,13 @@
       install_server: false
   - libjwt
   - lmod
-  - role: pyxis
-    when:
-    - install_pyxis
-  - role: pmix
-    when:
-    - install_pmix
   - role: slurm
     vars:
       handle_services: false
   - slurmcmd
+  - role: pyxis
+    when:
+    - install_pyxis
   - role: ompi
     when: install_ompi
   - role: lustre
