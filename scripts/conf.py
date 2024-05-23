@@ -14,21 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import List, Optional
 from itertools import chain
 from addict import Dict as NSDict
 from collections import defaultdict
 import json
 from pathlib import Path
 import util
-from util import Lookup, TPU, lkp, dirs, cfg, slurmdirs
+from util import Lookup, lkp, dirs, cfg, slurmdirs
 from util import (
     access_secret_version,
     blob_get,
-    to_hostlist,
-    to_hostnames,
-    chunked,
 )
 from resume import PLACEMENT_MAX_CNT
+from dataclasses import dataclass
 
 FILE_PREAMBLE = """
 # Warning:
@@ -38,7 +37,7 @@ FILE_PREAMBLE = """
 login_nodeset = "x-login"
 
 
-def dict_to_conf(conf, delim=" "):
+def dict_to_conf(conf, delim=" ") -> str:
     """convert dict to delimited slurm-style key-value pairs"""
 
     def filter_conf(pair):
@@ -50,11 +49,6 @@ def dict_to_conf(conf, delim=" "):
     return delim.join(
         f"{k}={v}" for k, v in map(filter_conf, conf.items()) if v is not None
     )
-
-
-def check_nodeset(nodeset, lkp=lkp):
-    tpu = TPU(nodeset)
-    return tpu.check_node_type() and tpu.check_tf_version()
 
 
 def conflines(cloud_parameters, lkp=lkp):
@@ -449,84 +443,88 @@ def install_gres_conf(lkp=lkp):
     util.chown_slurm(gres_conf, mode=0o600)
 
 
-def tpu_nodeset_switch_lines(lkp=lkp):
-    lines = []
-    g_switches = []
+@dataclass
+class Switch:
+    """
+    Represents a switch in the topology.conf file.
+    """
+
+    name: str
+    nodes: Optional[str] = None  # nodelist, e.g. "alpha-[0-4],beta-[14-17]"
+    switches: Optional[List["Switch"]] = None
+    link_speed: Optional[int] = None
+
+    def conf_line(self) -> str:
+        d = {"SwitchName": self.name}
+        if self.nodes:
+            d["Nodes"] = self.nodes
+        if self.switches:
+            d["Switches"] = util.to_hostlist([s.name for s in self.switches])
+        if self.link_speed is not None:
+            d["LinkSpeed"] = self.link_speed
+        return dict_to_conf(d)
+
+    def render_conf_lines(self) -> List[str]:
+        if self.empty():
+            return []
+
+        lines = [self.conf_line()]
+        for s in sorted(self.switches or [], key=lambda s: s.name):
+            lines.extend(s.render_conf_lines())
+        return lines
+
+    def empty(self) -> bool:
+        return not self.nodes and not self.switches
+
+
+def tpu_nodeset_switch_lines(lkp: util.Lookup) -> str:
+    root = Switch(name="nodeset_tpu-root", switches=[])
+
     for nodeset in lkp.cfg.nodeset_tpu.values():
-        tpuobj = TPU(nodeset)
-        static, dynamic = lkp.nodeset_lists(nodeset)
-        if tpuobj.vmcount == 1:
-            line = {
-                "SwitchName": nodeset.nodeset_name,
-                "Nodes": ",".join(filter(None, (static, dynamic))),
-            }
-            lines.extend([dict_to_conf(line)])
-            g_switches.append(nodeset.nodeset_name)
+        tpuobj = util.TPU(nodeset)
+        nodelists = filter(None, lkp.nodeset_lists(nodeset))  # (static, dynamic)
+
+        ns_switch = Switch(name=nodeset.nodeset_name)
+        if tpuobj.vmcount == 1:  # Put all nodes in one switch
+            ns_switch.nodes = ",".join(nodelists)
         else:
-            ns_switches = []
-            id = 0
-            if static:
-                for nodes in chunked(to_hostnames(static), n=tpuobj.vmcount):
-                    line = {
-                        "SwitchName": f"{nodeset.nodeset_name}-{id}",
-                        "Nodes": to_hostlist(nodes),
-                    }
-                    lines.extend([dict_to_conf(line)])
-                    ns_switches.append(f"{nodeset.nodeset_name}-{id}")
-                    id += 1
-                lines.extend([dict_to_conf(line)])
-            if dynamic:
-                for nodes in chunked(to_hostnames(dynamic), n=tpuobj.vmcount):
-                    line = {
-                        "SwitchName": f"{nodeset.nodeset_name}-{id}",
-                        "Nodes": to_hostlist(nodes),
-                    }
-                    lines.extend([dict_to_conf(line)])
-                    ns_switches.append(f"{nodeset.nodeset_name}-{id}")
-                    id += 1
-            if id > 0:
-                line = {
-                    "SwitchName": nodeset.nodeset_name,
-                    "Switches": to_hostlist(ns_switches),
-                }
-                lines.extend([dict_to_conf(line)])
-                g_switches.append(nodeset.nodeset_name)
-    if g_switches:
-        line = {
-            "SwitchName": "nodeset_tpu-root",
-            "Switches": to_hostlist(g_switches),
-        }
-        lines.extend([dict_to_conf(line)])
-    return "\n".join(filter(None, lines))
+            # Chunk nodes into sub-switches of size `vmcount`
+            ns_switch.switches = []
+            for nodelist in nodelists:
+                nodenames = util.to_hostnames(nodelist)
+                for nodes in util.chunked(nodenames, n=tpuobj.vmcount):
+                    sub_switch = Switch(
+                        name=f"{ns_switch.name}-{len(ns_switch.switches)}",
+                        nodes=util.to_hostlist(nodes),
+                    )
+                    ns_switch.switches.append(sub_switch)
+
+        if not ns_switch.empty():
+            root.switches.append(ns_switch)
+
+    return "\n".join(root.render_conf_lines())
 
 
-def nodeset_switch_lines(lkp=lkp):
-    lines = []
+def nodeset_switch_lines(lkp: util.Lookup) -> str:
+    root = Switch(name="nodeset-root", switches=[])
 
     for nodeset in lkp.cfg.nodeset.values():
-        static, dynamic = lkp.nodeset_lists(nodeset)
-        line = {
-            "SwitchName": nodeset.nodeset_name,
-            "Nodes": ",".join(filter(None, (static, dynamic))),
+        nodelists = filter(None, lkp.nodeset_lists(nodeset))
+        ns_switch = Switch(
+            name=nodeset.nodeset_name,
+            nodes=",".join(nodelists),
             # NOTE: LinkSpeed not used in Slurm.
             #       Used here to denote enable_placement=true.
-            "LinkSpeed": PLACEMENT_MAX_CNT if nodeset.enable_placement else None,
-        }
-        lines.extend([dict_to_conf(line)])
+            link_speed=PLACEMENT_MAX_CNT if nodeset.enable_placement else None,
+        )
 
-    # Make top level switch for all normal nodesets
-    switches = [n.nodeset_name for n in lkp.cfg.nodeset.values()]
-    if len(switches) > 0:
-        line = {
-            "SwitchName": "nodeset-root",
-            "Switches": to_hostlist(switches),
-        }
-        lines.extend([dict_to_conf(line)])
+        if not ns_switch.empty():
+            root.switches.append(ns_switch)
 
-    return "\n".join(filter(None, lines))
+    return "\n".join(root.render_conf_lines())
 
 
-def gen_topology_conf(lkp=lkp):
+def gen_topology_conf(lkp=lkp) -> None:
     """generate slurm topology.conf from config.yaml"""
     lines = [
         nodeset_switch_lines(lkp),
