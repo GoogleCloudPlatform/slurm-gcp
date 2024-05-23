@@ -34,6 +34,25 @@ locals {
 #################
 
 locals {
+  network_interfaces = [for index in range(local.num_instances) :
+    concat([
+      {
+        access_config      = var.access_config
+        alias_ip_range     = []
+        ipv6_access_config = []
+        network            = var.network
+        network_ip         = length(var.static_ips) == 0 ? "" : element(local.static_ips, index)
+        nic_type           = null
+        queue_count        = null
+        stack_type         = null
+        subnetwork         = var.subnetwork
+        subnetwork_project = var.subnetwork_project
+      }
+      ],
+      var.additional_networks
+    )
+  ]
+
   slurm_instance_role = lower(var.slurm_instance_role)
 
   scripts_dir = abspath("${path.module}/../../../../scripts")
@@ -74,17 +93,37 @@ resource "google_compute_instance_from_template" "slurm_instance" {
 
   allow_stopping_for_update = true
 
-  network_interface {
-    network            = var.network
-    subnetwork         = var.subnetwork
-    subnetwork_project = var.subnetwork_project
-    network_ip         = length(var.static_ips) == 0 ? "" : element(local.static_ips, count.index)
-    dynamic "access_config" {
-      for_each = var.access_config
-      content {
-        nat_ip       = access_config.value.nat_ip
-        network_tier = access_config.value.network_tier
+  dynamic "network_interface" {
+    for_each = local.network_interfaces[count.index]
+    iterator = nic
+    content {
+      dynamic "access_config" {
+        for_each = nic.value.access_config
+        content {
+          nat_ip       = access_config.value.nat_ip
+          network_tier = access_config.value.network_tier
+        }
       }
+      dynamic "alias_ip_range" {
+        for_each = nic.value.alias_ip_range
+        content {
+          ip_cidr_range         = alias_ip_range.value.ip_cidr_range
+          subnetwork_range_name = alias_ip_range.value.subnetwork_range_name
+        }
+      }
+      dynamic "ipv6_access_config" {
+        for_each = nic.value.ipv6_access_config
+        iterator = access_config
+        content {
+          network_tier = access_config.value.network_tier
+        }
+      }
+      network            = nic.value.network
+      network_ip         = nic.value.network_ip
+      nic_type           = nic.value.nic_type
+      queue_count        = nic.value.queue_count
+      subnetwork         = nic.value.subnetwork
+      subnetwork_project = nic.value.subnetwork_project
     }
   }
 
