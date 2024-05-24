@@ -113,7 +113,11 @@ def instance_properties(nodeset, model, placement_group, labels=None):
 
     if nodeset.reservation_name:
         reservation_name = nodeset.reservation_name
-        reservation = lkp.reservation(reservation_name)
+
+        zones = list(nodeset.zone_policy_allow or [])
+        assert len(zones) == 1, "Only single zone is supported if using a reservation"
+
+        reservation = lkp.reservation(reservation_name, zones[0])
 
         props.reservationAffinity = {
             "consumeReservationType": "SPECIFIC_RESERVATION",

@@ -1731,28 +1731,20 @@ class Lookup:
         return NSDict(info)
 
     @lru_cache()
-    def reservation(self, name):
-        """
-        See https://cloud.google.com/compute/docs/reference/rest/v1/reservations
-        """
-        resp = ensure_execute(
-            self.compute.reservations().aggregatedList(
-                project=self.project, filter=f"name={name}"
+    def reservation(self, name: str, zone: str) -> object:
+        """See https://cloud.google.com/compute/docs/reference/rest/v1/reservations"""
+        try:
+            _, project, _, short_name = name.split("/")
+        except ValueError:
+            raise ValueError(
+                f"Invalid reservation name: '{name}', expected format is 'projects/PROJECT/reservations/NAME'"
             )
+
+        return (
+            self.compute.reservations()
+            .get(project=project, zone=zone, reservation=short_name)
+            .execute()
         )
-
-        reservation = None
-        for _, e in resp["items"].items():
-            for r in e.get("reservations", []):
-                assert (
-                    reservation is None
-                ), f"multiple reservations '{name}' found in '{self.project}'."
-                reservation = r
-
-        assert (
-            reservation is not None
-        ), f"reservation '{name}' not found in '{self.project}'."
-        return reservation
 
     @lru_cache(maxsize=1)
     def machine_types(self, project=None):
