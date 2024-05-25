@@ -125,7 +125,7 @@ def instance_properties(partition, model, placement_group, labels=None):
 
     if node_group.reservation_name:
         reservation_name = node_group.reservation_name
-        reservation = lkp.reservation(reservation_name)
+        reservation = {}
         props.reservationAffinity = {
             "consumeReservationType": "SPECIFIC_RESERVATION",
             "key": "compute.googleapis.com/reservation-name",
