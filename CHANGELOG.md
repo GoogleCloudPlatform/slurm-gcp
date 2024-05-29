@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.5.6\]
+
+- Fix bug where dynamic nodes with hostname set to FQDN could not be found by
+  slurmsync script; in current architecture, this impacts login nodes. The
+  resulting Exception was uncaught; Solution truncates all nodenames to short
+  hostname before performing comparisons requiring short hostname
+
+## \[6.5.5\]
+
+- Fix bug where compute nodes with hostname set to FQDN could not find their
+  nodeset-specific startup-script
+
 ## \[6.5.4\]
 
 - Fix bug introduced in #134 mis-ordering tasks in Docker image building
