@@ -1462,8 +1462,8 @@ class Lookup:
         return compute_service()
 
     @cached_property
-    def hostname_short(self):
-        return socket.gethostname().split(".")[0]
+    def hostname(self):
+        return socket.gethostname()
 
     @cached_property
     def hostname_fqdn(self):
@@ -1485,8 +1485,10 @@ class Lookup:
     def _node_desc(self, node_name):
         """Get parts from node name"""
         if not node_name:
-            node_name = self.hostname_short
-        m = self.node_desc_regex.match(node_name)
+            node_name = self.hostname
+        # workaround below is for VMs whose hostname is FQDN
+        node_name_short = node_name.split(".")[0]
+        m = self.node_desc_regex.match(node_name_short)
         if not m:
             raise Exception(f"node name {node_name} is not valid")
         return m.groupdict()
