@@ -807,7 +807,7 @@ def natural_sort(text):
     return [atoi(w) for w in re.split(r"(\d+)", text)]
 
 
-def to_hostlist(nodenames):
+def to_hostlist(nodenames) -> str:
     """make hostlist from list of node names"""
     # use tmp file because list could be large
     tmp_file = tempfile.NamedTemporaryFile(mode="w+t", delete=False)
