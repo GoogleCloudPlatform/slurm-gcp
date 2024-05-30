@@ -2,8 +2,8 @@ import sys
 import util
 import pytest
 
-
-sys.path.append("..")  # TODO: make this more robust
+if ".." not in sys.path:
+    sys.path.append("..")  # TODO: make this more robust
 
 
 @pytest.mark.parametrize(

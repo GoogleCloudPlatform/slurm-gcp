@@ -46,6 +46,12 @@ repos:
     language: system
     types: [file, text]
     pass_filenames: false
+  - id: pytest-check
+    name: pytest-check
+    entry: ./scripts/tests/run.sh
+    language: system
+    pass_filenames: false
+    always_run: true
 - repo: https://github.com/antonbabenko/pre-commit-terraform
   rev: v1.83.4
   hooks:
