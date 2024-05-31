@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Iterable
+from typing import List, Optional, Iterable, Dict
 from itertools import chain
 from collections import defaultdict
 import json
@@ -397,6 +397,7 @@ def install_gres_conf(lkp: util.Lookup) -> None:
 class Switch:
     """
     Represents a switch in the topology.conf file.
+    IMPORTANT: can't express cyclic topologies, will loop forever
     """
 
     def __init__(
@@ -405,11 +406,11 @@ class Switch:
         # TODO: consider using an Iterable instead of list to save memory
         # That would required more elaborate behavior of `self.empty()`
         nodes: Optional[List[str]] = None,
-        switches: Optional[List["Switch"]] = None,
+        switches: Optional[Dict[str, "Switch"]] = None,
     ):
         self.name = name
         self.nodes = nodes or []
-        self.switches = switches or []
+        self.switches = switches or {}
 
     def conf_line(self) -> str:
         d = {"SwitchName": self.name}
@@ -417,33 +418,39 @@ class Switch:
             d["Nodes"] = util.to_hostlist_fast(self.nodes)
 
         non_empty = [
-            s for s in self.switches if not s.empty()
+            s for s in self.switches.values() if not s.empty()
         ]  # render only non-empty sub switches
         if non_empty:
             d["Switches"] = util.to_hostlist_fast([s.name for s in non_empty])
 
         return dict_to_conf(d)
 
-    def render_conf_lines(self) -> List[str]:
+    def render_conf_lines(self) -> list[str]:
         if self.empty():
             return []
 
         lines = [self.conf_line()]
-        for s in sorted(self.switches, key=lambda s: s.name):
+        for s in sorted(self.switches.values(), key=lambda s: s.name):
             lines.extend(s.render_conf_lines())
         return lines
 
     def empty(self) -> bool:
         if self.nodes:
             return False
-        return not any(not c.empty() for c in self.switches)
+        return not any(not c.empty() for c in self.switches.values())
+
+    def add_switch(self, switch: "Switch") -> None:
+        assert (
+            switch.name not in self.switches
+        ), f"Switch {switch.name} is already exists"
+        self.switches[switch.name] = switch
 
 
 def tpu_nodeset_switch(nodeset: object, lkp: util.Lookup) -> Switch:
     tpuobj = util.TPU(nodeset)
     static, dynamic = lkp.nodenames(nodeset)
 
-    switch = Switch(name=nodeset.nodeset_name)
+    switch = Switch(name=f"ns_{nodeset.nodeset_name}")
     if tpuobj.vmcount == 1:  # Put all nodes in one switch
         switch.nodes = list(chain(static, dynamic))
     else:
@@ -454,27 +461,94 @@ def tpu_nodeset_switch(nodeset: object, lkp: util.Lookup) -> Switch:
                     name=f"{switch.name}-{len(switch.switches)}",
                     nodes=list(nodeschunk),
                 )
-                switch.switches.append(sub_switch)
+                switch.add_switch(sub_switch)
     return switch
 
 
-def nodeset_switch(nodeset: object, lkp: util.Lookup) -> Switch:
-    return Switch(name=nodeset.nodeset_name, nodes=list(chain(*lkp.nodenames(nodeset))))
+def nodeset_switch_phony(nodeset: object, lkp: util.Lookup) -> Switch:
+    return Switch(
+        name=f"ns_{nodeset.nodeset_name}",
+        nodes=list(chain(*lkp.nodenames(nodeset))),
+    )
 
 
-def gen_topology(lkp: util.Lookup) -> List[Switch]:
+def _make_physical_path(inst: object) -> list[str]:
+    region, zone = (
+        f"region_{inst.region}",
+        f"zone_{inst.zone}",
+    )
+
+    physical_host = inst.resourceStatus.get("physicalHost")
+    if not physical_host:
+        padding = [f"{inst.name}_pad{i}" for i in reversed(range(3))]
+        return [region, zone, *padding]
+
+    assert physical_host.startswith("/"), f"Unexpected physicalHost: {physical_host}"
+    parts = physical_host[1:].split("/")
+    if len(parts) >= 4:
+        suff, domain = [], ""
+    elif len(parts) == 3:
+        suff = [zone]  # pad with zone
+        domain = ""
+        # pp_id = inst.placementPolicyId or "no_placement" # !!!!
+        # domain = f"{pp_id}_" # prepend with placement policy id to guarantee uniqueness
+    else:
+        raise ValueError(f"Unexpected physicalHost: {physical_host}")
+
+    for i in range(len(parts)):
+        chain = "_".join(parts[: i + 1])
+        suff.append(f"{domain}{chain}")
+
+    return [region, *suff]
+
+
+def nodeset_switch_real(nodeset: object, lkp: util.Lookup, root: Switch) -> None:
+    def add_switches(*path: str) -> Switch:
+        if not path:
+            return root
+        name, parent = path[-1], add_switches(*path[:-1])
+
+        if name not in parent.switches:
+            parent.switches[name] = Switch(name=name)
+        return parent.switches[name]
+
+    # Construct topology for real instances
+    real_nodes = set()
+    for inst in lkp.instances():
+        if lkp.node_nodeset_name(inst.name) != nodeset.nodeset_name:
+            continue
+        switch = add_switches(*_make_physical_path(inst))
+        switch.nodes.append(inst.name)
+        real_nodes.add(inst.name)
+
+    # Add phony nodes to the topology
+    phony_switch = Switch(f"ns_{nodeset.nodeset_name}")
+    for node in chain(*lkp.nodenames(nodeset)):
+        if node not in real_nodes:
+            phony_switch.nodes.append(node)
+
+    root.add_switch(phony_switch)
+    return root
+
+
+def gen_topology(lkp: util.Lookup) -> list[Switch]:
     # Returns a list of "root" switches
-    tpu_root = Switch(
-        name="nodeset_tpu-root",
-        switches=[tpu_nodeset_switch(ns, lkp) for ns in lkp.cfg.nodeset_tpu.values()],
-    )
 
-    ord_root = Switch(
-        name="nodeset-root",
-        switches=[nodeset_switch(ns, lkp) for ns in lkp.cfg.nodeset.values()],
-    )
+    root = Switch(name="slurm-root")
+    for ns in lkp.cfg.nodeset.values():
+        if ns.real_topology:
+            nodeset_switch_real(ns, lkp, root)
+        else:
+            root.add_switch(nodeset_switch_phony(ns, lkp))
 
-    return [tpu_root, ord_root]
+    for ns in lkp.cfg.nodeset_dyn.values():
+        nodeset_switch_real(ns, lkp, root)
+
+    tpu_root = Switch(name="nodeset_tpu-root")
+    for ns in lkp.cfg.nodeset_tpu.values():
+        tpu_root.add_switch(tpu_nodeset_switch(ns, lkp))
+
+    return [root, tpu_root]
 
 
 def gen_topology_conf(lkp: util.Lookup) -> None:

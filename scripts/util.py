@@ -1525,10 +1525,10 @@ class Lookup:
     def node_prefix(self, node_name=None):
         return self._node_desc(node_name)["prefix"]
 
-    def node_nodeset_name(self, node_name=None):
+    def node_nodeset_name(self, node_name=None) -> str:
         return self._node_desc(node_name)["nodeset"]
 
-    def node_nodeset(self, node_name=None):
+    def node_nodeset(self, node_name=None) -> NSDict:
         nodeset_name = self.node_nodeset_name(node_name)
         ns = self.cfg.nodeset.get(nodeset_name)
         if ns:
@@ -1634,9 +1634,7 @@ class Lookup:
         return self.slurm_nodes().get(nodename)
 
     @lru_cache(maxsize=1)
-    def instances(self, project=None, slurm_cluster_name=None):
-        slurm_cluster_name = slurm_cluster_name or self.cfg.slurm_cluster_name
-        project = project or self.project
+    def instances(self):
         instance_information_fields = [
             "advancedMachineFeatures",
             "cpuPlatform",
@@ -1671,6 +1669,9 @@ class Lookup:
             # "deletionProtection",
             # "startRestricted",
         ]
+
+        project, slurm_cluster_name = self.project, self.cfg.slurm_cluster_name
+
         if lkp.cfg.enable_slurm_gcp_plugins:
             slurm_gcp_plugins.register_instance_information_fields(
                 lkp=lkp,
@@ -1714,11 +1715,8 @@ class Lookup:
             op = act.aggregatedList_next(op, result)
         return instances
 
-    def instance(self, instance_name, project=None, slurm_cluster_name=None):
-        instances = self.instances(
-            project=project, slurm_cluster_name=slurm_cluster_name
-        )
-        return instances.get(instance_name)
+    def instance(self, instance_name: str):
+        return self.instances().get(instance_name)
 
     @lru_cache()
     def reservation(self, name: str, zone: str) -> object:
