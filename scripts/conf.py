@@ -21,9 +21,8 @@ from collections import defaultdict
 import json
 from pathlib import Path
 import util
-from util import Lookup, lkp, dirs, cfg, slurmdirs
+from util import dirs, slurmdirs
 from util import (
-    access_secret_version,
     blob_get,
 )
 from resume import PLACEMENT_MAX_CNT
@@ -51,18 +50,18 @@ def dict_to_conf(conf, delim=" ") -> str:
     )
 
 
-def conflines(cloud_parameters, lkp=lkp):
+def conflines(cloud_parameters, lkp: util.Lookup) -> str:
     scripts_dir = lkp.cfg.install_dir or dirs.scripts
     no_comma_params = cloud_parameters.no_comma_params or False
 
     any_gpus = any(
         lkp.template_info(nodeset.instance_template).gpu_count > 0
-        for nodeset in cfg.nodeset.values()
+        for nodeset in lkp.cfg.nodeset.values()
     )
 
     any_tpu = any(
         tpu_nodeset is not None
-        for part in cfg.partitions.values()
+        for part in lkp.cfg.partitions.values()
         for tpu_nodeset in part.partition_nodeset_tpu
     )
 
@@ -109,7 +108,7 @@ def conflines(cloud_parameters, lkp=lkp):
     return dict_to_conf(conf_options, delim="\n")
 
 
-def loginlines():
+def loginlines() -> str:
     nodeset = {
         "NodeSet": login_nodeset,
         "Feature": login_nodeset,
@@ -129,7 +128,7 @@ def loginlines():
     return "\n".join(lines)
 
 
-def nodeset_lines(nodeset, lkp=lkp):
+def nodeset_lines(nodeset, lkp: util.Lookup) -> str:
     template_info = lkp.template_info(nodeset.instance_template)
     machine_conf = lkp.template_machine_conf(nodeset.instance_template)
 
@@ -179,9 +178,8 @@ def nodeset_lines(nodeset, lkp=lkp):
     return "\n".join(filter(None, lines))
 
 
-def nodeset_tpu_lines(nodeset, lkp=lkp):
-    if not nodeset.node_conf:
-        return "INVALID, nodeset needs to contain a node_conf"
+def nodeset_tpu_lines(nodeset, lkp: util.Lookup) -> str:
+    assert nodeset.node_conf is not None, "nodeset needs to contain a node_conf"
 
     node_def = dict_to_conf(
         {
@@ -216,14 +214,14 @@ def nodeset_tpu_lines(nodeset, lkp=lkp):
     return "\n".join(filter(None, lines))
 
 
-def nodeset_dyn_lines(nodeset, lkp: Lookup = lkp):
+def nodeset_dyn_lines(nodeset):
     """generate slurm NodeSet definition for dynamic nodeset"""
     return dict_to_conf(
         {"NodeSet": nodeset.nodeset_name, "Feature": nodeset.nodeset_feature}
     )
 
 
-def partitionlines(partition, lkp=lkp) -> str:
+def partitionlines(partition, lkp: util.Lookup) -> str:
     """Make a partition line for the slurm.conf"""
     MIN_MEM_PER_CPU = 100
 
@@ -264,7 +262,7 @@ def partitionlines(partition, lkp=lkp) -> str:
     return dict_to_conf(line_elements)
 
 
-def suspend_exc_lines(lkp):
+def suspend_exc_lines(lkp: util.Lookup) -> str:
     static_nodes = ",".join(lkp.static_nodelist())
     suspend_exc_nodes = {
         "SuspendExcNodes": static_nodes,
@@ -288,17 +286,14 @@ def suspend_exc_lines(lkp):
     )
 
 
-def make_cloud_conf(lkp=lkp, cloud_parameters=None):
+def make_cloud_conf(lkp: util.Lookup) -> str:
     """generate cloud.conf snippet"""
-    if cloud_parameters is None:
-        cloud_parameters = lkp.cfg.cloud_parameters
-
     lines = [
         FILE_PREAMBLE,
-        conflines(cloud_parameters, lkp),
+        conflines(lkp.cfg.cloud_parameters, lkp),
         loginlines(),
         *(nodeset_lines(n, lkp) for n in lkp.cfg.nodeset.values()),
-        *(nodeset_dyn_lines(n, lkp) for n in lkp.cfg.nodeset_dyn.values()),
+        *(nodeset_dyn_lines(n) for n in lkp.cfg.nodeset_dyn.values()),
         *(nodeset_tpu_lines(n, lkp) for n in lkp.cfg.nodeset_tpu.values()),
         *(partitionlines(p, lkp) for p in lkp.cfg.partitions.values()),
         *(suspend_exc_lines(lkp)),
@@ -306,15 +301,15 @@ def make_cloud_conf(lkp=lkp, cloud_parameters=None):
     return "\n\n".join(filter(None, lines))
 
 
-def gen_cloud_conf(lkp=lkp, cloud_parameters=None):
-    content = make_cloud_conf(lkp, cloud_parameters=cloud_parameters)
+def gen_cloud_conf(lkp: util.Lookup) -> None:
+    content = make_cloud_conf(lkp)
 
     conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "cloud.conf"
     conf_file.write_text(content)
     util.chown_slurm(conf_file, mode=0o644)
 
 
-def install_slurm_conf(lkp=lkp):
+def install_slurm_conf(lkp: util.Lookup) -> None:
     """install slurm.conf"""
     if lkp.cfg.ompi_version:
         mpi_default = "pmi2"
@@ -339,7 +334,7 @@ def install_slurm_conf(lkp=lkp):
     util.chown_slurm(conf_file, mode=0o644)
 
 
-def install_slurmdbd_conf(lkp=lkp):
+def install_slurmdbd_conf(lkp: util.Lookup) -> None:
     """install slurmdbd.conf"""
     conf_options = NSDict(
         {
@@ -354,8 +349,8 @@ def install_slurmdbd_conf(lkp=lkp):
         }
     )
     if lkp.cfg.cloudsql_secret:
-        secret_name = f"{cfg.slurm_cluster_name}-slurm-secret-cloudsql"
-        payload = json.loads(access_secret_version(lkp.project, secret_name))
+        secret_name = f"{lkp.cfg.slurm_cluster_name}-slurm-secret-cloudsql"
+        payload = json.loads(util.access_secret_version(lkp.project, secret_name))
 
         if payload["db_name"] and payload["db_name"] != "":
             conf_options.db_name = payload["db_name"]
@@ -377,7 +372,7 @@ def install_slurmdbd_conf(lkp=lkp):
     util.chown_slurm(conf_file, 0o600)
 
 
-def install_cgroup_conf(lkp=lkp):
+def install_cgroup_conf(lkp: util.Lookup) -> None:
     """install cgroup.conf"""
     conf = blob_get("slurm-tpl-cgroup-conf").download_as_text()
 
@@ -386,7 +381,7 @@ def install_cgroup_conf(lkp=lkp):
     util.chown_slurm(conf_file, mode=0o600)
 
 
-def install_jobsubmit_lua(lkp=lkp):
+def install_jobsubmit_lua(lkp: util.Lookup) -> None:
     """install job_submit.lua if there are tpu nodes in the cluster"""
     if any(
         tpu_nodeset is not None
@@ -395,7 +390,7 @@ def install_jobsubmit_lua(lkp=lkp):
     ):
         conf_options = NSDict(
             {
-                "scripts_dir": cfg.slurm_scripts_dir or dirs.scripts,
+                "scripts_dir": lkp.cfg.slurm_scripts_dir or dirs.scripts,
             }
         )
         conf_resp = blob_get("slurm-tpl-job-submit-lua").download_as_text()
@@ -406,7 +401,7 @@ def install_jobsubmit_lua(lkp=lkp):
         util.chown_slurm(conf_file, 0o600)
 
 
-def gen_cloud_gres_conf(lkp=lkp):
+def gen_cloud_gres_conf(lkp: util.Lookup) -> None:
     """generate cloud_gres.conf"""
 
     gpu_nodes = defaultdict(list)
@@ -435,7 +430,7 @@ def gen_cloud_gres_conf(lkp=lkp):
     util.chown_slurm(conf_file, mode=0o600)
 
 
-def install_gres_conf(lkp=lkp):
+def install_gres_conf(lkp: util.Lookup) -> None:
     conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "cloud_gres.conf"
     gres_conf = Path(lkp.cfg.output_dir or slurmdirs.etc) / "gres.conf"
     if not gres_conf.exists():
@@ -524,7 +519,7 @@ def nodeset_switch_lines(lkp: util.Lookup) -> str:
     return "\n".join(root.render_conf_lines())
 
 
-def gen_topology_conf(lkp=lkp) -> None:
+def gen_topology_conf(lkp: util.Lookup) -> None:
     """generate slurm topology.conf from config.yaml"""
     lines = [
         nodeset_switch_lines(lkp),
@@ -538,7 +533,7 @@ def gen_topology_conf(lkp=lkp) -> None:
     util.chown_slurm(conf_file, mode=0o600)
 
 
-def install_topology_conf(lkp=lkp):
+def install_topology_conf(lkp: util.Lookup) -> None:
     conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "cloud_topology.conf"
     topo_conf = Path(lkp.cfg.output_dir or slurmdirs.etc) / "topology.conf"
     if not topo_conf.exists():
