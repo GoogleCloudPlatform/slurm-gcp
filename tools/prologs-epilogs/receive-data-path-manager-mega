@@ -30,10 +30,7 @@ fi
 # ensure that dmabuf-import-helper is loaded
 modprobe import-helper
 
-# Populate /etc/hostname for pyxis/enroot
-hostname | tee /etc/hostname
-
-NCCL_PLUGIN_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.1
+NCCL_PLUGIN_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.2
 RXDM_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.8
 RXDM_CONTAINER=receive-datapath-manager-"${SLURM_JOB_ID}"
 if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
