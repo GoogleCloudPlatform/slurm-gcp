@@ -41,6 +41,7 @@ No modules.
 
 | Name | Type |
 |------|------|
+| [google_compute_address.static_ip](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_address) | resource |
 | [google_compute_instance_from_template.slurm_instance](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_instance_from_template) | resource |
 | [null_resource.replace_trigger](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [google_compute_instance_template.base](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/compute_instance_template) | data source |
