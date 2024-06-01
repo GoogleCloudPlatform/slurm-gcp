@@ -20,7 +20,10 @@
 ##########
 
 locals {
-  hostname      = var.hostname == "" ? "default" : var.hostname
+  _hostname  = var.hostname == "" ? "default" : var.hostname
+  _hostnames = [for index in range(local.num_instances) : var.add_hostname_suffix ? format("%s%s%s", local._hostname, var.hostname_suffix_separator, format("%03d", index + 1)) : local._hostname]
+  // hostname      = var.hostname == "" ? "default" : var.hostname
+
   num_instances = length(var.static_ips) == 0 ? var.num_instances : length(var.static_ips)
 
   # local.static_ips is the same as var.static_ips with a dummy element appended
@@ -34,23 +37,38 @@ locals {
 #################
 
 locals {
-  network_interfaces = [for index in range(local.num_instances) :
-    concat([
-      {
-        access_config      = var.access_config
-        alias_ip_range     = []
-        ipv6_access_config = []
-        network            = var.network
-        network_ip         = length(var.static_ips) == 0 ? "" : element(local.static_ips, index)
-        nic_type           = null
-        queue_count        = null
-        stack_type         = null
-        subnetwork         = var.subnetwork
-        subnetwork_project = var.subnetwork_project
-      }
+  _network_interfaces = [for index in range(local.num_instances) :
+    concat(
+      [
+        {
+          access_config      = var.access_config
+          alias_ip_range     = []
+          ipv6_access_config = []
+          network            = var.network
+          network_ip         = length(var.static_ips) == 0 ? "" : element(local.static_ips, index)
+          nic_type           = null
+          queue_count        = null
+          stack_type         = null
+          subnetwork         = var.subnetwork
+          subnetwork_project = var.subnetwork_project
+        }
       ],
       var.additional_networks
     )
+  ]
+  network_config = [
+    for index in range(local.num_instances) : {
+      hostname = local._hostnames[index]
+      network_interfaces = [
+        for nic in local._network_interfaces[index] : merge(
+          nic,
+          {
+            # generate unique name for ip address name based on hostname and first 16 characters of sha256 of (sub)network id
+            ip_address_name = "${local._hostnames[index]}-${substr(sha256(coalesce(nic.subnetwork, nic.network)), 0, 16)}"
+          }
+        )
+      ]
+    }
   ]
 
   slurm_instance_role = lower(var.slurm_instance_role)
@@ -87,14 +105,14 @@ resource "null_resource" "replace_trigger" {
 
 resource "google_compute_instance_from_template" "slurm_instance" {
   count   = local.num_instances
-  name    = var.add_hostname_suffix ? format("%s%s%s", local.hostname, var.hostname_suffix_separator, format("%03d", count.index + 1)) : local.hostname
+  name    = local.network_config[count.index].hostname
   project = var.project_id
   zone    = var.zone == null ? data.google_compute_zones.available.names[count.index % length(data.google_compute_zones.available.names)] : var.zone
 
   allow_stopping_for_update = true
 
   dynamic "network_interface" {
-    for_each = local.network_interfaces[count.index]
+    for_each = local.network_config[count.index].network_interfaces
     iterator = nic
     content {
       dynamic "access_config" {
@@ -119,7 +137,7 @@ resource "google_compute_instance_from_template" "slurm_instance" {
         }
       }
       network            = nic.value.network
-      network_ip         = nic.value.network_ip
+      network_ip         = google_compute_address.static_ip[nic.value.ip_address_name].address
       nic_type           = nic.value.nic_type
       queue_count        = nic.value.queue_count
       subnetwork         = nic.value.subnetwork
@@ -152,4 +170,21 @@ resource "google_compute_instance_from_template" "slurm_instance" {
   lifecycle {
     replace_triggered_by = [null_resource.replace_trigger.id]
   }
+}
+
+##############
+# IP ADDRESS #
+##############
+
+resource "google_compute_address" "static_ip" {
+  for_each = {
+    for nic in flatten(
+      [for net_cfg in local.network_config : [for nic in net_cfg.network_interfaces : nic]]
+    ) : nic.ip_address_name => nic
+  }
+  name         = each.value.ip_address_name
+  subnetwork   = each.value.subnetwork
+  address_type = "INTERNAL"
+  region       = var.region
+  address      = each.value.network_ip
 }
