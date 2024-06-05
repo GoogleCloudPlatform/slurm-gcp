@@ -103,7 +103,7 @@ def conflines(cloud_parameters, lkp: util.Lookup) -> str:
         "SuspendTimeout": cloud_parameters.get("suspend_timeout", 300),
         "TreeWidth": "65533" if any_dynamic else None,
         "JobSubmitPlugins": "lua" if any_tpu else None,
-        "TopologyPlugin": "topology/tree",
+        "TopologyPlugin": cloud_parameters.get("topology_plugin", "topology/none"),
     }
     return dict_to_conf(conf_options, delim="\n")
 
