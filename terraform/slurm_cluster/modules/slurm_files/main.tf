@@ -82,6 +82,12 @@ locals {
     slurm_bin_dir           = var.enable_hybrid ? local.slurm_bin_dir : null
     slurm_log_dir           = var.enable_hybrid ? local.slurm_log_dir : null
 
+    # config files templates
+    slurmdbd_conf_tpl = file(coalesce(var.slurmdbd_conf_tpl, "${local.etc_dir}/slurmdbd.conf.tpl"))
+    slurm_conf_tpl    = file(coalesce(var.slurm_conf_tpl, "${local.etc_dir}/slurm.conf.tpl"))
+    cgroup_conf_tpl   = file(coalesce(var.cgroup_conf_tpl, "${local.etc_dir}/cgroup.conf.tpl"))
+    jobsubmit_lua_tpl = file(coalesce(var.job_submit_lua_tpl, "${local.etc_dir}/job_submit.lua.tpl"))
+
     # Providers
     universe_domain  = var.universe_domain
     custom_endpoints = var.custom_endpoints
@@ -164,49 +170,6 @@ resource "google_storage_bucket_object" "devel" {
   source = data.archive_file.slurm_gcp_devel_zip[0].output_path
 }
 
-##############
-# CONF FILES #
-##############
-
-data "local_file" "slurmdbd_conf_tpl" {
-  filename = abspath(coalesce(var.slurmdbd_conf_tpl, "${local.etc_dir}/slurmdbd.conf.tpl"))
-}
-
-resource "google_storage_bucket_object" "slurmdbd_conf_tpl" {
-  bucket  = var.bucket_name
-  name    = format("%s/slurm-tpl-slurmdbd-conf", local.bucket_dir)
-  content = data.local_file.slurmdbd_conf_tpl.content
-}
-
-data "local_file" "slurm_conf_tpl" {
-  filename = abspath(coalesce(var.slurm_conf_tpl, "${local.etc_dir}/slurm.conf.tpl"))
-}
-
-resource "google_storage_bucket_object" "slurm_conf_tpl" {
-  bucket  = var.bucket_name
-  name    = format("%s/slurm-tpl-slurm-conf", local.bucket_dir)
-  content = data.local_file.slurm_conf_tpl.content
-}
-
-data "local_file" "cgroup_conf_tpl" {
-  filename = abspath(coalesce(var.cgroup_conf_tpl, "${local.etc_dir}/cgroup.conf.tpl"))
-}
-
-resource "google_storage_bucket_object" "cgroup_conf_tpl" {
-  bucket  = var.bucket_name
-  name    = format("%s/slurm-tpl-cgroup-conf", local.bucket_dir)
-  content = data.local_file.cgroup_conf_tpl.content
-}
-
-data "local_file" "jobsubmit_lua_tpl" {
-  filename = abspath(coalesce(var.job_submit_lua_tpl, "${local.etc_dir}/job_submit.lua.tpl"))
-}
-
-resource "google_storage_bucket_object" "jobsubmit_lua_tpl" {
-  bucket  = var.bucket_name
-  name    = format("%s/slurm-tpl-job-submit-lua", local.bucket_dir)
-  content = data.local_file.jobsubmit_lua_tpl.content
-}
 
 ###########
 # SCRIPTS #
@@ -301,10 +264,6 @@ locals {
   checksum = md5(join("", flatten([
     google_storage_bucket_object.config.md5hash,
     [for f in google_storage_bucket_object.devel : f.md5hash],
-    google_storage_bucket_object.slurmdbd_conf_tpl.md5hash,
-    google_storage_bucket_object.slurm_conf_tpl.md5hash,
-    google_storage_bucket_object.cgroup_conf_tpl.md5hash,
-    google_storage_bucket_object.jobsubmit_lua_tpl.md5hash,
     [for k, f in google_storage_bucket_object.controller_startup_scripts : f.md5hash],
     [for k, f in google_storage_bucket_object.compute_startup_scripts : f.md5hash],
     [for k, f in google_storage_bucket_object.nodeset_startup_scripts : f.md5hash],
