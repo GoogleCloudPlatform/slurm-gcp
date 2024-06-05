@@ -81,6 +81,10 @@ locals {
     slurm_control_addr      = var.enable_hybrid ? var.slurm_control_addr : null
     slurm_bin_dir           = var.enable_hybrid ? local.slurm_bin_dir : null
     slurm_log_dir           = var.enable_hybrid ? local.slurm_log_dir : null
+
+    # Providers
+    universe_domain  = var.universe_domain
+    custom_endpoints = var.custom_endpoints
   }
 
   config_yaml        = "config.yaml"
