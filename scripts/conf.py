@@ -26,7 +26,6 @@ from util import (
     blob_get,
 )
 from resume import PLACEMENT_MAX_CNT
-from dataclasses import dataclass
 
 FILE_PREAMBLE = """
 # Warning:
@@ -438,16 +437,22 @@ def install_gres_conf(lkp: util.Lookup) -> None:
     util.chown_slurm(gres_conf, mode=0o600)
 
 
-@dataclass
 class Switch:
     """
     Represents a switch in the topology.conf file.
     """
 
-    name: str
-    nodes: Optional[str] = None  # nodelist, e.g. "alpha-[0-4],beta-[14-17]"
-    switches: Optional[List["Switch"]] = None
-    link_speed: Optional[int] = None
+    def __init__(
+        self,
+        name: str,
+        nodes: Optional[str] = None,
+        switches: Optional[List["Switch"]] = None,
+        link_speed: Optional[int] = None,
+    ):
+        self.name = name
+        self.nodes = nodes  # nodelist, e.g. "alpha-[0-4],beta-[14-17]"
+        self.switches = switches or []
+        self.link_speed = link_speed
 
     def conf_line(self) -> str:
         d = {"SwitchName": self.name}
@@ -464,7 +469,7 @@ class Switch:
             return []
 
         lines = [self.conf_line()]
-        for s in sorted(self.switches or [], key=lambda s: s.name):
+        for s in sorted(self.switches, key=lambda s: s.name):
             lines.extend(s.render_conf_lines())
         return lines
 
@@ -473,7 +478,7 @@ class Switch:
 
 
 def tpu_nodeset_switch_lines(lkp: util.Lookup) -> str:
-    root = Switch(name="nodeset_tpu-root", switches=[])
+    root = Switch(name="nodeset_tpu-root")
 
     for nodeset in lkp.cfg.nodeset_tpu.values():
         tpuobj = util.TPU(nodeset)
@@ -484,7 +489,6 @@ def tpu_nodeset_switch_lines(lkp: util.Lookup) -> str:
             ns_switch.nodes = ",".join(nodelists)
         else:
             # Chunk nodes into sub-switches of size `vmcount`
-            ns_switch.switches = []
             for nodelist in nodelists:
                 nodenames = util.to_hostnames(nodelist)
                 for nodes in util.chunked(nodenames, n=tpuobj.vmcount):
@@ -501,7 +505,7 @@ def tpu_nodeset_switch_lines(lkp: util.Lookup) -> str:
 
 
 def nodeset_switch_lines(lkp: util.Lookup) -> str:
-    root = Switch(name="nodeset-root", switches=[])
+    root = Switch(name="nodeset-root")
 
     for nodeset in lkp.cfg.nodeset.values():
         nodelists = filter(None, lkp.nodeset_lists(nodeset))
