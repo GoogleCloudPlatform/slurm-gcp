@@ -1421,26 +1421,6 @@ class Lookup:
     def scontrol(self):
         return Path(self.cfg.slurm_bin_dir if cfg else "") / "scontrol"
 
-    @property
-    def sinfo_bin(self):
-        return Path(self.cfg.slurm_bin_dir if cfg else "") / "sinfo"
-
-    def sinfo(self, cmd=None):
-        cmd = " ".join(str(s) for s in (self.sinfo_bin, cmd) if s is not None)
-        return run(cmd).stdout.rstrip()
-
-    @property
-    def squeue_bin(self):
-        return Path(self.cfg.slurm_bin_dir if cfg else "") / "squeue"
-
-    def squeue(self, cmd=None):
-        cmd = " ".join(str(s) for s in (self.squeue_bin, cmd) if s is not None)
-        return run(cmd).stdout.rstrip()
-
-    @property
-    def template_map(self):
-        return self.cfg.template_map
-
     @cached_property
     def instance_role(self):
         return instance_metadata("attributes/slurm_instance_role")
@@ -1472,10 +1452,6 @@ class Lookup:
     @cached_property
     def zone(self):
         return instance_metadata("zone")
-
-    @property
-    def enable_job_exclusive(self):
-        return bool(self.cfg.enable_job_exclusive or self.cfg.enable_placement)
 
     node_desc_regex = re.compile(
         r"^(?P<prefix>(?P<cluster>[^\s\-]+)-(?P<nodeset>\S+))-(?P<node>(?P<suffix>\w+)|(?P<range>\[[\d,-]+\]))$"
@@ -1620,13 +1596,6 @@ class Lookup:
 
         return cloud_nodes, local_nodes
 
-    def tpu_instances(self):
-        res = []
-        for ns in self.cfg.nodeset_tpu:
-            tpuobj = TPU(ns)
-            res.extend(tpuobj.list_node_names())
-        return res
-
     @lru_cache(maxsize=1)
     def instances(self, project=None, slurm_cluster_name=None):
         slurm_cluster_name = slurm_cluster_name or self.cfg.slurm_cluster_name
@@ -1681,9 +1650,7 @@ class Lookup:
 
         def properties(inst):
             """change instance properties to a preferred format"""
-            inst["zoneLink"] = inst["zone"]
             inst["zone"] = trim_self_link(inst["zone"])
-            inst["machineTypeLink"] = inst["machineType"]
             inst["machineType"] = trim_self_link(inst["machineType"])
             # metadata is fetched as a dict of dicts like:
             # {'key': key, 'value': value}, kinda silly
@@ -1715,20 +1682,6 @@ class Lookup:
             project=project, slurm_cluster_name=slurm_cluster_name
         )
         return instances.get(instance_name)
-
-    def describe_instance(self, instance_name, project=None, zone=None):
-        project = project or self.project
-        if zone is None:
-            self.instances.cache_clear()
-            inst = self.instance(instance_name, project=project)
-            if inst is None:
-                raise Exception(f"instance {instance_name} not found")
-            zone = inst.zone
-        op = self.compute.instances().get(
-            instance=instance_name, project=project, zone=zone
-        )
-        info = ensure_execute(op)
-        return NSDict(info)
 
     @lru_cache()
     def reservation(self, name):
@@ -1897,11 +1850,6 @@ class Lookup:
         chown_slurm(self.template_cache_path)
 
         return template
-
-    def clear_template_info_cache(self):
-        with self.template_cache(writeback=True) as cache:
-            cache.clear()
-        self.template_info.cache_clear()
 
     def nodeset_map(self, hostnames: list):
         """Convert a list of nodes into a map of nodeset_name to hostnames"""
