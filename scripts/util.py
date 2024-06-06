@@ -34,6 +34,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+from enum import Enum
 from collections import defaultdict, namedtuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
@@ -73,6 +74,8 @@ from google.oauth2 import service_account  # noqa: E402
 import googleapiclient.discovery  # noqa: E402
 import google_auth_httplib2  # noqa: E402
 from googleapiclient.http import set_user_agent  # noqa: E402
+from googleapiclient.discovery import DISCOVERY_URI  # noqa: E402
+from google.api_core.client_options import ClientOptions  # noqa: E402
 import httplib2  # noqa: E402
 
 if can_tpu:
@@ -216,7 +219,8 @@ def access_secret_version(project_id, secret_id, version_id="latest"):
     from google.cloud import secretmanager
     from google.api_core import exceptions
 
-    client = secretmanager.SecretManagerServiceClient()
+    co = create_client_options(ApiEndpoint.SECRET)
+    client = secretmanager.SecretManagerServiceClient(client_options=co)
     name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
     try:
         response = client.access_secret_version(request={"name": name})
@@ -296,7 +300,8 @@ def blob_get(file, project=None):
     uri = instance_metadata("attributes/slurm_bucket_path")
     bucket_name, path = parse_bucket_uri(uri)
     blob_name = f"{path}/{file}"
-    storage_client = storage.Client(project=project)
+    co = create_client_options(ApiEndpoint.STORAGE)
+    storage_client = storage.Client(project=project, client_options=co)
     return storage_client.get_bucket(bucket_name).blob(blob_name)
 
 
@@ -308,7 +313,8 @@ def blob_list(prefix="", delimiter=None, project=None):
     uri = instance_metadata("attributes/slurm_bucket_path")
     bucket_name, path = parse_bucket_uri(uri)
     blob_prefix = f"{path}/{prefix}"
-    storage_client = storage.Client(project=project)
+    co = create_client_options(ApiEndpoint.STORAGE)
+    storage_client = storage.Client(project=project, client_options=co)
     # Note: The call returns a response only when the iterator is consumed.
     blobs = storage_client.list_blobs(
         bucket_name, prefix=blob_prefix, delimiter=delimiter
@@ -407,16 +413,20 @@ def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
             new_http = google_auth_httplib2.AuthorizedHttp(credentials, http=new_http)
         return googleapiclient.http.HttpRequest(new_http, *args, **kwargs)
 
+    # Set endpoint
+    if lkp.cfg.custom_endpoints and "compute" in lkp.cfg.custom_endpoints:
+        uri = lkp.cfg.custom_endpoints["compute"]
+    else:
+        uri = DISCOVERY_URI
+
     log.debug(f"Using version={version} of Google Compute Engine API")
     return googleapiclient.discovery.build(
         "compute",
         version,
         requestBuilder=build_request,
         credentials=credentials,
+        discoveryServiceUrl=uri,
     )
-
-
-compute = compute_service()
 
 
 def load_config_data(config):
@@ -846,7 +856,8 @@ def project_metadata(key):
 def bucket_blob_download(bucket_name, blob_name):
     from google.cloud import storage
 
-    storage_client = storage.Client()
+    co = create_client_options("storage")
+    storage_client = storage.Client(client_options=co)
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
     contents = None
@@ -1282,7 +1293,8 @@ class TPU:
             raise Exception("TPU pip package not installed")
         self._nodeset = nodeset
         self._parent = f"projects/{lkp.project}/locations/{nodeset.zone}"
-        self._client = tpu.TpuClient()
+        co = create_client_options(ApiEndpoint.TPU)
+        self._client = tpu.TpuClient(client_options=co)
         self.data_disks = []
         for data_disk in nodeset.data_disks:
             ad = tpu.AttachedDisk()
@@ -1557,7 +1569,7 @@ class Lookup:
         # TODO evaluate when we need to use google_app_cred_path
         if self.cfg.google_app_cred_path:
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.cfg.google_app_cred_path
-        return compute_service()
+        return compute_service(credentials=lkp.cfg.get("api_credentials"))
 
     @cached_property
     def hostname(self):
@@ -1965,6 +1977,29 @@ if not cfg:
         save_config(cfg, CONFIG_FILE)
 
 lkp = Lookup(cfg)
+compute = compute_service(credentials=lkp.cfg.get("api_credentials"))
+
+
+class ApiEndpoint(Enum):
+    COMPUTE = "compute"
+    BQ = "bq"
+    STORAGE = "storage"
+    TPU = "tpu"
+    SECRET = "secret_manager"
+
+
+def create_client_options(api: ApiEndpoint = None) -> ClientOptions:
+    """Create client options for cloud endpoints"""
+    print(
+        f"Universe Domain: {lkp.cfg.get('universe_domain')}, Api Endpoint {api.value}"
+    )
+    return ClientOptions(
+        universe_domain=lkp.cfg.get("universe_domain"),
+        api_endpoint=lkp.cfg.get("custom_endpoints")[api.value]
+        if lkp.cfg.get("custom_endpoint") and api
+        else None,
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
