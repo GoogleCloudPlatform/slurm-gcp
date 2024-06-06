@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.5.7\]
+
+- Persist templates content in the config instead of bucket
+- Add support for shared reservations
+- Update latest versions for NCCL plugin and rxdm
+- Update A3 Mega solution to use NCCL plugin 1.0.2
+
 ## \[6.5.6\]
 
 - Fix bug where dynamic nodes with hostname set to FQDN could not be found by
