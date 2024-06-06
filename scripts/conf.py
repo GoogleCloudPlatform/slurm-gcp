@@ -16,15 +16,12 @@
 
 from typing import List, Optional
 from itertools import chain
-from addict import Dict as NSDict
 from collections import defaultdict
 import json
 from pathlib import Path
 import util
 from util import dirs, slurmdirs
-from util import (
-    blob_get,
-)
+
 from resume import PLACEMENT_MAX_CNT
 
 FILE_PREAMBLE = """
@@ -325,8 +322,8 @@ def install_slurm_conf(lkp: util.Lookup) -> None:
         "state_save": slurmdirs.state,
         "mpi_default": mpi_default,
     }
-    conf_resp = blob_get("slurm-tpl-slurm-conf").download_as_text()
-    conf = conf_resp.format(**conf_options)
+
+    conf = lkp.cfg.slurm_conf_tpl.format(**conf_options)
 
     conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "slurm.conf"
     conf_file.write_text(conf)
@@ -335,36 +332,36 @@ def install_slurm_conf(lkp: util.Lookup) -> None:
 
 def install_slurmdbd_conf(lkp: util.Lookup) -> None:
     """install slurmdbd.conf"""
-    conf_options = NSDict(
-        {
-            "control_host": lkp.control_host,
-            "slurmlog": dirs.log,
-            "state_save": slurmdirs.state,
-            "db_name": "slurm_acct_db",
-            "db_user": "slurm",
-            "db_pass": '""',
-            "db_host": "localhost",
-            "db_port": "3306",
-        }
-    )
+    conf_options = {
+        "control_host": lkp.control_host,
+        "slurmlog": dirs.log,
+        "state_save": slurmdirs.state,
+        "db_name": "slurm_acct_db",
+        "db_user": "slurm",
+        "db_pass": '""',
+        "db_host": "localhost",
+        "db_port": "3306",
+    }
+
     if lkp.cfg.cloudsql_secret:
         secret_name = f"{lkp.cfg.slurm_cluster_name}-slurm-secret-cloudsql"
         payload = json.loads(util.access_secret_version(lkp.project, secret_name))
 
         if payload["db_name"] and payload["db_name"] != "":
-            conf_options.db_name = payload["db_name"]
+            conf_options["db_name"] = payload["db_name"]
         if payload["user"] and payload["user"] != "":
-            conf_options.db_user = payload["user"]
+            conf_options["db_user"] = payload["user"]
         if payload["password"] and payload["password"] != "":
-            conf_options.db_pass = payload["password"]
+            conf_options["db_pass"] = payload["password"]
 
         db_host_str = payload["server_ip"].split(":")
-        if db_host_str[0] and db_host_str[0] != "":
-            conf_options.db_host = db_host_str[0]
-            conf_options.db_port = db_host_str[1] if len(db_host_str) >= 2 else "3306"
+        if db_host_str[0]:
+            conf_options["db_host"] = db_host_str[0]
+            conf_options["db_port"] = (
+                db_host_str[1] if len(db_host_str) >= 2 else "3306"
+            )
 
-    conf_resp = blob_get("slurm-tpl-slurmdbd-conf").download_as_text()
-    conf = conf_resp.format(**conf_options)
+    conf = lkp.cfg.slurmdbd_conf_tpl.format(**conf_options)
 
     conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "slurmdbd.conf"
     conf_file.write_text(conf)
@@ -373,10 +370,8 @@ def install_slurmdbd_conf(lkp: util.Lookup) -> None:
 
 def install_cgroup_conf(lkp: util.Lookup) -> None:
     """install cgroup.conf"""
-    conf = blob_get("slurm-tpl-cgroup-conf").download_as_text()
-
     conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "cgroup.conf"
-    conf_file.write_text(conf)
+    conf_file.write_text(lkp.cfg.cgroup_conf_tpl)
     util.chown_slurm(conf_file, mode=0o600)
 
 
@@ -387,13 +382,10 @@ def install_jobsubmit_lua(lkp: util.Lookup) -> None:
         for part in lkp.cfg.partitions.values()
         for tpu_nodeset in part.partition_nodeset_tpu
     ):
-        conf_options = NSDict(
-            {
-                "scripts_dir": lkp.cfg.slurm_scripts_dir or dirs.scripts,
-            }
-        )
-        conf_resp = blob_get("slurm-tpl-job-submit-lua").download_as_text()
-        conf = conf_resp.format(**conf_options)
+        conf_options = {
+            "scripts_dir": lkp.cfg.slurm_scripts_dir or dirs.scripts,
+        }
+        conf = lkp.cfg.jobsubmit_lua_tpl.format(**conf_options)
 
         conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "job_submit.lua"
         conf_file.write_text(conf)
