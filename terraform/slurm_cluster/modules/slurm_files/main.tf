@@ -231,6 +231,7 @@ resource "google_storage_bucket_object" "prolog_scripts" {
   bucket  = var.bucket_name
   name    = format("%s/slurm-prolog-script-%s", local.bucket_dir, each.key)
   content = each.value.content
+  source  = each.value.source
 }
 
 resource "google_storage_bucket_object" "epilog_scripts" {
@@ -242,6 +243,7 @@ resource "google_storage_bucket_object" "epilog_scripts" {
   bucket  = var.bucket_name
   name    = format("%s/slurm-epilog-script-%s", local.bucket_dir, each.key)
   content = each.value.content
+  source  = each.value.source
 }
 
 ################################
