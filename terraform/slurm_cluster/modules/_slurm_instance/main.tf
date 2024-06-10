@@ -60,11 +60,13 @@ locals {
     for index in range(local.num_instances) : {
       hostname = local._hostnames[index]
       network_interfaces = [
-        for nic in local._network_interfaces[index] : merge(
+        for nic_ind, nic in local._network_interfaces[index] : merge(
           nic,
           {
-            # generate unique name for ip address name based on hostname and first 16 characters of sha256 of (sub)network id
-            ip_address_name = "${local._hostnames[index]}-${substr(sha256(coalesce(nic.subnetwork, nic.network)), 0, 16)}"
+            # generate unique name for ip address name based on hostname and index in the list
+            # regrettably, can't use anything derived from network / subnetwork here, as those are known
+            # only after apply
+            ip_address_name = "${local._hostnames[index]}-nic${nic_ind}"
           }
         )
       ]
