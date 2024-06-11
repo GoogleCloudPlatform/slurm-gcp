@@ -509,7 +509,7 @@ if __name__ == "__main__":
     util.config_root_logger(filename, logfile=LOGFILE)
     sys.excepthook = util.handle_exception
 
-    # lkp = util.Lookup(cfg)  # noqa F811
+    lkp = util.Lookup(cfg)  # noqa F811
 
     try:
         main(args)
