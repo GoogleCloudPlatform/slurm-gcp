@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import List
 import argparse
 import logging
 import sys
@@ -111,19 +112,15 @@ def delete_instances(instances):
     log.info(f"deleted {len(done)} instances {to_hostlist(done.keys())}")
 
 
-def suspend_nodes(nodelist):
-    """suspend nodes in nodelist"""
-    nodes = nodelist
-    if not isinstance(nodes, list):
-        nodes = util.to_hostnames(nodes)
-
-    tpu_nodes = []
+def suspend_nodes(nodes: List[str]) -> None:
+    tpu_nodes, other_nodes = [], []
     for node in nodes[:]:
         if lkp.node_is_tpu(node):
             tpu_nodes.append(node)
-            nodes.remove(node)
+        else:
+            other_nodes.append(node)
 
-    delete_instances(nodes)
+    delete_instances(other_nodes)
     delete_tpu_instances(tpu_nodes)
 
 
