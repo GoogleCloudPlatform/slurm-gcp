@@ -37,6 +37,7 @@ from util import (
     run,
     separate,
     to_hostlist,
+    to_hostlist_fast,
     trim_self_link,
     wait_for_operation,
 )
@@ -218,7 +219,7 @@ def create_instances_request(nodes, partition_name, placement_group, job_id=None
 
     if log.isEnabledFor(logging.DEBUG):
         log.debug(
-            f"new request: endpoint={request.methodId} nodes={to_hostlist(nodes)}"
+            f"new request: endpoint={request.methodId} nodes={to_hostlist_fast(nodes)}"
         )
     log_api_request(request)
     return request
@@ -460,7 +461,7 @@ def resume_nodes(nodes, resume_data=None):
         bulk_op_name = bulk_op["name"]
         if "error" in bulk_op:
             error = bulk_op["error"]["errors"][0]
-            group_nodes = to_hostlist(grouped_nodes[group].nodes)
+            group_nodes = to_hostlist_fast(grouped_nodes[group].nodes)
             log.warning(
                 f"bulkInsert operation errors: {error['code']} name={bulk_op_name} operationGroupId={group_id} nodes={group_nodes}"
             )
@@ -492,7 +493,7 @@ def resume_nodes(nodes, resume_data=None):
 
         ready_nodes = {trim_self_link(op["targetLink"]) for op in successful_inserts}
         if len(ready_nodes) > 0:
-            ready_nodelist = to_hostlist(ready_nodes)
+            ready_nodelist = to_hostlist_fast(ready_nodes)
             log.info(f"created {len(ready_nodes)} instances: nodes={ready_nodelist}")
             all_successful_inserts.extend(successful_inserts)
 
@@ -571,7 +572,9 @@ def create_nodeset_placement_groups(node_list: list, job_id=0):
     }
 
     if log.isEnabledFor(logging.DEBUG):
-        debug_groups = {group: to_hostlist(nodes) for group, nodes in groups.items()}
+        debug_groups = {
+            group: to_hostlist_fast(nodes) for group, nodes in groups.items()
+        }
         log.debug(
             f"creating {len(groups)} placement groups: \n{yaml.safe_dump(debug_groups).rstrip()}"
         )
@@ -614,7 +617,7 @@ def create_nodeset_placement_groups(node_list: list, job_id=0):
             )
 
     log.info(
-        f"created {len(operations)} placement groups ({to_hostlist(operations.keys())})"
+        f"created {len(operations)} placement groups ({to_hostlist_fast(operations.keys())})"
     )
     return groups
 
@@ -655,7 +658,7 @@ def main(nodelist, force=False):
     cloud_nodes, local_nodes = lkp.filter_nodes(nodes)
     if len(local_nodes) > 0:
         log.debug(
-            f"Ignoring slurm-gcp external nodes '{util.to_hostlist(local_nodes)}' from '{nodelist}'"
+            f"Ignoring slurm-gcp external nodes '{to_hostlist_fast(local_nodes)}' from '{nodelist}'"
         )
     cloud_nodelist = util.to_hostlist(cloud_nodes)
     if len(cloud_nodes) > 0:

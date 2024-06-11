@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Iterable, List
 import argparse
 import collections
 import importlib.util
@@ -807,6 +808,7 @@ def natural_sort(text):
     return [atoi(w) for w in re.split(r"(\d+)", text)]
 
 
+# TODO: replace with to_hostlist_fast
 def to_hostlist(nodenames) -> str:
     """make hostlist from list of node names"""
     # use tmp file because list could be large
@@ -818,6 +820,64 @@ def to_hostlist(nodenames) -> str:
     log_hostlists.debug(f"hostlist({len(nodenames)}): {hostlist}".format(hostlist))
     os.remove(tmp_file.name)
     return hostlist
+
+
+def to_hostlist_fast(names: Iterable[str]) -> str:
+    """
+    Fast implementation of to_hostlist that doesn't invoke `scontrol`
+    IMPORTANT:
+    * Acts as `scontrol show hostlistsorted`, i.e. original order is not preserved
+    * Achieves worse compression than `to_hostlist` for some cases
+    """
+    pref = defaultdict(list)
+    tokenizer = re.compile(r"^(.*?)(\d*)$")
+    for name in filter(None, names):
+        p, s = tokenizer.match(name).groups()
+        pref[p].append(s)
+
+    def _compress_suffixes(ss: List[str]) -> List[str]:
+        cur, res = None, []
+
+        def cur_repr():
+            nums, strs = cur
+            if nums[0] == nums[1]:
+                return strs[0]
+            return f"{strs[0]}-{strs[1]}"
+
+        for s in sorted(ss, key=int):
+            n = int(s)
+            if cur is None:
+                cur = ((n, n), (s, s))
+                continue
+
+            nums, strs = cur
+            if n == nums[1] + 1:
+                cur = ((nums[0], n), (strs[0], s))
+            else:
+                res.append(cur_repr())
+                cur = ((n, n), (s, s))
+        if cur:
+            res.append(cur_repr())
+        return res
+
+    res = []
+    for p in sorted(pref.keys()):
+        sl = defaultdict(list)
+        for s in pref[p]:
+            sl[len(s)].append(s)
+        cs = []
+        for ln in sorted(sl.keys()):
+            if ln == 0:
+                res.append(p)
+            else:
+                cs.extend(_compress_suffixes(sl[ln]))
+        if not cs:
+            continue
+        if len(cs) == 1 and "-" not in cs[0]:
+            res.append(f"{p}{cs[0]}")
+        else:
+            res.append(f"{p}[{','.join(cs)}]")
+    return ",".join(res)
 
 
 def part_is_tpu(part):

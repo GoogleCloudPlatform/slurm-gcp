@@ -38,7 +38,7 @@ from util import (
     run,
     save_config,
     separate,
-    to_hostlist,
+    to_hostlist_fast,
     with_static,
     Lookup,
     NSDict,
@@ -363,7 +363,7 @@ def delete_placement_groups(placement_groups):
         if failures:
             log.error(f"some placement groups failed to delete: {failures}")
     log.info(
-        f"deleted {len(done)} of {len(placement_groups)} placement groups ({to_hostlist(done.keys())})"
+        f"deleted {len(done)} of {len(placement_groups)} placement groups ({to_hostlist_fast(done.keys())})"
     )
 
 
@@ -443,7 +443,8 @@ def sync_slurm():
     }
     if log.isEnabledFor(logging.DEBUG):
         status_nodelist = {
-            status.name: to_hostlist(nodes) for status, nodes in node_statuses.items()
+            status.name: to_hostlist_fast(nodes)
+            for status, nodes in node_statuses.items()
         }
         log.debug(f"node statuses: \n{yaml.safe_dump(status_nodelist).rstrip()}")
 

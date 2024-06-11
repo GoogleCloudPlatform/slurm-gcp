@@ -39,21 +39,6 @@ class TstTPU:  # to prevent client initialization durint "TPU.__init__"
     vmcount: int
 
 
-def make_to_hostlist_mock(tbl: Optional[dict[str, str]] = None, strict: bool = False):
-    if tbl is None:
-        tbl = {}
-
-    def se(names: list[str]) -> str:
-        k = ",".join(sorted(names))
-        if k in tbl:
-            return tbl[k]
-        if strict:
-            raise AssertionError(f"to_hostlist mock: unexpected nodenames: '{k}'")
-        return k
-
-    return se
-
-
 def make_to_hostnames_mock(tbl: Optional[dict[str, list[str]]]):
     def se(k: str) -> list[str]:
         if k not in tbl:
@@ -79,17 +64,6 @@ def test_gen_topology_conf_empty():
 
 @mock.patch("util.TPU")
 @mock.patch(
-    "util.to_hostlist",
-    side_effect=make_to_hostlist_mock(
-        {
-            "bold-0,bold-1,bold-2,bold-3": "bold-[0-3]",
-            "m22-bold-0,m22-bold-1,m22-bold-2": "m22-bold-[0-2]",
-            "m22-bold-4,m22-bold-5,m22-bold-6": "m22-bold-[4-6]",
-            "m22-bold-7,m22-bold-8": "m22-bold-[7-8]",
-        }
-    ),
-)
-@mock.patch(
     "util.to_hostnames",
     side_effect=make_to_hostnames_mock(
         {
@@ -105,7 +79,7 @@ def test_gen_topology_conf_empty():
         }
     ),
 )
-def test_gen_topology_conf(to_hostnames_mock, to_hostlist_mock, tpu_mock):
+def test_gen_topology_conf(to_hostnames_mock, tpu_mock):
     cfg = TstCfg(
         nodeset_tpu={
             "a": TstNodesetTpu("bold", node_count_static=4, node_count_dynamic_max=5),

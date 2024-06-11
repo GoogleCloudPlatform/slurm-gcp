@@ -26,7 +26,7 @@ from util import (
     groupby_unsorted,
     log_api_request,
     batch_execute,
-    to_hostlist,
+    to_hostlist_fast,
     wait_for_operations,
     separate,
     execute_with_futures,
@@ -99,17 +99,16 @@ def delete_instances(instances):
         log.debug("No instances to delete")
         return
 
-    valid_hostlist = util.to_hostlist(valid)
     requests = {inst: delete_instance_request(inst) for inst in valid}
 
-    log.info(f"delete {len(valid)} instances ({valid_hostlist})")
+    log.info(f"delete {len(valid)} instances ({to_hostlist_fast(valid)})")
     done, failed = batch_execute(requests)
     if failed:
         for err, nodes in groupby_unsorted(lambda n: failed[n][1], failed.keys()):
-            log.error(f"instances failed to delete: {err} ({to_hostlist(nodes)})")
+            log.error(f"instances failed to delete: {err} ({to_hostlist_fast(nodes)})")
     wait_for_operations(done.values())
     # TODO do we need to check each operation for success? That is a lot more API calls
-    log.info(f"deleted {len(done)} instances {to_hostlist(done.keys())}")
+    log.info(f"deleted {len(done)} instances {to_hostlist_fast(done.keys())}")
 
 
 def suspend_nodes(nodes: List[str]) -> None:
@@ -133,11 +132,11 @@ def main(nodelist):
     cloud_nodes, local_nodes = lkp.filter_nodes(nodes)
     if len(local_nodes) > 0:
         log.debug(
-            f"Ignoring slurm-gcp external nodes '{util.to_hostlist(local_nodes)}' from '{nodelist}'"
+            f"Ignoring slurm-gcp external nodes '{to_hostlist_fast(local_nodes)}' from '{nodelist}'"
         )
     if len(cloud_nodes) > 0:
         log.debug(
-            f"Using cloud nodes '{util.to_hostlist(cloud_nodes)}' from '{nodelist}'"
+            f"Using cloud nodes '{to_hostlist_fast(cloud_nodes)}' from '{nodelist}'"
         )
     else:
         log.debug("No cloud nodes to suspend")

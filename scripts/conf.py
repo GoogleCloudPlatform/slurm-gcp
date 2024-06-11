@@ -451,7 +451,7 @@ class Switch:
             s for s in self.switches if not s.empty()
         ]  # render only non-empty sub switches
         if non_empty:
-            d["Switches"] = util.to_hostlist([s.name for s in non_empty])
+            d["Switches"] = util.to_hostlist_fast([s.name for s in non_empty])
 
         return dict_to_conf(d)
 
@@ -484,7 +484,7 @@ def tpu_nodeset_switch(nodeset: object, lkp: util.Lookup) -> Switch:
             for nodes in util.chunked(nodenames, n=tpuobj.vmcount):
                 sub_switch = Switch(
                     name=f"{switch.name}-{len(switch.switches)}",
-                    nodes=util.to_hostlist(nodes),
+                    nodes=util.to_hostlist_fast(nodes),
                 )
                 switch.switches.append(sub_switch)
     return switch
