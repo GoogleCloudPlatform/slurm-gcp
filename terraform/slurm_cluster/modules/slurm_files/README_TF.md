@@ -105,7 +105,7 @@ No modules.
 | <a name="input_slurm_control_host_port"></a> [slurm\_control\_host\_port](#input\_slurm\_control\_host\_port) | The port number that the Slurm controller, slurmctld, listens to for work.<br><br>See https://slurm.schedmd.com/slurm.conf.html#OPT_SlurmctldPort | `string` | `"6818"` | no |
 | <a name="input_slurm_log_dir"></a> [slurm\_log\_dir](#input\_slurm\_log\_dir) | Directory where Slurm logs to. | `string` | `"/var/log/slurm"` | no |
 | <a name="input_slurmdbd_conf_tpl"></a> [slurmdbd\_conf\_tpl](#input\_slurmdbd\_conf\_tpl) | Slurm slurmdbd.conf template file path. | `string` | `null` | no |
-| <a name="input_universe_domain"></a> [universe\_domain](#input\_universe\_domain) | Domain address for alternate API universe | `string` | `null` | no |
+| <a name="input_universe_information"></a> [universe\_information](#input\_universe\_information) | Domain address and credentials for alternate API universe | <pre>object({<br>    domain      = string<br>    credentials = string<br>  })</pre> | <pre>{<br>  "credentials": null,<br>  "domain": null<br>}</pre> | no |
 
 ## Outputs
 

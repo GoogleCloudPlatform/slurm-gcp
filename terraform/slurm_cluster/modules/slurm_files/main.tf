@@ -95,8 +95,8 @@ locals {
 
   providers = {
     # Providers
-    universe_domain  = var.universe_domain
-    custom_endpoints = var.custom_endpoints
+    universe_information = var.universe_information
+    custom_endpoints     = var.custom_endpoints
   }
 
   providers_yaml        = "providers.yaml"
@@ -172,6 +172,8 @@ data "archive_file" "slurm_gcp_devel_zip" {
     fileset(local.scripts_dir, "*.cache"),
     fileset(local.scripts_dir, "*.lock"),
   ])
+
+  depends_on = [google_storage_bucket_object.providers]
 }
 
 resource "google_storage_bucket_object" "devel" {

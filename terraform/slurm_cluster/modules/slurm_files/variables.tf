@@ -456,10 +456,16 @@ variable "munge_mount" {
   }
 }
 
-variable "universe_domain" {
-  description = "Domain address for alternate API universe"
-  type        = string
-  default     = null
+variable "universe_information" {
+  description = "Domain address and credentials for alternate API universe"
+  type = object({
+    domain      = string
+    credentials = string
+  })
+  default = {
+    domain      = null
+    credentials = null
+  }
 }
 
 variable "custom_endpoints" {

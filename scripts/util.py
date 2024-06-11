@@ -74,7 +74,6 @@ from google.oauth2 import service_account  # noqa: E402
 import googleapiclient.discovery  # noqa: E402
 import google_auth_httplib2  # noqa: E402
 from googleapiclient.http import set_user_agent  # noqa: E402
-from googleapiclient.discovery import DISCOVERY_URI  # noqa: E402
 from google.api_core.client_options import ClientOptions  # noqa: E402
 import httplib2  # noqa: E402
 
@@ -101,6 +100,7 @@ if ENV_CONFIG_YAML:
     CONFIG_FILE = Path(ENV_CONFIG_YAML)
 else:
     CONFIG_FILE = Path(__file__).with_name("config.yaml")
+PROVIDERS_FILE = Path(__file__).with_name("providers.yaml")
 API_REQ_LIMIT = 2000
 URI_REGEX = r"[a-z]([-a-z0-9]*[a-z0-9])?"
 
@@ -158,6 +158,45 @@ slurmdirs = NSDict(
 yaml.SafeDumper.yaml_representers[
     None
 ] = lambda self, data: yaml.representer.SafeRepresenter.represent_str(self, str(data))
+
+with open(PROVIDERS_FILE) as stream:
+    try:
+        providers = yaml.safe_load(stream)
+    except yaml.YAMLError as exc:
+        providers = None
+        print(exc)
+prv = NSDict(providers)
+
+universe_domain = "googleapis.com"
+universe_credentials = None
+custom_endpoints = None
+if prv.universe_information:
+    d, c = "domain", "credentials"
+    if d in prv.universe_information and prv.universe_information[d]:
+        universe_domain = prv.universe_information[d]
+    if c in prv.universe_information and prv.universe_information[c]:
+        universe_credentials = prv.universe_information[c]
+if prv.custom_endpoints:
+    custom_endpoints = prv.custom_endpoints
+
+
+class ApiEndpoint(Enum):
+    COMPUTE = "compute"
+    BQ = "bq"
+    STORAGE = "storage"
+    TPU = "tpu"
+    SECRET = "secret_manager"
+
+
+def create_client_options(api: ApiEndpoint = None):
+    """Create client options for cloud endpoints"""
+    ep = None
+    if custom_endpoints and api and api.value in custom_endpoints:
+        if api == ApiEndpoint.STORAGE:
+            ep = f"https://{api.value}.{universe_domain}/"
+            os.environ["_API_VERSION_OVERRIDE_ENV_VAR"] = custom_endpoints[api.value]
+    print(f"Universe Domain: {universe_domain}, API: {api.value}, Api Endpoint {ep}")
+    return ClientOptions(universe_domain=universe_domain, api_endpoint=ep)
 
 
 class LogFormatter(logging.Formatter):
@@ -394,13 +433,14 @@ def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
     """Make thread-safe compute service handle
     creates a new Http for each request
     """
+
     try:
         key_path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
     except KeyError:
         key_path = None
     if key_path is not None:
         credentials = service_account.Credentials.from_service_account_file(
-            key_path, scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            key_path, scopes=[f"https://www.{universe_domain}/auth/cloud-platform"]
         )
     elif credentials is None:
         credentials = def_creds
@@ -413,11 +453,13 @@ def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
             new_http = google_auth_httplib2.AuthorizedHttp(credentials, http=new_http)
         return googleapiclient.http.HttpRequest(new_http, *args, **kwargs)
 
-    # Set endpoint
-    if lkp.cfg.custom_endpoints and "compute" in lkp.cfg.custom_endpoints:
-        uri = lkp.cfg.custom_endpoints["compute"]
-    else:
-        uri = DISCOVERY_URI
+    c_str = ApiEndpoint.COMPUTE.value
+    disc_url = None
+    if custom_endpoints and c_str in custom_endpoints:
+        version = custom_endpoints[c_str]
+        disc_url = googleapiclient.discovery.DISCOVERY_URI.replace(
+            "googleapis.com", universe_domain
+        )
 
     log.debug(f"Using version={version} of Google Compute Engine API")
     return googleapiclient.discovery.build(
@@ -425,8 +467,68 @@ def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
         version,
         requestBuilder=build_request,
         credentials=credentials,
-        discoveryServiceUrl=uri,
+        discoveryServiceUrl=disc_url,
     )
+
+
+# class ComputeServices():
+
+#     def __init__(self, credentials = None):
+#         try:
+#             key_path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
+#         except KeyError:
+#             key_path = None
+#         if credentials is not None and key_path is not None:
+#             self.credentials = service_account.Credentials.from_service_account_file(
+#                 key_path, scopes=[f"https://www.{universe_domain}/auth/cloud-platform"]
+#             )
+#         elif credentials is None:
+#             self.credentials = def_creds
+
+#         co = create_client_options(ApiEndpoint.COMPUTE)
+#         self.clients = NSDict({
+#             "instances": compute_v1.InstancesClient(credentials=self.credentials, client_options=co),
+#             "zone_ops": compute_v1.ZoneOperationsClient(credentials=self.credentials, client_options=co),
+#             "region_ops": compute_v1.RegionOperationsClient(credentials=self.credentials, client_options=co),
+#             "global_ops": compute_v1.GlobalOperationsClient(credentials=self.credentials, client_options=co),
+#             "rec_pol": compute_v1.ResourcePoliciesClient(credentials=self.credentials, client_options=co),
+#             "reservations": compute_v1.ReservationsClient(credentials=self.credentials, client_options=co),
+#             "machine_type": compute_v1.MachineTypesClient(credentials=self.credentials, client_options=co),
+#             "instance_template": compute_v1.InstanceTemplatesClient(credentials=self.credentials, client_options=co),
+#             "region_instances": compute_v1.RegionInstancesClient(credentials=self.credentials, client_options=co)
+#         })
+
+#     def instances(self) -> compute_v1.InstancesClient:
+#         return self.clients.instances
+
+#     def zoneOperations(self) -> compute_v1.ZoneOperationsClient:
+#         return self.clients.zone_ops
+
+#     def regionOperations(self) -> compute_v1.RegionOperationsClient:
+#         return self.clients.region_ops
+
+#     def globalOperations(self) -> compute_v1.GlobalOperationsClient:
+#         return self.clients.global_ops
+
+#     def reservations(self) -> compute_v1.ReservationsClient:
+#         return self.clients.reservations
+
+#     def resourcePolicies(self) -> compute_v1.ResourcePoliciesClient:
+#         return self.clients.rec_pol
+
+#     def machineTypes(self) -> compute_v1.MachineTypesClient:
+#         return self.clients.machine_type
+
+#     def instanceTemplates(self) -> compute_v1.InstanceTemplatesClient:
+#         return self.clients.instance_template
+
+#     def regionInstances(self) -> compute_v1.RegionInstancesClient:
+#         return self.clients.region_instances
+
+compute = compute_service(universe_credentials)
+
+# def compute_service(credentials=None) -> ComputeServices:
+#     return ComputeServices(credentials)
 
 
 def load_config_data(config):
@@ -1569,7 +1671,7 @@ class Lookup:
         # TODO evaluate when we need to use google_app_cred_path
         if self.cfg.google_app_cred_path:
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.cfg.google_app_cred_path
-        return compute_service(credentials=lkp.cfg.get("api_credentials"))
+        return compute_service(universe_credentials)
 
     @cached_property
     def hostname(self):
@@ -1977,28 +2079,6 @@ if not cfg:
         save_config(cfg, CONFIG_FILE)
 
 lkp = Lookup(cfg)
-compute = compute_service(credentials=lkp.cfg.get("api_credentials"))
-
-
-class ApiEndpoint(Enum):
-    COMPUTE = "compute"
-    BQ = "bq"
-    STORAGE = "storage"
-    TPU = "tpu"
-    SECRET = "secret_manager"
-
-
-def create_client_options(api: ApiEndpoint = None) -> ClientOptions:
-    """Create client options for cloud endpoints"""
-    print(
-        f"Universe Domain: {lkp.cfg.get('universe_domain')}, Api Endpoint {api.value}"
-    )
-    return ClientOptions(
-        universe_domain=lkp.cfg.get("universe_domain"),
-        api_endpoint=lkp.cfg.get("custom_endpoints")[api.value]
-        if lkp.cfg.get("custom_endpoint") and api
-        else None,
-    )
 
 
 if __name__ == "__main__":

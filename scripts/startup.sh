@@ -53,6 +53,27 @@ function devel::zip() {
 	echo "INFO: Updated permissions of files in '$SCRIPTS_DIR'."
 }
 
+function devel::providers() {
+	local BUCKET="$($CURL $URL/instance/attributes/slurm_bucket_path)"
+	if [[ -z $BUCKET ]]; then
+		echo "ERROR: No bucket path detected."
+		return 1
+	fi
+
+	local SLURM_PROVIDERS_URL="$BUCKET/providers.yaml"
+	local SLURM_PROVIDERS_FILE="$SCRIPTS_DIR/providers.yaml"
+	eval $(gsutil cp "$SLURM_PROVIDERS_URL" "$SLURM_PROVIDERS_FILE")
+	if ! [[ -f "$SLURM_PROVIDERS_FILE" ]]; then
+		echo "INFO: No providers files downloaded. Skipping."
+		return 0
+	fi
+
+	#temporary hack to not make the script fail on TPU vm
+	chown slurm:slurm -R "$SLURM_PROVIDERS_FILE" || true
+	chmod 600 -R "$SLURM_PROVIDERS_FILE"
+	echo "INFO: Updated permissions of '$SLURM_PROVIDERS_FILE'."
+}
+
 PING_METADATA="ping -q -w1 -c1 $METADATA_SERVER"
 echo "INFO: $PING_METADATA"
 for i in $(seq 10); do
@@ -88,6 +109,7 @@ SETUP_SCRIPT_FILE=$SCRIPTS_DIR/setup.py
 UTIL_SCRIPT_FILE=$SCRIPTS_DIR/util.py
 
 devel::zip
+devel::providers
 
 if [ -f $FLAGFILE ]; then
 	echo "WARNING: Slurm was previously configured, quitting"
