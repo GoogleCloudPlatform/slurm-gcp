@@ -22,8 +22,6 @@ from pathlib import Path
 import util
 from util import dirs, slurmdirs
 
-from resume import PLACEMENT_MAX_CNT
-
 FILE_PREAMBLE = """
 # Warning:
 # This file is managed by a script. Manual modifications will be overwritten.
@@ -439,21 +437,22 @@ class Switch:
         name: str,
         nodes: Optional[str] = None,
         switches: Optional[List["Switch"]] = None,
-        link_speed: Optional[int] = None,
     ):
         self.name = name
         self.nodes = nodes  # nodelist, e.g. "alpha-[0-4],beta-[14-17]"
         self.switches = switches or []
-        self.link_speed = link_speed
 
     def conf_line(self) -> str:
         d = {"SwitchName": self.name}
         if self.nodes:
             d["Nodes"] = self.nodes
-        if self.switches:
-            d["Switches"] = util.to_hostlist([s.name for s in self.switches])
-        if self.link_speed is not None:
-            d["LinkSpeed"] = self.link_speed
+
+        non_empty = [
+            s for s in self.switches if not s.empty()
+        ]  # render only non-empty sub switches
+        if non_empty:
+            d["Switches"] = util.to_hostlist([s.name for s in non_empty])
+
         return dict_to_conf(d)
 
     def render_conf_lines(self) -> List[str]:
@@ -466,66 +465,62 @@ class Switch:
         return lines
 
     def empty(self) -> bool:
-        return not self.nodes and not self.switches
+        if self.nodes:
+            return False
+        return not any(not c.empty() for c in self.switches)
 
 
-def tpu_nodeset_switch_lines(lkp: util.Lookup) -> str:
-    root = Switch(name="nodeset_tpu-root")
+def tpu_nodeset_switch(nodeset: object, lkp: util.Lookup) -> Switch:
+    tpuobj = util.TPU(nodeset)
+    nodelists = filter(None, lkp.nodeset_lists(nodeset))  # (static, dynamic)
 
-    for nodeset in lkp.cfg.nodeset_tpu.values():
-        tpuobj = util.TPU(nodeset)
-        nodelists = filter(None, lkp.nodeset_lists(nodeset))  # (static, dynamic)
-
-        ns_switch = Switch(name=nodeset.nodeset_name)
-        if tpuobj.vmcount == 1:  # Put all nodes in one switch
-            ns_switch.nodes = ",".join(nodelists)
-        else:
-            # Chunk nodes into sub-switches of size `vmcount`
-            for nodelist in nodelists:
-                nodenames = util.to_hostnames(nodelist)
-                for nodes in util.chunked(nodenames, n=tpuobj.vmcount):
-                    sub_switch = Switch(
-                        name=f"{ns_switch.name}-{len(ns_switch.switches)}",
-                        nodes=util.to_hostlist(nodes),
-                    )
-                    ns_switch.switches.append(sub_switch)
-
-        if not ns_switch.empty():
-            root.switches.append(ns_switch)
-
-    return "\n".join(root.render_conf_lines())
+    switch = Switch(name=nodeset.nodeset_name)
+    if tpuobj.vmcount == 1:  # Put all nodes in one switch
+        switch.nodes = ",".join(nodelists)
+    else:
+        # Chunk nodes into sub-switches of size `vmcount`
+        for nodelist in nodelists:
+            nodenames = util.to_hostnames(nodelist)
+            for nodes in util.chunked(nodenames, n=tpuobj.vmcount):
+                sub_switch = Switch(
+                    name=f"{switch.name}-{len(switch.switches)}",
+                    nodes=util.to_hostlist(nodes),
+                )
+                switch.switches.append(sub_switch)
+    return switch
 
 
-def nodeset_switch_lines(lkp: util.Lookup) -> str:
-    root = Switch(name="nodeset-root")
+def nodeset_switch(nodeset: object, lkp: util.Lookup) -> Switch:
+    return Switch(
+        name=nodeset.nodeset_name,
+        nodes=",".join(filter(None, lkp.nodeset_lists(nodeset))),
+    )
 
-    for nodeset in lkp.cfg.nodeset.values():
-        nodelists = filter(None, lkp.nodeset_lists(nodeset))
-        ns_switch = Switch(
-            name=nodeset.nodeset_name,
-            nodes=",".join(nodelists),
-            # NOTE: LinkSpeed not used in Slurm.
-            #       Used here to denote enable_placement=true.
-            link_speed=PLACEMENT_MAX_CNT if nodeset.enable_placement else None,
-        )
 
-        if not ns_switch.empty():
-            root.switches.append(ns_switch)
+def gen_topology(lkp: util.Lookup) -> List[Switch]:
+    # Returns a list of "root" switches
+    tpu_root = Switch(
+        name="nodeset_tpu-root",
+        switches=[tpu_nodeset_switch(ns, lkp) for ns in lkp.cfg.nodeset_tpu.values()],
+    )
 
-    return "\n".join(root.render_conf_lines())
+    ord_root = Switch(
+        name="nodeset-root",
+        switches=[nodeset_switch(ns, lkp) for ns in lkp.cfg.nodeset.values()],
+    )
+
+    return [tpu_root, ord_root]
 
 
 def gen_topology_conf(lkp: util.Lookup) -> None:
     """generate slurm topology.conf from config.yaml"""
-    lines = [
-        nodeset_switch_lines(lkp),
-        tpu_nodeset_switch_lines(lkp),
-    ]
+    lines = [FILE_PREAMBLE]
+    for r in gen_topology(lkp):
+        lines.extend(r.render_conf_lines())
     lines.append("\n")
-    content = FILE_PREAMBLE + "\n".join(lines)
 
     conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "cloud_topology.conf"
-    conf_file.write_text(content)
+    conf_file.write_text("\n".join(lines))
     util.chown_slurm(conf_file, mode=0o600)
 
 

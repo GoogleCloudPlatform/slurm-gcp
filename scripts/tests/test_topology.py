@@ -8,6 +8,7 @@ import util
 import conf
 
 from dataclasses import dataclass, field
+import tempfile
 
 
 # TODO: use "real" classes once they are defined (instead of NSDict)
@@ -16,7 +17,6 @@ class TstNodeset:
     nodeset_name: str
     node_count_static: int = 0
     node_count_dynamic_max: int = 0
-    enable_placement: bool = False
 
 
 @dataclass
@@ -31,6 +31,7 @@ class TstCfg:
     slurm_cluster_name: str = "m22"
     nodeset: dict[TstNodeset] = field(default_factory=dict)
     nodeset_tpu: dict[TstNodesetTpu] = field(default_factory=dict)
+    output_dir: Optional[str] = None
 
 
 @dataclass
@@ -62,9 +63,18 @@ def make_to_hostnames_mock(tbl: Optional[dict[str, list[str]]]):
     return se
 
 
-def test_tpu_nodeset_switch_lines_empty():
-    lkp = util.Lookup(TstCfg())
-    assert conf.tpu_nodeset_switch_lines(lkp) == ""
+def test_gen_topology_conf_empty():
+    cfg = TstCfg(output_dir=tempfile.mkdtemp())
+    conf.gen_topology_conf(util.Lookup(cfg))
+    assert (
+        open(cfg.output_dir + "/cloud_topology.conf").read()
+        == """
+# Warning:
+# This file is managed by a script. Manual modifications will be overwritten.
+
+
+"""
+    )
 
 
 @mock.patch("util.TPU")
@@ -95,12 +105,18 @@ def test_tpu_nodeset_switch_lines_empty():
         }
     ),
 )
-def test_tpu_nodeset_switch_lines(to_hostnames_mock, to_hostlist_mock, tpu_mock):
+def test_gen_topology_conf(to_hostnames_mock, to_hostlist_mock, tpu_mock):
     cfg = TstCfg(
         nodeset_tpu={
             "a": TstNodesetTpu("bold", node_count_static=4, node_count_dynamic_max=5),
             "b": TstNodesetTpu("slim", node_count_dynamic_max=3),
-        }
+        },
+        nodeset={
+            "c": TstNodeset("green", node_count_static=2, node_count_dynamic_max=3),
+            "d": TstNodeset("blue", node_count_static=7),
+            "e": TstNodeset("pink", node_count_dynamic_max=4),
+        },
+        output_dir=tempfile.mkdtemp(),
     )
 
     def tpu_se(ns: TstNodesetTpu) -> TstTPU:
@@ -112,43 +128,24 @@ def test_tpu_nodeset_switch_lines(to_hostnames_mock, to_hostlist_mock, tpu_mock)
 
     tpu_mock.side_effect = tpu_se
 
-    lkp = util.Lookup(cfg)
-    want = "\n".join(
-        [
-            "SwitchName=nodeset_tpu-root Switches=bold,slim",
-            "SwitchName=bold Switches=bold-[0-3]",
-            "SwitchName=bold-0 Nodes=m22-bold-[0-2]",
-            "SwitchName=bold-1 Nodes=m22-bold-3",
-            "SwitchName=bold-2 Nodes=m22-bold-[4-6]",
-            "SwitchName=bold-3 Nodes=m22-bold-[7-8]",
-            "SwitchName=slim Nodes=m22-slim-[0-2]",
-        ]
+    conf.gen_topology_conf(util.Lookup(cfg))
+    assert (
+        open(cfg.output_dir + "/cloud_topology.conf").read()
+        == """
+# Warning:
+# This file is managed by a script. Manual modifications will be overwritten.
+
+SwitchName=nodeset_tpu-root Switches=bold,slim
+SwitchName=bold Switches=bold-[0-3]
+SwitchName=bold-0 Nodes=m22-bold-[0-2]
+SwitchName=bold-1 Nodes=m22-bold-3
+SwitchName=bold-2 Nodes=m22-bold-[4-6]
+SwitchName=bold-3 Nodes=m22-bold-[7-8]
+SwitchName=slim Nodes=m22-slim-[0-2]
+SwitchName=nodeset-root Switches=blue,green,pink
+SwitchName=blue Nodes=m22-blue-[0-6]
+SwitchName=green Nodes=m22-green-[0-1],m22-green-[2-4]
+SwitchName=pink Nodes=m22-pink-[0-3]
+
+"""
     )
-    assert conf.tpu_nodeset_switch_lines(lkp) == want
-
-
-def test_nodeset_switch_lines_empty():
-    lkp = util.Lookup(TstCfg())
-    assert conf.nodeset_switch_lines(lkp) == ""
-
-
-@mock.patch("util.to_hostlist", side_effect=make_to_hostlist_mock())
-def test_nodeset_switch_lines(to_hostlist_mock):
-    cfg = TstCfg(
-        nodeset={
-            "a": TstNodeset("green", node_count_static=2, node_count_dynamic_max=3),
-            "b": TstNodeset("blue", node_count_static=7),
-            "c": TstNodeset("pink", node_count_dynamic_max=4, enable_placement=True),
-        }
-    )
-
-    lkp = util.Lookup(cfg)
-    want = "\n".join(
-        [
-            "SwitchName=nodeset-root Switches=blue,green,pink",
-            "SwitchName=blue Nodes=m22-blue-[0-6]",
-            "SwitchName=green Nodes=m22-green-[0-1],m22-green-[2-4]",
-            "SwitchName=pink Nodes=m22-pink-[0-3] LinkSpeed=150",
-        ]
-    )
-    assert conf.nodeset_switch_lines(lkp) == want
