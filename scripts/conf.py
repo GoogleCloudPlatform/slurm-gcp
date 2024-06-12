@@ -84,6 +84,7 @@ def conflines(cloud_parameters, lkp: util.Lookup) -> str:
     }
     prolog_path = Path(dirs.custom_scripts / "prolog.d")
     epilog_path = Path(dirs.custom_scripts / "epilog.d")
+    default_tree_width = 65533 if any_dynamic else None
     conf_options = {
         **(comma_params if not no_comma_params else {}),
         "Prolog": f"{prolog_path}/*" if lkp.cfg.prolog_scripts else None,
@@ -95,9 +96,9 @@ def conflines(cloud_parameters, lkp: util.Lookup) -> str:
         "ResumeTimeout": cloud_parameters.get("resume_timeout", 300),
         "SuspendRate": cloud_parameters.get("suspend_rate", 0),
         "SuspendTimeout": cloud_parameters.get("suspend_timeout", 300),
-        "TreeWidth": "65533" if any_dynamic else None,
+        "TreeWidth": cloud_parameters.get("tree_width", default_tree_width),
         "JobSubmitPlugins": "lua" if any_tpu else None,
-        "TopologyPlugin": "topology/tree",
+        "TopologyPlugin": cloud_parameters.get("topology_plugin", "topology/tree"),
     }
     return dict_to_conf(conf_options, delim="\n")
 
