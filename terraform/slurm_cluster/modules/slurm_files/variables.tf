@@ -326,19 +326,17 @@ variable "partitions" {
 }
 
 variable "cloud_parameters" {
-  description = "cloud.conf options."
+  description = "cloud.conf options. Default behavior defined in scripts/conf.py"
   type = object({
-    resume_rate     = number
-    resume_timeout  = number
-    suspend_rate    = number
-    suspend_timeout = number
+    no_comma_params = optional(bool)
+    resume_rate     = optional(number)
+    resume_timeout  = optional(number)
+    suspend_rate    = optional(number)
+    suspend_timeout = optional(number)
+    topology_plugin = optional(string)
+    tree_width      = optional(number)
   })
-  default = {
-    resume_rate     = 0
-    resume_timeout  = 300
-    suspend_rate    = 0
-    suspend_timeout = 300
-  }
+  default = {}
 }
 
 ##########
