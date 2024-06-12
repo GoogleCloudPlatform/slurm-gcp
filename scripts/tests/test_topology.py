@@ -20,17 +20,10 @@ class TstNodeset:
 
 
 @dataclass
-class TstNodesetTpu:
-    nodeset_name: str
-    node_count_static: int = 0
-    node_count_dynamic_max: int = 0
-
-
-@dataclass
 class TstCfg:
     slurm_cluster_name: str = "m22"
-    nodeset: dict[TstNodeset] = field(default_factory=dict)
-    nodeset_tpu: dict[TstNodesetTpu] = field(default_factory=dict)
+    nodeset: dict[str, TstNodeset] = field(default_factory=dict)
+    nodeset_tpu: dict[str, TstNodeset] = field(default_factory=dict)
     output_dir: Optional[str] = None
 
 
@@ -40,6 +33,8 @@ class TstTPU:  # to prevent client initialization durint "TPU.__init__"
 
 
 def make_to_hostnames_mock(tbl: Optional[dict[str, list[str]]]):
+    tbl = tbl or {}
+
     def se(k: str) -> list[str]:
         if k not in tbl:
             raise AssertionError(f"to_hostnames mock: unexpected nodelist: '{k}'")
@@ -82,8 +77,8 @@ def test_gen_topology_conf_empty():
 def test_gen_topology_conf(to_hostnames_mock, tpu_mock):
     cfg = TstCfg(
         nodeset_tpu={
-            "a": TstNodesetTpu("bold", node_count_static=4, node_count_dynamic_max=5),
-            "b": TstNodesetTpu("slim", node_count_dynamic_max=3),
+            "a": TstNodeset("bold", node_count_static=4, node_count_dynamic_max=5),
+            "b": TstNodeset("slim", node_count_dynamic_max=3),
         },
         nodeset={
             "c": TstNodeset("green", node_count_static=2, node_count_dynamic_max=3),
@@ -93,7 +88,7 @@ def test_gen_topology_conf(to_hostnames_mock, tpu_mock):
         output_dir=tempfile.mkdtemp(),
     )
 
-    def tpu_se(ns: TstNodesetTpu) -> TstTPU:
+    def tpu_se(ns: TstNodeset) -> TstTPU:
         if ns.nodeset_name == "bold":
             return TstTPU(vmcount=3)
         if ns.nodeset_name == "slim":
