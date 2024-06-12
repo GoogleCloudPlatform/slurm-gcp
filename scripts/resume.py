@@ -37,7 +37,6 @@ from util import (
     run,
     separate,
     to_hostlist,
-    to_hostnames,
     trim_self_link,
     wait_for_operation,
 )
@@ -498,20 +497,18 @@ def resume_nodes(nodes, resume_data=None):
             all_successful_inserts.extend(successful_inserts)
 
 
-def update_job_comment(nodelist: list, comment: str):
-    resume_data = global_resume_data
-    if resume_data is None:
+def update_job_comment(nodelist: str, comment: str):
+    if global_resume_data is None:
         log.warning(
             "Cannot update and notify jobs with API failures as no valid resume file is present."
         )
         return
-    if isinstance(nodelist, str):
-        nodelist: list = util.to_hostnames(nodelist)
 
+    nodes = util.to_hostnames(nodelist)
     job_list = (
         job
-        for job in resume_data.jobs
-        if any(map(lambda each: each in nodelist, to_hostnames(job.nodelist_resume)))
+        for job in global_resume_data.jobs
+        if any(map(lambda node: node in nodes, util.to_hostnames(job.nodelist_resume)))
     )
     for job in job_list:
         run(f"{lkp.scontrol} update jobid={job.job_id} admincomment='{comment}'")

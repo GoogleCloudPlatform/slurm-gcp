@@ -39,7 +39,6 @@ from util import (
     save_config,
     separate,
     to_hostlist,
-    to_hostnames,
     with_static,
     Lookup,
     NSDict,
@@ -130,7 +129,7 @@ def _find_tpu_node_status(nodename, state):
             + " | awk -F'=' '/Level=0/ { print $NF }'",
             shell=True,
         ).stdout
-        l_nodelist = to_hostnames(nodelist)
+        l_nodelist = util.to_hostnames(nodelist)
         group_names = set(l_nodelist)
         # get the list of all the existing tpus in the nodeset
         tpus_list = set(tpuobj.list_node_names())
