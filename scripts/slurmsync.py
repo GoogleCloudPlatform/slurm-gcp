@@ -34,6 +34,7 @@ from util import (
     execute_with_futures,
     fetch_config_yaml,
     fetch_config_yaml_md5,
+    install_custom_scripts,
     load_config_file,
     run,
     save_config,
@@ -524,6 +525,11 @@ def main():
         sync_placement_groups()
     except Exception:
         log.exception("failed to sync placement groups")
+
+    try:
+        install_custom_scripts(check_hash=True)
+    except Exception:
+        log.exception("failed to sync custom scripts")
 
 
 parser = argparse.ArgumentParser(

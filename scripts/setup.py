@@ -35,7 +35,7 @@ from util import (
     dirs,
     slurmdirs,
     run,
-    blob_list,
+    install_custom_scripts,
 )
 
 from conf import (
@@ -50,7 +50,7 @@ from conf import (
     install_jobsubmit_lua,
     login_nodeset,
 )
-import slurmsync
+from slurmsync import sync_slurm
 
 from setup_network_storage import (
     setup_network_storage,
@@ -140,50 +140,6 @@ def failed_motd():
     motd_msg = MOTD_HEADER + wall_msg + "\n\n"
     Path("/etc/motd").write_text(motd_msg)
     util.run(f"wall -n '{wall_msg}'", timeout=30)
-
-
-def install_custom_scripts():
-    """download custom scripts from gcs bucket"""
-
-    compute_tokens = ["compute", "prolog", "epilog"]
-    if lkp.instance_role == "compute":
-        try:
-            compute_tokens.append(f"nodeset-{lkp.node_nodeset_name()}")
-        except Exception as e:
-            log.error(f"Failed to lookup nodeset: {e}")
-
-    prefix_tokens = dict.get(
-        {
-            "login": ["login"],
-            "compute": compute_tokens,
-            "controller": ["controller", "prolog", "epilog"],
-        },
-        lkp.instance_role,
-        [],
-    )
-    prefixes = [f"slurm-{tok}-script" for tok in prefix_tokens]
-    blobs = list(chain.from_iterable(blob_list(prefix=p) for p in prefixes))
-
-    script_pattern = re.compile(r"slurm-(?P<path>\S+)-script-(?P<name>\S+)")
-    for blob in blobs:
-        m = script_pattern.match(Path(blob.name).name)
-        if not m:
-            log.warning(f"found blob that doesn't match expected pattern: {blob.name}")
-            continue
-        path_parts = m["path"].split("-")
-        path_parts[0] += ".d"
-        stem, _, ext = m["name"].rpartition("_")
-        filename = ".".join((stem, ext))
-
-        path = Path(*path_parts, filename)
-        fullpath = (dirs.custom_scripts / path).resolve()
-        log.info(f"installing custom script: {path} from {blob.name}")
-        fullpath.parent.mkdirp()
-        for par in path.parents:
-            util.chown_slurm(dirs.custom_scripts / par)
-        with fullpath.open("wb") as f:
-            blob.download_to_file(f)
-        util.chown_slurm(fullpath, mode=0o755)
 
 
 def run_custom_scripts():
@@ -444,7 +400,7 @@ def setup_controller(args):
     run("systemctl status slurmctld", timeout=30)
     run("systemctl status slurmrestd", timeout=30)
 
-    slurmsync.sync_slurm()
+    sync_slurm()
     run("systemctl enable slurm_load_bq.timer", timeout=30)
     run("systemctl start slurm_load_bq.timer", timeout=30)
     run("systemctl status slurm_load_bq.timer", timeout=30)
