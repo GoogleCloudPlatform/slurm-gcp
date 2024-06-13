@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import List
 import argparse
 import collections
 import json
@@ -225,16 +226,6 @@ def create_instances_request(nodes, partition_name, placement_group, job_id=None
     return request
 
 
-def expand_nodelist(nodelist):
-    """expand nodes in hostlist to hostnames"""
-    if not nodelist:
-        return []
-
-    # TODO use a python library instead?
-    nodes = run(f"{lkp.scontrol} show hostnames {nodelist}").stdout.splitlines()
-    return nodes
-
-
 def group_nodes_bulk(nodes, resume_data=None):
     """group nodes by job_id, placement_group, node_group, and max bulkInsert size"""
     if resume_data is None:
@@ -246,9 +237,9 @@ def group_nodes_bulk(nodes, resume_data=None):
     # expand all job nodelists
     for job in jobs.values():
         job.nodelist_alloc = job.nodes_alloc
-        job.nodes_alloc = expand_nodelist(job.nodelist_alloc)
+        job.nodes_alloc = util.to_hostnames(job.nodelist_alloc)
         job.nodelist_resume = job.nodes_resume
-        job.nodes_resume = expand_nodelist(job.nodelist_resume)
+        job.nodes_resume = util.to_hostnames(job.nodelist_resume)
         job.tpu = util.part_is_tpu(job.partition)
         if not job.tpu:
             # create placement groups if nodes for job need it
@@ -372,13 +363,9 @@ def start_tpu(data):
             log.error("Error creating tpu node {node}")
 
 
-def resume_nodes(nodes, resume_data=None):
+def resume_nodes(nodes: List[str], resume_data=None):
     """resume nodes in nodelist"""
-    # support already expanded list
-    if isinstance(nodes, str):
-        nodelist = nodes
-        nodes = expand_nodelist(nodelist)
-    if len(nodes) == 0:
+    if not nodes:
         log.info("No nodes to resume")
         return
 
@@ -652,23 +639,24 @@ def get_resume_file_data():
 def main(nodelist, force=False):
     """main called when run as script"""
     log.debug(f"ResumeProgram {nodelist}")
-    nodes = expand_nodelist(nodelist)
-
     # Filter out nodes not in config.yaml
-    cloud_nodes, local_nodes = lkp.filter_nodes(nodes)
-    if len(local_nodes) > 0:
+    other_nodes, pm_nodes = separate(
+        lkp.is_power_managed_node, util.to_hostnames(nodelist)
+    )
+    if other_nodes:
         log.debug(
-            f"Ignoring slurm-gcp external nodes '{to_hostlist_fast(local_nodes)}' from '{nodelist}'"
+            f"Ignoring non-power-managed nodes '{to_hostlist_fast(other_nodes)}' from '{nodelist}'"
         )
-    cloud_nodelist = util.to_hostlist(cloud_nodes)
-    if len(cloud_nodes) > 0:
-        log.debug(f"Using cloud nodes '{cloud_nodelist}' from '{nodelist}'")
+
+    pm_nodelist = util.to_hostlist_fast(pm_nodes)
+    if pm_nodes:
+        log.debug(f"Resuming nodes '{pm_nodelist}' from '{nodelist}'")
     else:
-        log.debug("No cloud nodes to resume")
+        log.debug("No nodes to resume")
         return
 
-    log.info(f"resume {cloud_nodelist}")
-    resume_nodes(cloud_nodes, global_resume_data)
+    log.info(f"resume {pm_nodelist}")
+    resume_nodes(pm_nodes, global_resume_data)
     # TODO only run below if resume_nodes succeeds but
     # resume_nodes does not currently return any status.
     if lkp.cfg.enable_slurm_gcp_plugins:

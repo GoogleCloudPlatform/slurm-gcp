@@ -39,7 +39,6 @@ from util import (
     save_config,
     separate,
     to_hostlist_fast,
-    with_static,
     Lookup,
     NSDict,
     TPU,
@@ -190,12 +189,8 @@ def allow_power_down(state):
     return True
 
 
-@with_static(static_nodeset=None)
 def find_node_status(nodename):
     """Determine node/instance status that requires action"""
-    if find_node_status.static_nodeset is None:
-        find_node_status.static_nodeset = set(util.to_hostnames(lkp.static_nodelist()))
-
     state = lkp.slurm_node(nodename)
 
     if lkp.node_is_dyn(nodename):
@@ -223,10 +218,7 @@ def find_node_status(nodename):
             return NodeStatus.unbacked
         if state.base == "DOWN" and not power_flags and allow_power_down(state):
             return NodeStatus.power_down
-        if (
-            "POWERED_DOWN" in state.flags
-            and nodename in find_node_status.static_nodeset
-        ):
+        if "POWERED_DOWN" in state.flags and lkp.is_static_node(nodename):
             return NodeStatus.resume
     elif (
         state is not None
