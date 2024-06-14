@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.5.8\]
+
+- Expose TreeWidth and TopologyPlugin variables
+- Add 'source' argument for path to prolog or epilog scripts
+
 ## \[6.5.7\]
 
 - Persist templates content in the config instead of bucket
