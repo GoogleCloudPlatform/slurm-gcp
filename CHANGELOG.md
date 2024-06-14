@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.6.0\]
+
+- Upgrade Slurm to 23.11.8
+
 ## \[6.5.10\]
 
 - Add support for building open source compliant NVIDIA drivers

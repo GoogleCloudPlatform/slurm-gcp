@@ -107,7 +107,7 @@ parser.add_argument(
     "--slurm_version",
     "-s",
     dest="slurm_version",
-    default="23.11.7",
+    default="23.11.8",
     help="The Slurm version to use for the image.",
 )
 parser.add_argument(
