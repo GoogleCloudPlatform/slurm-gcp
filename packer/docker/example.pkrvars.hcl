@@ -52,7 +52,8 @@ tags = [
 # PROVISION #
 #############
 
-# slurm_version = "23.11.7"
+# example slurm_version
+# slurm_version = "23.11.6"
 
 # Disable some ansible roles here; they are enabled by default
 # install_cuda = false
