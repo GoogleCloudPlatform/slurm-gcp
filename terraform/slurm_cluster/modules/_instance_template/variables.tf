@@ -350,3 +350,17 @@ EOF
   })
   default = null
 }
+
+
+variable "resource_policies" {
+  description = <<-EOD
+  A list of self_links of resource policies to attach to the instance.
+  Currently a max of 1 resource policy is supported.
+  EOD
+  type        = list(string)
+  default     = null
+  validation {
+    condition     = try(length(var.resource_policies) <= 1, true)
+    error_message = "Only one resource policy can be attached to the instance."
+  }
+}

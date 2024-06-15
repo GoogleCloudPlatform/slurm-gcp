@@ -170,5 +170,6 @@ module "instance_template" {
     },
     var.disk_labels,
   )
-  additional_disks = local.additional_disks
+  additional_disks  = local.additional_disks
+  resource_policies = var.resource_policies
 }
