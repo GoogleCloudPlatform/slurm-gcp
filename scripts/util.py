@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Tuple, Dict
 import argparse
 import collections
 import importlib.util
@@ -1634,7 +1634,7 @@ class Lookup:
         return self.slurm_nodes().get(nodename)
 
     @lru_cache(maxsize=1)
-    def instances(self):
+    def instances(self) -> Dict[str, object]:
         instance_information_fields = [
             "advancedMachineFeatures",
             "cpuPlatform",

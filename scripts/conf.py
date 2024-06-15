@@ -425,7 +425,7 @@ class Switch:
 
         return dict_to_conf(d)
 
-    def render_conf_lines(self) -> list[str]:
+    def render_conf_lines(self) -> List[str]:
         if self.empty():
             return []
 
@@ -472,9 +472,9 @@ def nodeset_switch_phony(nodeset: object, lkp: util.Lookup) -> Switch:
     )
 
 
-def _make_physical_path(inst: object) -> list[str]:
+def _make_physical_path(inst: object) -> List[str]:
     region, zone = (
-        f"region_{inst.region}",
+        f"region_{inst.region}", # !!! no region in inst
         f"zone_{inst.zone}",
     )
 
@@ -514,9 +514,14 @@ def nodeset_switch_real(nodeset: object, lkp: util.Lookup, root: Switch) -> None
 
     # Construct topology for real instances
     real_nodes = set()
-    for inst in lkp.instances():
-        if lkp.node_nodeset_name(inst.name) != nodeset.nodeset_name:
-            continue
+    for inst in lkp.instances().values():
+        try:
+            ns_name = lkp.node_nodeset_name(inst.name)
+            if ns_name != nodeset.nodeset_name:
+                continue
+        except Exception:
+            continue # it's Ok !!!
+        
         switch = add_switches(*_make_physical_path(inst))
         switch.nodes.append(inst.name)
         real_nodes.add(inst.name)
@@ -531,7 +536,7 @@ def nodeset_switch_real(nodeset: object, lkp: util.Lookup, root: Switch) -> None
     return root
 
 
-def gen_topology(lkp: util.Lookup) -> list[Switch]:
+def gen_topology(lkp: util.Lookup) -> List[Switch]:
     # Returns a list of "root" switches
 
     root = Switch(name="slurm-root")
