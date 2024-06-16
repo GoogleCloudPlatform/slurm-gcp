@@ -9,6 +9,8 @@ import conf
 
 from dataclasses import dataclass, field
 import tempfile
+import ring_sort
+import pytest
 
 
 # TODO: use "real" classes once they are defined (instead of NSDict)
@@ -118,3 +120,18 @@ SwitchName=pink Nodes=m22-pink-[0-3]
 
 """
     )
+
+
+def test_ring_sort_order():
+    g = [l.split("/") for l in ["x/d", "x/c", "f", "g", "h"]]
+    assert ring_sort.order(g, start_from="f") == ["f", "g", "h", "c", "d"]
+    assert ring_sort.order(g, start_from="c") == ["c", "d", "f", "g", "h"]
+    assert ring_sort.order(g, start_from="d") == ["d", "c", "f", "g", "h"]
+
+
+def test_ring_sort_order_start_from_not_found():
+    g = [l.split("/") for l in ["x/d", "x/c", "f", "g", "h"]]
+    with pytest.raises(AssertionError):
+        ring_sort.order(g, start_from="z")
+    with pytest.raises(AssertionError):
+        ring_sort.order(g, start_from="x")
