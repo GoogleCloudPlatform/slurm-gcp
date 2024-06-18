@@ -156,7 +156,6 @@
   - name: Install driver
     command: >
       bash {{ cuda_driver_runfile }} --silent
-      --kernel-name={{ cuda_driver_kernel_version }}
       {{ "--no-drm" if cuda_runfile_disable_nvidia_drm else "" }}
 
   - name: Install nvidia-persistenced systemd-file
