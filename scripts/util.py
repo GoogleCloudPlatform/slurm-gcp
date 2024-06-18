@@ -311,6 +311,15 @@ def blob_list(prefix="", delimiter=None, project=None):
     )
     return [blob for blob in blobs]
 
+def _hash_file(fullpath):
+    with open(fullpath, "rb") as f:
+        file_hash = hashlib.md5()
+        chunk = f.read(8192)
+        while chunk:
+            file_hash.update(chunk)
+            chunk = f.read(8192)
+    return base64.b64encode(file_hash.digest()).decode('utf-8')
+
 def install_custom_scripts(check_hash=False):
     """download custom scripts from gcs bucket"""
 
@@ -351,12 +360,7 @@ def install_custom_scripts(check_hash=False):
             chown_slurm(dirs.custom_scripts / par)
         need_update = True
         if check_hash and fullpath.exists():
-            with open(fullpath, "rb") as f:
-                file_hash = hashlib.md5()
-                while chunk := f.read(8192):
-                    file_hash.update(chunk)
-            local_hash = base64.b64encode(file_hash.digest()).decode('utf-8')
-            need_update = (local_hash != blob.md5_hash)
+            need_update = (_hash_file(fullpath) != blob.md5_hash)
         if need_update:
             log.info(f"installing custom script: {path} from {blob.name}")
             with fullpath.open("wb") as f:
