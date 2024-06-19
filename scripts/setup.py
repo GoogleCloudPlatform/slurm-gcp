@@ -18,14 +18,12 @@
 import argparse
 import logging
 import os
-import re
 import shutil
 import subprocess
 import sys
 import stat
 import time
 from functools import partialmethod
-from itertools import chain
 from pathlib import Path
 
 import util
