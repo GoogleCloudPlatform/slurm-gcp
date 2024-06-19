@@ -16,7 +16,9 @@
 
 from typing import Iterable, List
 import argparse
+import base64
 import collections
+import hashlib
 import importlib.util
 import inspect
 import json
@@ -308,6 +310,64 @@ def blob_list(prefix="", delimiter=None, project=None):
         bucket_name, prefix=blob_prefix, delimiter=delimiter
     )
     return [blob for blob in blobs]
+
+
+def _hash_file(fullpath):
+    with open(fullpath, "rb") as f:
+        file_hash = hashlib.md5()
+        chunk = f.read(8192)
+        while chunk:
+            file_hash.update(chunk)
+            chunk = f.read(8192)
+    return base64.b64encode(file_hash.digest()).decode("utf-8")
+
+
+def install_custom_scripts(check_hash=False):
+    """download custom scripts from gcs bucket"""
+
+    compute_tokens = ["compute", "prolog", "epilog"]
+    if lkp.instance_role == "compute":
+        try:
+            compute_tokens.append(f"nodeset-{lkp.node_nodeset_name()}")
+        except Exception as e:
+            log.error(f"Failed to lookup nodeset: {e}")
+
+    prefix_tokens = dict.get(
+        {
+            "login": ["login"],
+            "compute": compute_tokens,
+            "controller": ["controller", "prolog", "epilog"],
+        },
+        lkp.instance_role,
+        [],
+    )
+    prefixes = [f"slurm-{tok}-script" for tok in prefix_tokens]
+    blobs = list(chain.from_iterable(blob_list(prefix=p) for p in prefixes))
+
+    script_pattern = re.compile(r"slurm-(?P<path>\S+)-script-(?P<name>\S+)")
+    for blob in blobs:
+        m = script_pattern.match(Path(blob.name).name)
+        if not m:
+            log.warning(f"found blob that doesn't match expected pattern: {blob.name}")
+            continue
+        path_parts = m["path"].split("-")
+        path_parts[0] += ".d"
+        stem, _, ext = m["name"].rpartition("_")
+        filename = ".".join((stem, ext))
+
+        path = Path(*path_parts, filename)
+        fullpath = (dirs.custom_scripts / path).resolve()
+        fullpath.parent.mkdirp()
+        for par in path.parents:
+            chown_slurm(dirs.custom_scripts / par)
+        need_update = True
+        if check_hash and fullpath.exists():
+            need_update = _hash_file(fullpath) != blob.md5_hash
+        if need_update:
+            log.info(f"installing custom script: {path} from {blob.name}")
+            with fullpath.open("wb") as f:
+                blob.download_to_file(f)
+            chown_slurm(fullpath, mode=0o755)
 
 
 def reservation_resource_policies(reservation):
