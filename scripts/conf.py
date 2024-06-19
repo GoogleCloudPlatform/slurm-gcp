@@ -404,7 +404,7 @@ class Switch:
     def __init__(
         self,
         name: str,
-        nodes: Optional[Iterable[str]] = None,
+        nodes: Optional[List[str]] = None,  # TODO: consider using generators
         switches: Optional[Dict[str, "Switch"]] = None,
     ):
         self.name = name
@@ -425,16 +425,16 @@ class Switch:
             yield from s.render_conf_lines()
 
 
-class TopologyBuilder:
+class Topology:
     def __init__(self) -> None:
-        self._r = Switch("root")
+        self._r = Switch("")  # fake root, not part of the tree
 
     def add(self, path: List[str], nodes: Iterable[str]) -> None:
         n = self._r
         assert path
         for p in path:
             n = n.switches.setdefault(p, Switch(p))
-        n.nodes = chain(n.nodes, nodes)
+        n.nodes = [*n.nodes, *nodes]
 
     def render_conf_lines(self) -> Iterable[str]:
         if not self._r.switches:
@@ -442,12 +442,28 @@ class TopologyBuilder:
         for s in sorted(self._r.switches.values(), key=lambda s: s.name):
             yield from s.render_conf_lines()
 
+    def compress(self) -> "Topology":
+        compressed = Topology()
 
-def add_tpu_nodeset_topology(nodeset: object, bldr: TopologyBuilder, lkp: util.Lookup):
+        def _walk(
+            u: Switch, c: Switch
+        ):  # u: uncompressed node, c: counterpart in compressed tree
+            pref = f"{c.name}_" if c != compressed._r else "s"
+            for i, us in enumerate(sorted(u.switches.values(), key=lambda s: s.name)):
+                cs = Switch(f"{pref}{i}", nodes=us.nodes)
+                c.switches[cs.name] = cs
+                _walk(us, cs)
+
+        _walk(self._r, compressed._r)
+        return compressed
+
+
+def add_tpu_nodeset_topology(nodeset: object, bldr: Topology, lkp: util.Lookup):
     tpuobj = util.TPU(nodeset)
     static, dynamic = lkp.nodenames(nodeset)
 
-    pref = ["nodeset_tpu-root", nodeset.nodeset_name]
+    switch_name = f"ns_{nodeset.nodeset_name}"
+    pref = ["tpu-root", switch_name]
     if tpuobj.vmcount == 1:  # Put all nodes in one switch
         bldr.add(pref, list(chain(static, dynamic)))
         return
@@ -456,35 +472,80 @@ def add_tpu_nodeset_topology(nodeset: object, bldr: TopologyBuilder, lkp: util.L
     chunk_num = 0
     for nodenames in (static, dynamic):
         for nodeschunk in util.chunked(nodenames, n=tpuobj.vmcount):
-            chunk_name = f"{nodeset.nodeset_name}-{chunk_num}"
+            chunk_name = f"{switch_name}-{chunk_num}"
             chunk_num += 1
             bldr.add([*pref, chunk_name], list(nodeschunk))
 
 
-def add_nodeset_topology(
-    nodeset: object, bldr: TopologyBuilder, lkp: util.Lookup
+def add_nodeset_phony_topology(
+    nodeset: object, topo: Topology, lkp: util.Lookup
 ) -> None:
-    path = ["nodeset-root", nodeset.nodeset_name]
+    path = ["slurm-root", f"ns_{nodeset.nodeset_name}"]
     nodes = list(chain(*lkp.nodenames(nodeset)))
-    bldr.add(path, nodes)
+    topo.add(path, nodes)
 
 
-def gen_topology(lkp: util.Lookup) -> TopologyBuilder:
-    bldr = TopologyBuilder()
-    for ns in lkp.cfg.nodeset_tpu.values():
-        add_tpu_nodeset_topology(ns, bldr, lkp)
+def _make_physical_path(inst: object) -> List[str]:
+    root, zone = "slurm-root", f"zone_{inst.zone}"
+    physical_host = inst.resourceStatus.get("physicalHost")
+
+    if not physical_host:
+        padding = [f"{inst.name}_pad{i}" for i in reversed(range(3))]
+        return [root, zone, *padding]
+    assert physical_host.startswith("/"), f"Unexpected physicalHost: {physical_host}"
+    parts = physical_host[1:].split("/")
+    if len(parts) >= 4:
+        return [root, *parts]
+    elif len(parts) == 3:
+        # TODO: parts[0] = placement_id + parts[0]
+        return [root, zone, *parts]
+    raise ValueError(f"Unexpected physicalHost: {physical_host}")
+
+
+def add_nodeset_real_topology(
+    nodeset: object, topo: Topology, lkp: util.Lookup
+) -> None:
+    real_nodes = set()
+    for inst in lkp.instances().values():
+        try:
+            if lkp.node_nodeset_name(inst.name) != nodeset.nodeset_name:
+                continue
+        except Exception:
+            continue  # fail to lookup nodeset
+
+        topo.add(_make_physical_path(inst), [inst.name])
+        real_nodes.add(inst.name)
+
+    # Add phony nodes to the topology
+    phony_nodes = []
+    for node in chain(*lkp.nodenames(nodeset)):
+        if node not in real_nodes:
+            phony_nodes.append(node)
+    if phony_nodes:
+        topo.add(["slurm-root", f"ns_{nodeset.nodeset_name}"], phony_nodes)
+
+
+def gen_topology(lkp: util.Lookup) -> Topology:
+    topo = Topology()
     for ns in lkp.cfg.nodeset.values():
-        add_nodeset_topology(ns, bldr, lkp)
-    return bldr
+        if ns.real_topology:
+            add_nodeset_real_topology(ns, topo, lkp)
+        else:
+            add_nodeset_phony_topology(ns, topo, lkp)
+    for ns in lkp.cfg.nodeset_dyn.values():
+        add_nodeset_real_topology(ns, topo, lkp)
+    for ns in lkp.cfg.nodeset_tpu.values():
+        add_tpu_nodeset_topology(ns, topo, lkp)
+    return topo
 
 
 def gen_topology_conf(lkp: util.Lookup) -> None:
     """generate slurm topology.conf from config.yaml"""
-    bldr = gen_topology(lkp)
+    topo = gen_topology(lkp).compress()
     conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "cloud_topology.conf"
     with open(conf_file, "w") as f:
         f.writelines(FILE_PREAMBLE + "\n")
-        for line in bldr.render_conf_lines():
+        for line in topo.render_conf_lines():
             f.write(line)
             f.write("\n")
         f.write("\n")
