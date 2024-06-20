@@ -126,27 +126,25 @@ def suspend_nodes(nodes: List[str]) -> None:
 def main(nodelist):
     """main called when run as script"""
     log.debug(f"SuspendProgram {nodelist}")
-    nodes = util.to_hostnames(nodelist)
 
     # Filter out nodes not in config.yaml
-    cloud_nodes, local_nodes = lkp.filter_nodes(nodes)
-    if len(local_nodes) > 0:
+    other_nodes, pm_nodes = separate(
+        lkp.is_power_managed_node, util.to_hostnames(nodelist)
+    )
+    if other_nodes:
         log.debug(
-            f"Ignoring slurm-gcp external nodes '{to_hostlist_fast(local_nodes)}' from '{nodelist}'"
+            f"Ignoring non-power-managed nodes '{to_hostlist_fast(other_nodes)}' from '{nodelist}'"
         )
-    if len(cloud_nodes) > 0:
-        log.debug(
-            f"Using cloud nodes '{to_hostlist_fast(cloud_nodes)}' from '{nodelist}'"
-        )
+    if pm_nodes:
+        log.debug(f"Suspending nodes '{to_hostlist_fast(pm_nodes)}' from '{nodelist}'")
     else:
         log.debug("No cloud nodes to suspend")
         return
 
-    # suspend is allowed to delete exclusive nodes
     log.info(f"suspend {nodelist}")
     if lkp.cfg.enable_slurm_gcp_plugins:
         slurm_gcp_plugins.pre_main_suspend_nodes(lkp=lkp, nodelist=nodelist)
-    suspend_nodes(nodes)
+    suspend_nodes(pm_nodes)
 
 
 parser = argparse.ArgumentParser(

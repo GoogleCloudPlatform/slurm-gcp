@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional
+from typing import List, Optional, Iterable
 from itertools import chain
 from collections import defaultdict
 import json
@@ -129,84 +129,51 @@ def nodeset_lines(nodeset, lkp: util.Lookup) -> str:
 
     # follow https://slurm.schedmd.com/slurm.conf.html#OPT_Boards
     # by setting Boards, SocketsPerBoard, CoresPerSocket, and ThreadsPerCore
-    node_def = dict_to_conf(
-        {
-            "NodeName": "DEFAULT",
-            "State": "UNKNOWN",
-            "RealMemory": machine_conf.memory,
-            "Boards": machine_conf.boards,
-            "SocketsPerBoard": machine_conf.sockets_per_board,
-            "CoresPerSocket": machine_conf.cores_per_socket,
-            "ThreadsPerCore": machine_conf.threads_per_core,
-            "CPUs": machine_conf.cpus,
-            **nodeset.node_conf,
-        }
-    )
+    node_def = {
+        "NodeName": "DEFAULT",
+        "State": "UNKNOWN",
+        "RealMemory": machine_conf.memory,
+        "Boards": machine_conf.boards,
+        "SocketsPerBoard": machine_conf.sockets_per_board,
+        "CoresPerSocket": machine_conf.cores_per_socket,
+        "ThreadsPerCore": machine_conf.threads_per_core,
+        "CPUs": machine_conf.cpus,
+        **nodeset.node_conf,
+    }
 
-    gres = None
-    if template_info.gpu_count:
-        gres = f"gpu:{template_info.gpu_count}"
+    gres = f"gpu:{template_info.gpu_count}" if template_info.gpu_count else None
+    nodelist = lkp.nodelist(nodeset)
 
-    lines = [node_def]
-    static, dynamic = lkp.nodeset_lists(nodeset)
-    # static or dynamic could be None, but Nones are filtered out of the lines
-    lines.extend(
-        dict_to_conf(
-            {
-                "NodeName": nodelist,
-                "State": "CLOUD",
-                "Gres": gres,
-            }
-        )
-        if nodelist is not None
-        else None
-        for nodelist in [static, dynamic]
-    )
-    lines.append(
-        dict_to_conf(
-            {
-                "NodeSet": nodeset.nodeset_name,
-                "Nodes": ",".join(filter(None, (static, dynamic))),
-            }
+    return "\n".join(
+        map(
+            dict_to_conf,
+            [
+                node_def,
+                {"NodeName": nodelist, "State": "CLOUD", "Gres": gres},
+                {"NodeSet": nodeset.nodeset_name, "Nodes": nodelist},
+            ],
         )
     )
-    return "\n".join(filter(None, lines))
 
 
 def nodeset_tpu_lines(nodeset, lkp: util.Lookup) -> str:
-    assert nodeset.node_conf is not None, "nodeset needs to contain a node_conf"
+    node_def = {
+        "NodeName": "DEFAULT",
+        "State": "UNKNOWN",
+        **nodeset.node_conf,
+    }
+    nodelist = lkp.nodelist(nodeset)
 
-    node_def = dict_to_conf(
-        {
-            "NodeName": "DEFAULT",
-            "State": "UNKNOWN",
-            **nodeset.node_conf,
-        }
-    )
-
-    lines = [node_def]
-    static, dynamic = lkp.nodeset_lists(nodeset)
-    # static or dynamic could be None, but Nones are filtered out of the lines
-    lines.extend(
-        dict_to_conf(
-            {
-                "NodeName": nodelist,
-                "State": "CLOUD",
-            }
-        )
-        if nodelist is not None
-        else None
-        for nodelist in [static, dynamic]
-    )
-    lines.append(
-        dict_to_conf(
-            {
-                "NodeSet": nodeset.nodeset_name,
-                "Nodes": ",".join(filter(None, (static, dynamic))),
-            }
+    return "\n".join(
+        map(
+            dict_to_conf,
+            [
+                node_def,
+                {"NodeName": nodelist, "State": "CLOUD"},
+                {"NodeSet": nodeset.nodeset_name, "Nodes": nodelist},
+            ],
         )
     )
-    return "\n".join(filter(None, lines))
 
 
 def nodeset_dyn_lines(nodeset):
@@ -257,11 +224,13 @@ def partitionlines(partition, lkp: util.Lookup) -> str:
     return dict_to_conf(line_elements)
 
 
-def suspend_exc_lines(lkp: util.Lookup) -> str:
-    static_nodes = ",".join(lkp.static_nodelist())
-    suspend_exc_nodes = {
-        "SuspendExcNodes": static_nodes,
-    }
+def suspend_exc_lines(lkp: util.Lookup) -> Iterable[str]:
+    static_nodelists = []
+    for ns in lkp.power_managed_nodesets():
+        if ns.node_count_static:
+            nodelist = lkp.nodelist_range(ns.nodeset_name, 0, ns.node_count_static)
+            static_nodelists.append(nodelist)
+    suspend_exc_nodes = {"SuspendExcNodes": static_nodelists}
 
     dyn_parts = [
         p.partition_name
@@ -270,14 +239,12 @@ def suspend_exc_lines(lkp: util.Lookup) -> str:
     ]
     suspend_exc_parts = {"SuspendExcParts": [login_nodeset, *dyn_parts]}
 
-    return list(
-        filter(
-            None,
-            [
-                dict_to_conf(suspend_exc_nodes) if static_nodes else None,
-                dict_to_conf(suspend_exc_parts),
-            ],
-        )
+    return filter(
+        None,
+        [
+            dict_to_conf(suspend_exc_nodes) if static_nodelists else None,
+            dict_to_conf(suspend_exc_parts),
+        ],
     )
 
 
@@ -400,7 +367,7 @@ def gen_cloud_gres_conf(lkp: util.Lookup) -> None:
         gpu_count = template_info.gpu_count
         if gpu_count == 0:
             continue
-        gpu_nodes[gpu_count].extend(filter(None, lkp.nodeset_lists(nodeset)))
+        gpu_nodes[gpu_count].append(lkp.nodelist(nodeset))
 
     lines = [
         dict_to_conf(
@@ -436,17 +403,19 @@ class Switch:
     def __init__(
         self,
         name: str,
-        nodes: Optional[str] = None,
+        # TODO: consider using an Iterable instead of list to save memory
+        # That would required more elaborate behavior of `self.empty()`
+        nodes: Optional[List[str]] = None,
         switches: Optional[List["Switch"]] = None,
     ):
         self.name = name
-        self.nodes = nodes  # nodelist, e.g. "alpha-[0-4],beta-[14-17]"
+        self.nodes = nodes or []
         self.switches = switches or []
 
     def conf_line(self) -> str:
         d = {"SwitchName": self.name}
         if self.nodes:
-            d["Nodes"] = self.nodes
+            d["Nodes"] = util.to_hostlist_fast(self.nodes)
 
         non_empty = [
             s for s in self.switches if not s.empty()
@@ -473,29 +442,25 @@ class Switch:
 
 def tpu_nodeset_switch(nodeset: object, lkp: util.Lookup) -> Switch:
     tpuobj = util.TPU(nodeset)
-    nodelists = filter(None, lkp.nodeset_lists(nodeset))  # (static, dynamic)
+    static, dynamic = lkp.nodenames(nodeset)
 
     switch = Switch(name=nodeset.nodeset_name)
     if tpuobj.vmcount == 1:  # Put all nodes in one switch
-        switch.nodes = ",".join(nodelists)
+        switch.nodes = list(chain(static, dynamic))
     else:
         # Chunk nodes into sub-switches of size `vmcount`
-        for nodelist in nodelists:
-            nodenames = util.to_hostnames(nodelist)
-            for nodes in util.chunked(nodenames, n=tpuobj.vmcount):
+        for nodenames in (static, dynamic):
+            for nodeschunk in util.chunked(nodenames, n=tpuobj.vmcount):
                 sub_switch = Switch(
                     name=f"{switch.name}-{len(switch.switches)}",
-                    nodes=util.to_hostlist_fast(nodes),
+                    nodes=list(nodeschunk),
                 )
                 switch.switches.append(sub_switch)
     return switch
 
 
 def nodeset_switch(nodeset: object, lkp: util.Lookup) -> Switch:
-    return Switch(
-        name=nodeset.nodeset_name,
-        nodes=",".join(filter(None, lkp.nodeset_lists(nodeset))),
-    )
+    return Switch(name=nodeset.nodeset_name, nodes=list(chain(*lkp.nodenames(nodeset))))
 
 
 def gen_topology(lkp: util.Lookup) -> List[Switch]:

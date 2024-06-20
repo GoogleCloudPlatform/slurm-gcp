@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterable, List
+from typing import Iterable, List, Tuple
 import argparse
 import base64
 import collections
@@ -665,15 +665,6 @@ def cd(path):
         os.chdir(prev)
 
 
-def with_static(**kwargs):
-    def decorate(func):
-        for var, val in kwargs.items():
-            setattr(func, var, val)
-        return func
-
-    return decorate
-
-
 def cached_property(f):
     return property(lru_cache()(f))
 
@@ -958,8 +949,10 @@ def get_vmcount_of_tpu_part(part):
     return res
 
 
-def to_hostnames(nodelist):
+def to_hostnames(nodelist: str) -> List[str]:
     """make list of hostnames from hostlist expression"""
+    if not nodelist:
+        return []  # avoid degenerate invocation of scontrol
     if isinstance(nodelist, str):
         hostlist = nodelist
     else:
@@ -1628,34 +1621,48 @@ class Lookup:
     def nodeset_prefix(self, nodeset_name):
         return f"{self.cfg.slurm_cluster_name}-{nodeset_name}"
 
-    def nodeset_lists(self, nodeset):
-        """Return static and dynamic nodenames given a partition node type
-        definition
-        """
+    def nodelist_range(self, nodeset_name: str, start: int, count: int) -> str:
+        assert 0 <= start and 0 < count
+        pref = self.nodeset_prefix(nodeset_name)
+        if count == 1:
+            return f"{pref}-{start}"
+        return f"{pref}-[{start}-{start + count - 1}]"
 
-        def node_range(count, start=0):
-            end = start + count - 1
-            return f"{start}" if count == 1 else f"[{start}-{end}]", end + 1
+    def static_dynamic_sizes(self, nodeset: object) -> int:
+        return (nodeset.node_count_static or 0, nodeset.node_count_dynamic_max or 0)
 
-        prefix = self.nodeset_prefix(nodeset.nodeset_name)
-        static_count = nodeset.node_count_static
-        dynamic_count = nodeset.node_count_dynamic_max
-        static_range, end = node_range(static_count) if static_count else (None, 0)
-        dynamic_range, _ = (
-            node_range(dynamic_count, start=end) if dynamic_count else (None, 0)
+    def nodelist(self, nodeset) -> str:
+        cnt = sum(self.static_dynamic_sizes(nodeset))
+        if cnt == 0:
+            return ""
+        return self.nodelist_range(nodeset.nodeset_name, 0, cnt)
+
+    def nodenames(self, nodeset) -> Tuple[Iterable[str], Iterable[str]]:
+        pref = self.nodeset_prefix(nodeset.nodeset_name)
+        s_count, d_count = self.static_dynamic_sizes(nodeset)
+        return (
+            (f"{pref}-{i}" for i in range(s_count)),
+            (f"{pref}-{i}" for i in range(s_count, s_count + d_count)),
         )
 
-        static_nodelist = f"{prefix}-{static_range}" if static_count else None
-        dynamic_nodelist = f"{prefix}-{dynamic_range}" if dynamic_count else None
-        return static_nodelist, dynamic_nodelist
+    def power_managed_nodesets(self) -> Iterable[object]:
+        return chain(self.cfg.nodeset.values(), self.cfg.nodeset_tpu.values())
 
-    @lru_cache(maxsize=1)
-    def static_nodelist(self):
-        static_nodesets = (
-            self.nodeset_lists(ns)[0]
-            for ns in chain(self.cfg.nodeset.values(), self.cfg.nodeset_tpu.values())
-        )
-        return [static for static in static_nodesets if static is not None]
+    def is_power_managed_node(self, node_name: str) -> bool:
+        try:
+            ns = self.node_nodeset(node_name)
+            if ns is None:
+                return False
+            idx = int(self._node_desc(node_name)["suffix"])
+            return idx < sum(self.static_dynamic_sizes(ns))
+        except Exception:
+            return False
+
+    def is_static_node(self, node_name: str) -> bool:
+        if not self.is_power_managed_node(node_name):
+            return False
+        idx = int(self._node_desc(node_name)["suffix"])
+        return idx < self.node_nodeset(node_name).node_count_static
 
     @lru_cache(maxsize=None)
     def slurm_nodes(self):
@@ -1685,36 +1692,6 @@ class Lookup:
 
     def slurm_node(self, nodename):
         return self.slurm_nodes().get(nodename)
-
-    def cloud_nodes(self):
-        static_nodes = []
-        dynamic_nodes = []
-
-        for nodeset in self.cfg.nodeset.values():
-            static, dynamic = self.nodeset_lists(nodeset)
-            if static is not None:
-                static_nodes.extend(to_hostnames(static))
-            if dynamic is not None:
-                dynamic_nodes.extend(to_hostnames(dynamic))
-        for nodeset in self.cfg.nodeset_tpu.values():
-            static, dynamic = self.nodeset_lists(nodeset)
-            if static is not None:
-                static_nodes.extend(to_hostnames(static))
-            if dynamic is not None:
-                dynamic_nodes.extend(to_hostnames(dynamic))
-        return static_nodes, dynamic_nodes
-
-    def filter_nodes(self, nodes):
-        static_nodes, dynamic_nodes = lkp.cloud_nodes()
-
-        all_cloud_nodes = []
-        all_cloud_nodes.extend(static_nodes)
-        all_cloud_nodes.extend(dynamic_nodes)
-
-        cloud_nodes = list(set(nodes).intersection(all_cloud_nodes))
-        local_nodes = list(set(nodes).difference(all_cloud_nodes))
-
-        return cloud_nodes, local_nodes
 
     @lru_cache(maxsize=1)
     def instances(self, project=None, slurm_cluster_name=None):

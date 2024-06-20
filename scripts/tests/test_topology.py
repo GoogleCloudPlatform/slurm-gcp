@@ -113,7 +113,7 @@ SwitchName=bold-3 Nodes=m22-bold-[7-8]
 SwitchName=slim Nodes=m22-slim-[0-2]
 SwitchName=nodeset-root Switches=blue,green,pink
 SwitchName=blue Nodes=m22-blue-[0-6]
-SwitchName=green Nodes=m22-green-[0-1],m22-green-[2-4]
+SwitchName=green Nodes=m22-green-[0-4]
 SwitchName=pink Nodes=m22-pink-[0-3]
 
 """
