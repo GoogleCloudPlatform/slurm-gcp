@@ -96,7 +96,7 @@ locals {
   providers = {
     # Providers
     universe_information = var.universe_information
-    custom_endpoints     = var.custom_endpoints
+    endpoint_versions    = var.endpoint_versions
   }
 
   providers_yaml        = "providers.yaml"
