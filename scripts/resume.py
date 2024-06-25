@@ -152,6 +152,17 @@ def instance_properties(partition, model, placement_group, labels=None):
         props.scheduling = props.scheduling or {}
         props.scheduling["maintenanceInterval"] = node_group.maintenance_interval
 
+    # Required, can be int or string, set to 7 days
+    props.scheduling.maxRunDuration.seconds = 7 * 24 * 60 * 60
+
+    # Must specify when we use a max-run-duration
+    props.scheduling.instanceTerminationAction = "DELETE"
+
+    # required
+    props.reservationAffinity = {
+        "consumeReservationType": "NO_RESERVATION",
+    }
+
     return props
 
 
@@ -174,7 +185,6 @@ def create_instances_request(nodes, placement_group, exclusive_job=None):
     model = next(iter(nodes))
     partition = lkp.node_partition(model)
     template = lkp.node_template(model)
-    region = lkp.node_region(model)
 
     body = NSDict()
     body.count = len(nodes)
@@ -193,20 +203,6 @@ def create_instances_request(nodes, placement_group, exclusive_job=None):
     # key is instance name, value overwrites properties
     body.perInstanceProperties = {k: per_instance_properties(k) for k in nodes}
 
-    zones = {
-        **{
-            f"zones/{zone}": {"preference": "ALLOW"}
-            for zone in partition.zone_policy_allow or []
-        },
-        **{
-            f"zones/{zone}": {"preference": "DENY"}
-            for zone in partition.zone_policy_deny or []
-        },
-    }
-    body.locationPolicy.targetShape = cfg.zone_target_shape or "ANY_SINGLE_ZONE"
-    if zones:
-        body.locationPolicy.locations = zones
-
     if lkp.cfg.enable_slurm_gcp_plugins:
         slurm_gcp_plugins.pre_instance_bulk_insert(
             lkp=lkp,
@@ -216,8 +212,10 @@ def create_instances_request(nodes, placement_group, exclusive_job=None):
             request_body=body,
         )
 
-    request = util.compute.regionInstances().bulkInsert(
-        project=cfg.project, region=region, body=body.to_dict()
+    zone = lkp.zone.split("/")[-1]
+
+    request = util.compute.instances().bulkInsert(
+        project=cfg.project, zone=zone, body=body.to_dict()
     )
 
     if log.isEnabledFor(logging.DEBUG):
