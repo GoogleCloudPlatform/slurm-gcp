@@ -277,10 +277,12 @@ locals {
   external_epilog = [{
     filename = "z_external_epilog.sh"
     content  = data.local_file.external_epilog.content
+    source   = null
   }]
   external_prolog = [{
     filename = "z_external_prolog.sh"
     content  = data.local_file.external_prolog.content
+    source   = null
   }]
   setup_external = [{
     filename = "z_setup_external.sh"
