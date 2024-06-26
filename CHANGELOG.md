@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.5.9\]
+
+- Sync script files from bucket
+- Add `resource_policies` to template
+
 ## \[6.5.8\]
 
 - Expose TreeWidth and TopologyPlugin variables
