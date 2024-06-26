@@ -23,7 +23,6 @@ import subprocess
 import sys
 import stat
 import time
-from functools import partialmethod
 from pathlib import Path
 
 import util
@@ -59,8 +58,6 @@ SETUP_SCRIPT = Path(__file__)
 filename = SETUP_SCRIPT.name
 LOGFILE = ((cfg.slurm_log_dir if cfg else ".") / SETUP_SCRIPT).with_suffix(".log")
 log = logging.getLogger(filename)
-
-Path.mkdirp = partialmethod(Path.mkdir, parents=True, exist_ok=True)
 
 
 MOTD_HEADER = """
@@ -235,7 +232,7 @@ def setup_munge_key():
 def setup_nss_slurm():
     """install and configure nss_slurm"""
     # setup nss_slurm
-    Path("/var/spool/slurmd").mkdirp()
+    util.mkdirp(Path("/var/spool/slurmd"))
     run(
         "ln -s {}/lib/libnss_slurm.so.2 /usr/lib64/libnss_slurm.so.2".format(
             slurmdirs.prefix
@@ -310,12 +307,12 @@ innodb_lock_wait_timeout=900
 
 def configure_dirs():
     for p in dirs.values():
-        p.mkdirp()
+        util.mkdirp(p)
     util.chown_slurm(dirs.slurm)
     util.chown_slurm(dirs.scripts)
 
     for p in slurmdirs.values():
-        p.mkdirp()
+        util.mkdirp(p)
         util.chown_slurm(p)
 
     etc_slurm = Path("/etc/slurm")

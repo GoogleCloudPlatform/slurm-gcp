@@ -37,7 +37,7 @@ import tempfile
 from collections import defaultdict, namedtuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
-from functools import lru_cache, reduce, partialmethod, wraps
+from functools import lru_cache, reduce, wraps
 from itertools import chain, compress, islice
 from pathlib import Path
 from time import sleep, time
@@ -102,7 +102,11 @@ API_REQ_LIMIT = 2000
 URI_REGEX = r"[a-z]([-a-z0-9]*[a-z0-9])?"
 
 def_creds, auth_project = google.auth.default()
-Path.mkdirp = partialmethod(Path.mkdir, parents=True, exist_ok=True)
+
+
+def mkdirp(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
 
 scripts_dir = next(
     p for p in (Path(__file__).parent, Path("/slurm/scripts")) if p.is_dir()
@@ -357,7 +361,8 @@ def install_custom_scripts(check_hash=False):
 
         path = Path(*path_parts, filename)
         fullpath = (dirs.custom_scripts / path).resolve()
-        fullpath.parent.mkdirp()
+        mkdirp(fullpath.parent)
+
         for par in path.parents:
             chown_slurm(dirs.custom_scripts / par)
         need_update = True
@@ -634,12 +639,12 @@ def spawn(cmd, quiet=False, shell=False, **kwargs):
     return subprocess.Popen(args, shell=shell, **kwargs)
 
 
-def chown_slurm(path, mode=None):
+def chown_slurm(path: Path, mode=None) -> None:
     if path.exists():
         if mode:
             path.chmod(mode)
     else:
-        path.parent.mkdirp()
+        mkdirp(path.parent)
         if mode:
             path.touch(mode=mode)
         else:
