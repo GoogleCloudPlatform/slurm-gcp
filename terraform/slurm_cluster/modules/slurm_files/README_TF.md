@@ -50,7 +50,6 @@ No modules.
 | [google_storage_bucket_object.login_startup_scripts](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_bucket_object) | resource |
 | [google_storage_bucket_object.nodeset_startup_scripts](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_bucket_object) | resource |
 | [google_storage_bucket_object.prolog_scripts](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_bucket_object) | resource |
-| [google_storage_bucket_object.providers](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_bucket_object) | resource |
 | [random_uuid.cluster_id](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/uuid) | resource |
 | [archive_file.slurm_gcp_devel_zip](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/data-sources/file) | data source |
 | [google_storage_bucket.this](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/storage_bucket) | data source |
@@ -105,7 +104,6 @@ No modules.
 | <a name="input_slurm_control_host_port"></a> [slurm\_control\_host\_port](#input\_slurm\_control\_host\_port) | The port number that the Slurm controller, slurmctld, listens to for work.<br><br>See https://slurm.schedmd.com/slurm.conf.html#OPT_SlurmctldPort | `string` | `"6818"` | no |
 | <a name="input_slurm_log_dir"></a> [slurm\_log\_dir](#input\_slurm\_log\_dir) | Directory where Slurm logs to. | `string` | `"/var/log/slurm"` | no |
 | <a name="input_slurmdbd_conf_tpl"></a> [slurmdbd\_conf\_tpl](#input\_slurmdbd\_conf\_tpl) | Slurm slurmdbd.conf template file path. | `string` | `null` | no |
-| <a name="input_universe_information"></a> [universe\_information](#input\_universe\_information) | Domain address and service account credentials for alternate API universe | <pre>object({<br>    domain         = string<br>    sa_credentials = string<br>  })</pre> | <pre>{<br>  "domain": null,<br>  "sa_credentials": null<br>}</pre> | no |
 
 ## Outputs
 

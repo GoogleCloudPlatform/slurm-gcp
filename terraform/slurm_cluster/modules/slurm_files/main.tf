@@ -88,19 +88,12 @@ locals {
     cgroup_conf_tpl   = file(coalesce(var.cgroup_conf_tpl, "${local.etc_dir}/cgroup.conf.tpl"))
     jobsubmit_lua_tpl = file(coalesce(var.job_submit_lua_tpl, "${local.etc_dir}/job_submit.lua.tpl"))
 
+    # Providers
+    endpoint_versions = var.endpoint_versions
   }
 
   config_yaml        = "config.yaml"
   config_yaml_bucket = format("%s/%s", local.bucket_dir, local.config_yaml)
-
-  providers = {
-    # Providers
-    universe_information = var.universe_information
-    endpoint_versions    = var.endpoint_versions
-  }
-
-  providers_yaml        = "providers.yaml"
-  providers_yaml_bucket = format("%s/%s", local.bucket_dir, local.providers_yaml)
 
   partitions = { for p in var.partitions[*].partition : p.partition_name => p }
 
@@ -140,12 +133,6 @@ resource "google_storage_bucket_object" "config" {
   content = yamlencode(local.config)
 }
 
-resource "google_storage_bucket_object" "providers" {
-  bucket  = data.google_storage_bucket.this.name
-  name    = local.providers_yaml_bucket
-  content = yamlencode(local.providers)
-}
-
 #########
 # DEVEL #
 #########
@@ -173,7 +160,6 @@ data "archive_file" "slurm_gcp_devel_zip" {
     fileset(local.scripts_dir, "*.lock"),
   ])
 
-  depends_on = [google_storage_bucket_object.providers]
 }
 
 resource "google_storage_bucket_object" "devel" {

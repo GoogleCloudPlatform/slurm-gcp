@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Tuple, Optional
 import argparse
 import base64
 import collections
@@ -100,11 +100,8 @@ if ENV_CONFIG_YAML:
     CONFIG_FILE = Path(ENV_CONFIG_YAML)
 else:
     CONFIG_FILE = Path(__file__).with_name("config.yaml")
-PROVIDERS_FILE = Path(__file__).with_name("providers.yaml")
 API_REQ_LIMIT = 2000
 URI_REGEX = r"[a-z]([-a-z0-9]*[a-z0-9])?"
-
-def_creds, auth_project = google.auth.default()
 
 
 def mkdirp(path: Path) -> None:
@@ -159,29 +156,6 @@ yaml.SafeDumper.yaml_representers[
     None
 ] = lambda self, data: yaml.representer.SafeRepresenter.represent_str(self, str(data))
 
-with open(PROVIDERS_FILE) as stream:
-    try:
-        providers = yaml.safe_load(stream)
-    except yaml.YAMLError as exc:
-        providers = None
-        print(exc)
-prv = NSDict(providers)
-
-universe_domain = "googleapis.com"
-universe_sa_credentials = None
-endpoint_versions = None
-if prv.universe_information:
-    d, c = "domain", "sa_credentials"
-    if d in prv.universe_information and prv.universe_information[d]:
-        universe_domain = prv.universe_information[d]
-        # Only use credentials if domain is different
-        if c in prv.universe_information and prv.universe_information[c]:
-            universe_sa_credentials = "universe_sa_credentials.json"
-            with open("universe_sa_credentials.json", "w") as f:
-                f.write(prv.universe_information[c])
-if prv.endpoint_versions:
-    endpoint_versions = prv.endpoint_versions
-
 
 class ApiEndpoint(Enum):
     COMPUTE = "compute"
@@ -191,27 +165,58 @@ class ApiEndpoint(Enum):
     SECRET = "secret_manager"
 
 
-def create_client_options(api: ApiEndpoint = None):
+@lru_cache(maxsize=1)
+def default_credentials():
+    return google.auth.default()[0]
+
+
+@lru_cache(maxsize=1)
+def authentication_project():
+    return google.auth.default()[1]
+
+
+def universe_domain() -> str:
+    return instance_metadata("attributes/universe_domain")
+
+
+def endpoint_version(api: ApiEndpoint) -> Optional[str]:
+    if api and api.value in lkp.endpoint_versions:
+        return lkp.endpoint_versions[api.value]
+    return None
+
+
+@lru_cache(maxsize=1)
+def get_credentials() -> Optional[service_account.Credentials]:
+    """Get credentials for service account"""
+    key_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if key_path is not None:
+        credentials = service_account.Credentials.from_service_account_file(
+            key_path, scopes=[f"https://www.{universe_domain()}/auth/cloud-platform"]
+        )
+    else:
+        credentials = default_credentials()
+
+    return credentials
+
+
+def create_client_options(api: ApiEndpoint = None) -> ClientOptions:
     """Create client options for cloud endpoints"""
     ep = None
-    if (
-        endpoint_versions
-        and api
-        and api.value in endpoint_versions
-        and endpoint_versions[api.value]
-    ):
-        ep = f"https://{api.value}.{universe_domain}/"
-        if api == ApiEndpoint.STORAGE:
-            os.environ["_API_VERSION_OVERRIDE_ENV_VAR"] = endpoint_versions[api.value]
-        else:
-            ep += f"{endpoint_versions[api.value]}"
+    ver = endpoint_version(api)
+    ud = universe_domain()
+    if ver:
+        ep = f"https://{api.value}.{ud}/{ver}/"
     log.debug(
-        f"For API: {api.value}, using universe Domain: {universe_domain} and API Endpoint {ep}"
+        f"Using universe domain: {ud}. "
+        + (
+            f"For API: {api.value} using API endpoint: " f"{ep if ep else 'default'}"
+            if api
+            else ""
+        )
     )
     return ClientOptions(
-        universe_domain=universe_domain,
+        universe_domain=ud,
         api_endpoint=ep,
-        credentials_file=universe_sa_credentials,
     )
 
 
@@ -450,20 +455,7 @@ def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
     creates a new Http for each request
     """
 
-    try:
-        key_path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
-    except KeyError:
-        key_path = None
-    if universe_sa_credentials is not None:
-        credentials = service_account.Credentials.from_service_account_file(
-            universe_sa_credentials
-        )
-    elif key_path is not None:
-        credentials = service_account.Credentials.from_service_account_file(
-            key_path, scopes=[f"https://www.{universe_domain}/auth/cloud-platform"]
-        )
-    elif credentials is None:
-        credentials = def_creds
+    credentials = get_credentials()
 
     def build_request(http, *args, **kwargs):
         new_http = httplib2.Http()
@@ -473,13 +465,11 @@ def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
             new_http = google_auth_httplib2.AuthorizedHttp(credentials, http=new_http)
         return googleapiclient.http.HttpRequest(new_http, *args, **kwargs)
 
-    c_str = ApiEndpoint.COMPUTE.value
-    disc_url = None
-    if endpoint_versions and c_str in endpoint_versions:
-        version = endpoint_versions[c_str]
-        disc_url = googleapiclient.discovery.DISCOVERY_URI.replace(
-            "googleapis.com", universe_domain
-        )
+    ver = endpoint_version(ApiEndpoint.COMPUTE)
+    disc_url = googleapiclient.discovery.DISCOVERY_URI
+    if ver:
+        version = ver
+        disc_url = disc_url.replace("googleapis.com", universe_domain())
 
     log.debug(f"Using version={version} of Google Compute Engine API")
     return googleapiclient.discovery.build(
@@ -489,9 +479,6 @@ def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
         credentials=credentials,
         discoveryServiceUrl=disc_url,
     )
-
-
-compute = compute_service(universe_sa_credentials)
 
 
 def load_config_data(config):
@@ -1076,10 +1063,12 @@ def ensure_execute(request):
         break
 
 
-def batch_execute(requests, compute=compute, retry_cb=None, log_err=log.error):
+def batch_execute(requests, retry_cb=None, log_err=log.error):
     """execute list or dict<req_id, request> as batch requests
     retry if retry_cb returns true
     """
+
+    compute = globals()["compute"]
     BATCH_LIMIT = 1000
     if not isinstance(requests, dict):
         requests = {str(k): v for k, v in enumerate(requests)}  # rid generated here
@@ -1136,8 +1125,10 @@ def batch_execute(requests, compute=compute, retry_cb=None, log_err=log.error):
     return done, failed
 
 
-def wait_request(operation, project=None, compute=compute):
+def wait_request(operation, project=None, compute=None):
     """makes the appropriate wait request for a given operation"""
+    if not compute:
+        compute = globals()["compute"]
     if project is None:
         project = lkp.project
     if "zone" in operation:
@@ -1159,8 +1150,10 @@ def wait_request(operation, project=None, compute=compute):
     return req
 
 
-def wait_for_operation(operation, project=None, compute=compute):
+def wait_for_operation(operation, project=None, compute=None):
     """wait for given operation"""
+    if not compute:
+        compute = globals()["compute"]
     if project is None:
         project = parse_self_link(operation["selfLink"]).project
     wait_req = wait_request(operation, project=project, compute=compute)
@@ -1175,20 +1168,12 @@ def wait_for_operation(operation, project=None, compute=compute):
             return result
 
 
-def wait_for_operations(operations, project=None, compute=compute):
+def wait_for_operations(operations, project=None, compute=None):
+    if not compute:
+        compute = globals()["compute"]
     return [
         wait_for_operation(op, project=project, compute=compute) for op in operations
     ]
-
-
-def wait_for_operations_async(operations, project=None, compute=compute):
-    """wait for all operations"""
-
-    def operation_retry(resp):
-        return resp["status"] != "DONE"
-
-    requests = [wait_request(op, project=project, compute=compute) for op in operations]
-    return batch_execute(requests, retry_cb=operation_retry)
 
 
 def get_filtered_operations(
@@ -1197,10 +1182,12 @@ def get_filtered_operations(
     region=None,
     only_global=False,
     project=None,
-    compute=compute,
+    compute=None,
 ):
     """get list of operations associated with group id"""
 
+    if not compute:
+        compute = globals()["compute"]
     if project is None:
         project = lkp.project
     operations = []
@@ -1243,8 +1230,10 @@ def get_filtered_operations(
     return operations
 
 
-def get_insert_operations(group_ids, flt=None, project=None, compute=compute):
+def get_insert_operations(group_ids, flt=None, project=None, compute=None):
     """get all insert operations from a list of operationGroupId"""
+    if not compute:
+        compute = globals()["compute"]
     if project is None:
         project = lkp.project
     if isinstance(group_ids, str):
@@ -1594,7 +1583,7 @@ class Lookup:
 
     @property
     def project(self):
-        return self.cfg.project or auth_project
+        return self.cfg.project or authentication_project()
 
     @property
     def control_addr(self):
@@ -1611,6 +1600,10 @@ class Lookup:
     @property
     def control_host_port(self):
         return self.cfg.slurm_control_host_port
+
+    @property
+    def endpoint_versions(self):
+        return self.cfg.endpoint_versions
 
     @property
     def scontrol(self):
@@ -1634,7 +1627,7 @@ class Lookup:
         # TODO evaluate when we need to use google_app_cred_path
         if self.cfg.google_app_cred_path:
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.cfg.google_app_cred_path
-        return compute_service(universe_sa_credentials)
+        return compute_service()
 
     @cached_property
     def hostname(self):
@@ -2042,6 +2035,9 @@ if not cfg:
         save_config(cfg, CONFIG_FILE)
 
 lkp = Lookup(cfg)
+
+# Needs to be run after the lookup is complete to get endpoint versions
+compute = compute_service()
 
 
 if __name__ == "__main__":

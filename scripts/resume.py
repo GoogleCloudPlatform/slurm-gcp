@@ -42,7 +42,7 @@ from util import (
     trim_self_link,
     wait_for_operation,
 )
-from util import cfg, lkp, NSDict, TPU, universe_domain
+from util import cfg, lkp, NSDict, TPU
 
 # from util import cfg, lkp, NSDict
 import slurm_gcp_plugins
@@ -122,7 +122,7 @@ def instance_properties(nodeset, model, placement_group, labels=None):
 
         props.reservationAffinity = {
             "consumeReservationType": "SPECIFIC_RESERVATION",
-            "key": f"compute.{universe_domain}/reservation-name",
+            "key": f"compute.{util.universe_domain()}/reservation-name",
             "values": [reservation_name],
         }
 

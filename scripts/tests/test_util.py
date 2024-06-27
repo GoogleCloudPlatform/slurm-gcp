@@ -4,6 +4,9 @@ import pytest
 if ".." not in sys.path:
     sys.path.append("..")  # TODO: make this more robust
 import util
+from google.api_core.client_options import ClientOptions  # noqa: E402
+
+# Note: need to install pytest-mock
 
 
 @pytest.mark.parametrize(
@@ -77,3 +80,69 @@ def test_node_desc_fail(name):
 )
 def test_to_hostlist_fast(names, expected):
     assert util.to_hostlist_fast(names.split(",")) == expected
+
+
+@pytest.mark.parametrize(
+    "api,ep_ver,expected",
+    [
+        (
+            util.ApiEndpoint.BQ,
+            "v1",
+            ClientOptions(
+                api_endpoint="https://bq.googleapis.com/v1/",
+                universe_domain="googleapis.com",
+            ),
+        ),
+        (
+            util.ApiEndpoint.COMPUTE,
+            "staging_v1",
+            ClientOptions(
+                api_endpoint="https://compute.googleapis.com/staging_v1/",
+                universe_domain="googleapis.com",
+            ),
+        ),
+        (
+            util.ApiEndpoint.SECRET,
+            "v1",
+            ClientOptions(
+                api_endpoint="https://secret_manager.googleapis.com/v1/",
+                universe_domain="googleapis.com",
+            ),
+        ),
+        (
+            util.ApiEndpoint.STORAGE,
+            "beta",
+            ClientOptions(
+                api_endpoint="https://storage.googleapis.com/beta/",
+                universe_domain="googleapis.com",
+            ),
+        ),
+        (
+            util.ApiEndpoint.TPU,
+            "alpha",
+            ClientOptions(
+                api_endpoint="https://tpu.googleapis.com/alpha/",
+                universe_domain="googleapis.com",
+            ),
+        ),
+    ],
+)
+def test_create_client_options(
+    api: util.ApiEndpoint, ep_ver: str, expected: ClientOptions, mocker
+):
+    ud_mock = mocker.patch("util.universe_domain")
+    ep_mock = mocker.patch("util.endpoint_version")
+    ud_mock.return_value = "googleapis.com"
+    ep_mock.return_value = ep_ver
+    co = util.create_client_options(api)
+    assert (
+        co.api_endpoint == expected.api_endpoint
+        and co.universe_domain == expected.universe_domain
+    )
+    ud_mock.return_value = None
+    ep_mock.return_value = None
+    co = util.create_client_options(api)
+    assert (
+        co.api_endpoint != expected.api_endpoint
+        and co.universe_domain != expected.universe_domain
+    )

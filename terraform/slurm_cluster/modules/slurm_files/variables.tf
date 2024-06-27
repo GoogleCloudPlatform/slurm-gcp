@@ -456,23 +456,6 @@ variable "munge_mount" {
   }
 }
 
-variable "universe_information" {
-  description = "Domain address and service account credentials for alternate API universe"
-  type = object({
-    domain         = string
-    sa_credentials = string
-  })
-  default = {
-    domain         = null
-    sa_credentials = null
-  }
-
-  validation {
-    condition     = var.universe_information.domain == null && var.universe_information.sa_credentials == null
-    error_message = "Universe credentials cannot be null if the domain is null"
-  }
-}
-
 variable "endpoint_versions" {
   description = "Version of the API to use (The compute service is the only API currently supported)"
   type = object({
