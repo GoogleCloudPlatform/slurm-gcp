@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Tuple, Dict
 import argparse
 import base64
 import collections
@@ -1694,7 +1694,7 @@ class Lookup:
         return self.slurm_nodes().get(nodename)
 
     @lru_cache(maxsize=1)
-    def instances(self, project=None, slurm_cluster_name=None):
+    def instances(self, project=None, slurm_cluster_name=None) -> Dict[str, object]:
         slurm_cluster_name = slurm_cluster_name or self.cfg.slurm_cluster_name
         project = project or self.project
         instance_information_fields = [
