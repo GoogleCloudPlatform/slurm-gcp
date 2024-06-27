@@ -110,7 +110,7 @@ def setup_network_storage(log):
         remote_mount = mount.remote_mount
         fs_type = mount.fs_type
         server_ip = mount.server_ip or ""
-        local_mount.mkdirp()
+        util.mkdirp(local_mount)
 
         log.info(
             "Setting up mount ({}) {}{} to {}".format(
@@ -295,12 +295,12 @@ def setup_nfs_exports():
     # export path if corresponding selector boolean is True
     exports = []
     for path in con_mounts:
-        Path(path).mkdirp()
+        util.mkdirp(Path(path))
         run(rf"sed -i '\#{path}#d' /etc/exports", timeout=30)
         exports.append(f"{path}  *(rw,no_subtree_check,no_root_squash)")
 
     exportsd = Path("/etc/exports.d")
-    exportsd.mkdirp()
+    util.mkdirp(exportsd)
     with (exportsd / "slurm.exports").open("w") as f:
         f.write("\n")
         f.write("\n".join(exports))
