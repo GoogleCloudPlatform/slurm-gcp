@@ -3,6 +3,7 @@
 # By default gpu is False, set it to True on the gpu nodes in the hosts file
 
 gpu: false
+use_open_drivers: false
 cuda_repo_url: http://developer.download.nvidia.com/compute/cuda/repos
 cuda_rpm_key_path: /etc/rpm/nvidia_packaging_key.asc
 cuda_packages:

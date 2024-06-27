@@ -142,22 +142,25 @@
     find:
       paths: /tmp/cuda_runfile
       patterns: NVIDIA*.run
-    register: cuda_driver_runfile_find
+    register: nvidia_driver_runfile_find
 
   - name: Set NVIDIA runfile path
     set_fact:
-      cuda_driver_runfile: '{{ cuda_driver_runfile_find.files[0].path }}'
+      nvidia_driver_runfile: '{{ nvidia_driver_runfile_find.files[0].path }}'
 
   - name: Print information about driver
     debug:
-      msg: Building driver {{ cuda_driver_runfile }} for kernel {{ cuda_driver_kernel_version
-        }}
+      msg: Building driver {{ nvidia_driver_runfile }} for kernel {{ cuda_driver_kernel_version }}
 
   - name: Install driver
-    command: >
-      bash {{ cuda_driver_runfile }} --silent
-      --kernel-name={{ cuda_driver_kernel_version }}
-      {{ "--no-drm" if cuda_runfile_disable_nvidia_drm else "" }}
+    command:
+      argv:
+      - bash
+      - "{{ nvidia_driver_runfile }}"
+      - --silent
+      - --kernel-name={{ cuda_driver_kernel_version }}
+      - "{{ '-m=kernel-open' if use_open_drivers else '' }}"
+      - "{{ '--no-drm' if cuda_runfile_disable_nvidia_drm else '' }}"
 
   - name: Install nvidia-persistenced systemd-file
     copy:
