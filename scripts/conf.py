@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Iterable
+from typing import List, Optional, Iterable, Dict
 from itertools import chain
 from collections import defaultdict
 import json
@@ -398,95 +398,96 @@ def install_gres_conf(lkp: util.Lookup) -> None:
 class Switch:
     """
     Represents a switch in the topology.conf file.
+    NOTE: It's class user job to make sure that there is no leaf-less Switches in the tree
     """
 
     def __init__(
         self,
         name: str,
-        # TODO: consider using an Iterable instead of list to save memory
-        # That would required more elaborate behavior of `self.empty()`
-        nodes: Optional[List[str]] = None,
-        switches: Optional[List["Switch"]] = None,
+        nodes: Optional[Iterable[str]] = None,
+        switches: Optional[Dict[str, "Switch"]] = None,
     ):
         self.name = name
         self.nodes = nodes or []
-        self.switches = switches or []
+        self.switches = switches or {}
 
     def conf_line(self) -> str:
         d = {"SwitchName": self.name}
         if self.nodes:
             d["Nodes"] = util.to_hostlist_fast(self.nodes)
-
-        non_empty = [
-            s for s in self.switches if not s.empty()
-        ]  # render only non-empty sub switches
-        if non_empty:
-            d["Switches"] = util.to_hostlist_fast([s.name for s in non_empty])
-
+        if self.switches:
+            d["Switches"] = util.to_hostlist_fast(self.switches.keys())
         return dict_to_conf(d)
 
-    def render_conf_lines(self) -> List[str]:
-        if self.empty():
+    def render_conf_lines(self) -> Iterable[str]:
+        yield self.conf_line()
+        for s in sorted(self.switches.values(), key=lambda s: s.name):
+            yield from s.render_conf_lines()
+
+
+class TopologyBuilder:
+    def __init__(self) -> None:
+        self._r = Switch("root")
+
+    def add(self, path: List[str], nodes: Iterable[str]) -> None:
+        n = self._r
+        assert path
+        for p in path:
+            n = n.switches.setdefault(p, Switch(p))
+        n.nodes = chain(n.nodes, nodes)
+
+    def render_conf_lines(self) -> Iterable[str]:
+        if not self._r.switches:
             return []
-
-        lines = [self.conf_line()]
-        for s in sorted(self.switches, key=lambda s: s.name):
-            lines.extend(s.render_conf_lines())
-        return lines
-
-    def empty(self) -> bool:
-        if self.nodes:
-            return False
-        return not any(not c.empty() for c in self.switches)
+        for s in sorted(self._r.switches.values(), key=lambda s: s.name):
+            yield from s.render_conf_lines()
 
 
-def tpu_nodeset_switch(nodeset: object, lkp: util.Lookup) -> Switch:
+def add_tpu_nodeset_topology(nodeset: object, bldr: TopologyBuilder, lkp: util.Lookup):
     tpuobj = util.TPU(nodeset)
     static, dynamic = lkp.nodenames(nodeset)
 
-    switch = Switch(name=nodeset.nodeset_name)
+    pref = ["nodeset_tpu-root", nodeset.nodeset_name]
     if tpuobj.vmcount == 1:  # Put all nodes in one switch
-        switch.nodes = list(chain(static, dynamic))
-    else:
-        # Chunk nodes into sub-switches of size `vmcount`
-        for nodenames in (static, dynamic):
-            for nodeschunk in util.chunked(nodenames, n=tpuobj.vmcount):
-                sub_switch = Switch(
-                    name=f"{switch.name}-{len(switch.switches)}",
-                    nodes=list(nodeschunk),
-                )
-                switch.switches.append(sub_switch)
-    return switch
+        bldr.add(pref, list(chain(static, dynamic)))
+        return
+
+    # Chunk nodes into sub-switches of size `vmcount`
+    chunk_num = 0
+    for nodenames in (static, dynamic):
+        for nodeschunk in util.chunked(nodenames, n=tpuobj.vmcount):
+            chunk_name = f"{nodeset.nodeset_name}-{chunk_num}"
+            chunk_num += 1
+            bldr.add([*pref, chunk_name], list(nodeschunk))
 
 
-def nodeset_switch(nodeset: object, lkp: util.Lookup) -> Switch:
-    return Switch(name=nodeset.nodeset_name, nodes=list(chain(*lkp.nodenames(nodeset))))
+def add_nodeset_topology(
+    nodeset: object, bldr: TopologyBuilder, lkp: util.Lookup
+) -> None:
+    path = ["nodeset-root", nodeset.nodeset_name]
+    nodes = list(chain(*lkp.nodenames(nodeset)))
+    bldr.add(path, nodes)
 
 
-def gen_topology(lkp: util.Lookup) -> List[Switch]:
-    # Returns a list of "root" switches
-    tpu_root = Switch(
-        name="nodeset_tpu-root",
-        switches=[tpu_nodeset_switch(ns, lkp) for ns in lkp.cfg.nodeset_tpu.values()],
-    )
-
-    ord_root = Switch(
-        name="nodeset-root",
-        switches=[nodeset_switch(ns, lkp) for ns in lkp.cfg.nodeset.values()],
-    )
-
-    return [tpu_root, ord_root]
+def gen_topology(lkp: util.Lookup) -> TopologyBuilder:
+    bldr = TopologyBuilder()
+    for ns in lkp.cfg.nodeset_tpu.values():
+        add_tpu_nodeset_topology(ns, bldr, lkp)
+    for ns in lkp.cfg.nodeset.values():
+        add_nodeset_topology(ns, bldr, lkp)
+    return bldr
 
 
 def gen_topology_conf(lkp: util.Lookup) -> None:
     """generate slurm topology.conf from config.yaml"""
-    lines = [FILE_PREAMBLE]
-    for r in gen_topology(lkp):
-        lines.extend(r.render_conf_lines())
-    lines.append("\n")
-
+    bldr = gen_topology(lkp)
     conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "cloud_topology.conf"
-    conf_file.write_text("\n".join(lines))
+    with open(conf_file, "w") as f:
+        f.writelines(FILE_PREAMBLE + "\n")
+        for line in bldr.render_conf_lines():
+            f.write(line)
+            f.write("\n")
+        f.write("\n")
     util.chown_slurm(conf_file, mode=0o600)
 
 

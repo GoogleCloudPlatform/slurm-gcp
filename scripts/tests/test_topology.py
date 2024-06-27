@@ -104,6 +104,10 @@ def test_gen_topology_conf(to_hostnames_mock, tpu_mock):
 # Warning:
 # This file is managed by a script. Manual modifications will be overwritten.
 
+SwitchName=nodeset-root Switches=blue,green,pink
+SwitchName=blue Nodes=m22-blue-[0-6]
+SwitchName=green Nodes=m22-green-[0-4]
+SwitchName=pink Nodes=m22-pink-[0-3]
 SwitchName=nodeset_tpu-root Switches=bold,slim
 SwitchName=bold Switches=bold-[0-3]
 SwitchName=bold-0 Nodes=m22-bold-[0-2]
@@ -111,10 +115,6 @@ SwitchName=bold-1 Nodes=m22-bold-3
 SwitchName=bold-2 Nodes=m22-bold-[4-6]
 SwitchName=bold-3 Nodes=m22-bold-[7-8]
 SwitchName=slim Nodes=m22-slim-[0-2]
-SwitchName=nodeset-root Switches=blue,green,pink
-SwitchName=blue Nodes=m22-blue-[0-6]
-SwitchName=green Nodes=m22-green-[0-4]
-SwitchName=pink Nodes=m22-pink-[0-3]
 
 """
     )
