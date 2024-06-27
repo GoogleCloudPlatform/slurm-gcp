@@ -1,0 +1,21 @@
+---
+
+- name: Add data to a file
+  hosts: localhost
+  tasks:
+  - name: Show content to update
+    debug:
+      msg:
+      - "Data: {{ data }}"
+      - "Path: {{ path }}"
+
+  - name: Create file if it doesn't exist
+    ansible.builtin.file:
+      path: "{{ path }}"
+      state: touch
+
+  - name: Ensure data entry is present (lineinfile)
+    ansible.builtin.lineinfile:
+      path: "{{ path }}"
+      line: "{{ data }}"
+      state: present

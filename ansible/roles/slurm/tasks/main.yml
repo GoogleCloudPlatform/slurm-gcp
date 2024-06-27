@@ -71,6 +71,8 @@
   - setup_network_storage.py
   - startup.sh
   - slurmsync.py
+  - network_wrapper.sh
+  - network_storage.yml
   - suspend.py
   - util.py
   - load_bq.py

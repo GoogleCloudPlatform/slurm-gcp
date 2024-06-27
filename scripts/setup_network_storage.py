@@ -16,17 +16,78 @@
 # limitations under the License.
 
 import os
-import sys
-import stat
 import time
+import subprocess
 
-import shutil
 from pathlib import Path
 from concurrent.futures import as_completed
 from addict import Dict as NSDict
 
-import util
-from util import lkp, run, cfg, dirs, separate
+from util import (
+    lkp,
+    dirs,
+    separate,
+    host_lookup,
+    load_config_file,
+    backoff_delay,
+)
+
+
+def call_update_file(path, data, log=None):
+    """Calls the func_update_file Bash function to update a file using Ansible.
+
+    Args:
+        path: The path to the file to update.
+        data: The line to add to the file.
+        log: A logging object to record messages.
+    """
+    try:
+        if os.geteuid() == 0:  # If run by root.
+            subprocess.run(
+                f"""/slurm/scripts/network_wrapper.sh update_file '{path}' '{data}'""",
+                shell=True,
+                check=True,  # Raise an exception if the command fails
+                text=True,  # Capture stdout/stderr as text
+            )
+        else:  # If run by non-root user
+            subprocess.run(
+                f"""sudo /slurm/scripts/network_wrapper.sh update_file '{path}' '{data}'""",
+                shell=True,
+                check=True,  # Raise an exception if the command fails
+                text=True,  # Capture stdout/stderr as text
+            )
+        log.info("File updated successfully via Ansible.")
+    except Exception as e:
+        log.error(f"An error occurred: {e}")
+
+
+def call_run_cmd(command, *args, timeout=None, log=None):
+    """Calls the func_run_cmd Bash function to execute a shell command.
+
+    Args:
+        command: The shell command to run.
+        *args: Additional arguments for the command.
+        log: A logging object to record messages.
+    """
+    try:
+        if os.geteuid() == 0:  # If run by root
+            subprocess.run(
+                f"/slurm/scripts/network_wrapper.sh run_cmd {command} {' '.join(args)}",
+                shell=True,
+                check=True,  # Raise an exception if the command fails
+                text=True,  # Capture stdout/stderr as text
+            )
+        else:  # If run by non-root
+            subprocess.run(
+                f"sudo /slurm/scripts/network_wrapper.sh run_cmd {command} {' '.join(args)}",
+                shell=True,
+                check=True,  # Raise an exception if the command fails
+                timeout=timeout,
+                text=True,  # Capture stdout/stderr as text
+            )
+        log.info(f"Command '{command}' executed successfully.")
+    except Exception as e:
+        log.error(f"An error occurred: {e}")
 
 
 def mounts_by_local(mounts):
@@ -36,7 +97,7 @@ def mounts_by_local(mounts):
 
 def resolve_network_storage(nodeset=None):
     """Combine appropriate network_storage fields to a single list"""
-
+    cfg = load_config_file(Path(__file__).with_name("config.yaml"))
     if lkp.instance_role == "compute":
         try:
             nodeset = lkp.node_nodeset()
@@ -84,7 +145,7 @@ def separate_external_internal_mounts(mounts):
     def internal_mount(mount):
         # NOTE: Valid Lustre server_ip can take the form of '<IP>@tcp'
         server_ip = mount.server_ip.split("@")[0]
-        mount_addr = util.host_lookup(server_ip)
+        mount_addr = host_lookup(server_ip)
         return mount_addr == lkp.control_host_addr
 
     return separate(internal_mount, mounts)
@@ -93,6 +154,7 @@ def separate_external_internal_mounts(mounts):
 def setup_network_storage(log):
     """prepare network fs mounts and add them to fstab"""
     log.info("Set up network storage")
+
     # filter mounts into two dicts, cluster-internal and external mounts
 
     all_mounts = resolve_network_storage()
@@ -110,7 +172,7 @@ def setup_network_storage(log):
         remote_mount = mount.remote_mount
         fs_type = mount.fs_type
         server_ip = mount.server_ip or ""
-        local_mount.mkdirp()
+        call_run_cmd("mkdir -p", str(local_mount), log=log)
 
         log.info(
             "Setting up mount ({}) {}{} to {}".format(
@@ -142,15 +204,15 @@ def setup_network_storage(log):
                 )
             )
 
+    # Copy fstab to fstab.bak and use backup as clean copy to re-evaluate mounts.
     fstab = Path("/etc/fstab")
     if not Path(fstab.with_suffix(".bak")).is_file():
-        shutil.copy2(fstab, fstab.with_suffix(".bak"))
-    shutil.copy2(fstab.with_suffix(".bak"), fstab)
-    with open(fstab, "a") as f:
-        f.write("\n")
-        for entry in fstab_entries:
-            f.write(entry)
-            f.write("\n")
+        call_run_cmd("cp -p", str(fstab), str(fstab.with_suffix(".bak")), log=log)
+    call_run_cmd("cp -p", str(fstab.with_suffix(".bak")), str(fstab), log=log)
+
+    # Update fstab.
+    for entry in fstab_entries:
+        call_update_file("/etc/fstab", entry, log)
 
     mount_fstab(mounts_by_local(mounts), log)
     munge_mount_handler(log)
@@ -163,11 +225,10 @@ def mount_fstab(mounts, log):
     def mount_path(path):
         log.info(f"Waiting for '{path}' to be mounted...")
         try:
-            run(f"mount {path}", timeout=120)
+            call_run_cmd("mount", path, timeout=120, log=log)
         except Exception as e:
-            exc_type, _, _ = sys.exc_info()
-            log.error(f"mount of path '{path}' failed: {exc_type}: {e}")
-            raise e
+            log.error(f"mount of path '{path}' failed: {e}")
+            return
         log.info(f"Mount point '{path}' was mounted.")
 
     MAX_MOUNT_TIMEOUT = 60 * 5
@@ -191,6 +252,7 @@ def mount_fstab(mounts, log):
 
 
 def munge_mount_handler(log):
+    cfg = load_config_file(Path(__file__).with_name("config.yaml"))
     if not cfg.munge_mount:
         log.error("Missing munge_mount in cfg")
     elif lkp.instance_role == "controller":
@@ -214,7 +276,7 @@ def munge_mount_handler(log):
     munge_key = Path(dirs.munge / "munge.key")
 
     log.info(f"Mounting munge share to: {local_mount}")
-    local_mount.mkdir()
+    call_run_cmd("mkdir -p", str(local_mount), log=log)
     if fs_type.lower() == "gcsfuse".lower():
         if remote_mount is None:
             remote_mount = ""
@@ -236,9 +298,9 @@ def munge_mount_handler(log):
         ]
     # wait max 120s for munge mount
     timeout = 120
-    for retry, wait in enumerate(util.backoff_delay(0.5, timeout), 1):
+    for retry, wait in enumerate(backoff_delay(0.5, timeout), 1):
         try:
-            run(cmd, timeout=timeout)
+            call_run_cmd(cmd, timeout=timeout, log=log)
             break
         except Exception as e:
             log.error(
@@ -251,24 +313,27 @@ def munge_mount_handler(log):
         raise err
 
     log.info(f"Copy munge.key from: {local_mount}")
-    shutil.copy2(Path(local_mount / "munge.key"), munge_key)
+    call_run_cmd(
+        "cp", "-r", str(Path(local_mount) / "munge.key"), str(munge_key), log=log
+    )
 
     log.info("Restrict permissions of munge.key")
-    shutil.chown(munge_key, user="munge", group="munge")
-    os.chmod(munge_key, stat.S_IRUSR)
+    call_run_cmd("chown -r munge:munge", munge_key, log=log)
+    call_run_cmd("chmod", "0400", munge_key, log=log)
 
     log.info(f"Unmount {local_mount}")
     if fs_type.lower() == "gcsfuse".lower():
-        run(f"fusermount -u {local_mount}", timeout=120)
+        call_run_cmd("fusermount -u", local_mount, timeout=120, log=log)
     else:
-        run(f"umount {local_mount}", timeout=120)
-    shutil.rmtree(local_mount)
+        call_run_cmd("umount", local_mount, timeout=120, log=log)
+    call_run_cmd("rm -rf", local_mount, log=log)
 
 
-def setup_nfs_exports():
+def setup_nfs_exports(log):
     """nfs export all needed directories"""
     # The controller only needs to set up exports for cluster-internal mounts
     # switch the key to remote mount path since that is what needs exporting
+    cfg = load_config_file(Path(__file__).with_name("config.yaml"))
     mounts = resolve_network_storage()
     # manually add munge_mount
     mounts.append(
@@ -295,13 +360,14 @@ def setup_nfs_exports():
     # export path if corresponding selector boolean is True
     exports = []
     for path in con_mounts:
-        Path(path).mkdirp()
-        run(rf"sed -i '\#{path}#d' /etc/exports", timeout=30)
+        call_run_cmd("mkdir -p", path, log=log)
+        call_run_cmd("sed", "-i", rf"\#{path}#d", "/etc/exports", timeout=30, log=log)
         exports.append(f"{path}  *(rw,no_subtree_check,no_root_squash)")
 
     exportsd = Path("/etc/exports.d")
-    exportsd.mkdirp()
-    with (exportsd / "slurm.exports").open("w") as f:
-        f.write("\n")
-        f.write("\n".join(exports))
-    run("exportfs -a", timeout=30)
+    call_run_cmd("mkdir -p", str(exportsd), log=log)
+
+    for export in exports:
+        call_update_file("/etc/exports.d/slurm.exports", export, log)
+
+    call_run_cmd("exportfs -a", timeout=30, log=log)
