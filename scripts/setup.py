@@ -20,7 +20,6 @@ import logging
 import os
 import shutil
 import subprocess
-import sys
 import stat
 import time
 from pathlib import Path
@@ -54,10 +53,7 @@ from setup_network_storage import (
     setup_nfs_exports,
 )
 
-SETUP_SCRIPT = Path(__file__)
-filename = SETUP_SCRIPT.name
-LOGFILE = ((cfg.slurm_log_dir if cfg else ".") / SETUP_SCRIPT).with_suffix(".log")
-log = logging.getLogger(filename)
+log = logging.getLogger()
 
 
 MOTD_HEADER = """
@@ -131,7 +127,7 @@ Log back in to ensure your home directory is correct.
 
 def failed_motd():
     """modify motd to signal that setup is failed"""
-    wall_msg = f"*** Slurm setup failed! Please view log: {LOGFILE} ***"
+    wall_msg = f"*** Slurm setup failed! Please view log: {util.get_log_path()} ***"
     motd_msg = MOTD_HEADER + wall_msg + "\n\n"
     Path("/etc/motd").write_text(motd_msg)
     util.run(f"wall -n '{wall_msg}'", timeout=30)
@@ -494,8 +490,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-    util.chown_slurm(LOGFILE, mode=0o600)
-
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -504,10 +498,7 @@ if __name__ == "__main__":
         dest="slurmd_feature",
         help="Feature for slurmd to register with. Controller ignores this option.",
     )
-    args = parser.parse_args()
-
-    util.config_root_logger(filename, logfile=LOGFILE)
-    sys.excepthook = util.handle_exception
+    args = util.init_logs_and_parse(parser)
 
     lkp = util.Lookup(cfg)  # noqa F811
 
