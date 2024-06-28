@@ -15,7 +15,6 @@
 
 import argparse
 import logging
-from pathlib import Path
 from time import sleep
 from suspend import (
     batch_execute,
@@ -23,10 +22,9 @@ from suspend import (
     truncate_iter,
     wait_for_operations,
 )
-from util import lkp, compute, config_root_logger, parse_self_link
+from util import lkp, compute, parse_self_link
 
-logger_name = Path(__file__).name
-log = logging.getLogger(logger_name)
+log = logging.getLogger()
 
 
 def delete_instances(compute_list):
@@ -112,20 +110,4 @@ if __name__ == "__main__":
     parser.add_argument(
         "--exclude", help="NodeNames excluded from destruction", type=str, default=None
     )
-    parser.add_argument(
-        "--debug",
-        "-d",
-        dest="debug",
-        action="store_true",
-        help="Enable debugging output",
-    )
-
-    args = parser.parse_args()
-
-    logfile = (Path(__file__).parent / logger_name).with_suffix(".log")
-    if args.debug:
-        config_root_logger(logger_name, level="DEBUG", logfile=logfile)
-    else:
-        config_root_logger(logger_name, level="INFO", logfile=logfile)
-
-    main(args)
+    main(parser.parse_args())

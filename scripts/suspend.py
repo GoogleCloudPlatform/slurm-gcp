@@ -18,8 +18,6 @@
 from typing import List
 import argparse
 import logging
-import sys
-from pathlib import Path
 
 import util
 from util import (
@@ -31,13 +29,11 @@ from util import (
     separate,
     execute_with_futures,
 )
-from util import lkp, cfg, compute, TPU
+from util import lkp, compute, TPU
 
 import slurm_gcp_plugins
 
-filename = Path(__file__).name
-LOGFILE = (Path(cfg.slurm_log_dir if cfg else ".") / filename).with_suffix(".log")
-log = logging.getLogger(filename)
+log = logging.getLogger()
 
 TOT_REQ_CNT = 1000
 
@@ -147,38 +143,10 @@ def main(nodelist):
     suspend_nodes(pm_nodes)
 
 
-parser = argparse.ArgumentParser(
-    description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-)
-parser.add_argument("nodelist", help="list of nodes to suspend")
-parser.add_argument(
-    "--debug",
-    "-d",
-    dest="loglevel",
-    action="store_const",
-    const=logging.DEBUG,
-    default=logging.INFO,
-    help="Enable debugging output",
-)
-parser.add_argument(
-    "--trace-api",
-    "-t",
-    action="store_true",
-    help="Enable detailed api request output",
-)
-
-
 if __name__ == "__main__":
-    args = parser.parse_args()
-
-    if cfg.enable_debug_logging:
-        args.loglevel = logging.DEBUG
-    if args.trace_api:
-        cfg.extra_logging_flags = list(cfg.extra_logging_flags)
-        cfg.extra_logging_flags.append("trace_api")
-    util.chown_slurm(LOGFILE, mode=0o600)
-    util.config_root_logger(filename, level=args.loglevel, logfile=LOGFILE)
-    log = logging.getLogger(Path(__file__).name)
-    sys.excepthook = util.handle_exception
-
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("nodelist", help="list of nodes to suspend")
+    args = util.init_logs_and_parse(parser)
     main(args.nodelist)
