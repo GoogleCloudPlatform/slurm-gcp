@@ -41,7 +41,7 @@ variable "enable_debug_logging" {
 
 variable "extra_logging_flags" {
   type        = map(bool)
-  description = "The list of extra flags for the logging system to use. See the logging_flags variable in scripts/util.py to get the list of supported log flags."
+  description = "The list of extra flags for the logging system to use."
   default     = {}
 }
 
