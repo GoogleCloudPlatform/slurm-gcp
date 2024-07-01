@@ -13,9 +13,9 @@ from google.cloud.bigquery import SchemaField
 from google.cloud import bigquery as bq
 from google.api_core import retry, exceptions
 
+import util
 from util import run
 from util import cfg
-from util import def_creds
 
 
 SACCT = "sacct"
@@ -161,7 +161,11 @@ job_schema = {field.name: field for field in schema_fields}
 # Order is important here, as that is how they are parsed from sacct output
 Job = namedtuple("Job", job_schema.keys())
 
-client = bq.Client(project=cfg.project, credentials=def_creds)
+client = bq.Client(
+    project=cfg.project,
+    credentials=util.default_credentials(),
+    client_options=util.create_client_options(util.ApiEndpoint.BQ),
+)
 dataset_id = f"{cfg.slurm_cluster_name}_job_data"
 dataset = bq.DatasetReference(project=cfg.project, dataset_id=dataset_id)
 table = bq.Table(

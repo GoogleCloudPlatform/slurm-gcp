@@ -122,7 +122,7 @@ def instance_properties(nodeset, model, placement_group, labels=None):
 
         props.reservationAffinity = {
             "consumeReservationType": "SPECIFIC_RESERVATION",
-            "key": "compute.googleapis.com/reservation-name",
+            "key": f"compute.{util.universe_domain()}/reservation-name",
             "values": [reservation_name],
         }
 

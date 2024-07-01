@@ -27,6 +27,8 @@ METADATA_SERVER="metadata.google.internal"
 URL="http://$METADATA_SERVER/computeMetadata/v1"
 HEADER="Metadata-Flavor:Google"
 CURL="curl -sS --fail --header $HEADER"
+UNIVERSE_DOMAIN="$($CURL $URL/instance/attributes/universe_domain)"
+STORAGE_CMD="CLOUDSDK_CORE_UNIVERSE_DOMAIN=$UNIVERSE_DOMAIN gcloud storage"
 
 function devel::zip() {
 	local BUCKET="$($CURL $URL/instance/attributes/slurm_bucket_path)"
@@ -38,7 +40,7 @@ function devel::zip() {
 	local SLURM_ZIP_URL="$BUCKET/slurm-gcp-devel.zip"
 	local SLURM_ZIP_FILE="$HOME/slurm-gcp-devel.zip"
 	local SLURM_ZIP_DIR="$HOME/slurm-gcp-devel"
-	eval $(gsutil cp "$SLURM_ZIP_URL" "$SLURM_ZIP_FILE")
+	eval $(bash -c "$STORAGE_CMD cp $SLURM_ZIP_URL $SLURM_ZIP_FILE")
 	if ! [[ -f "$SLURM_ZIP_FILE" ]]; then
 		echo "INFO: No development files downloaded. Skipping."
 		return 0
@@ -51,6 +53,27 @@ function devel::zip() {
 	chown slurm:slurm -R "$SCRIPTS_DIR" || true
 	chmod 700 -R "$SCRIPTS_DIR"
 	echo "INFO: Updated permissions of files in '$SCRIPTS_DIR'."
+}
+
+function config() {
+	local BUCKET="$($CURL $URL/instance/attributes/slurm_bucket_path)"
+	if [[ -z $BUCKET ]]; then
+		echo "ERROR: No bucket path detected."
+		return 1
+	fi
+
+	local SLURM_CONFIG_URL="$BUCKET/config.yaml"
+	local SLURM_CONFIG_FILE="$SCRIPTS_DIR/config.yaml"
+	eval $(bash -c "$STORAGE_CMD cp $SLURM_CONFIG_URL $SLURM_CONFIG_FILE")
+	if ! [[ -f "$SLURM_CONFIG_FILE" ]]; then
+		echo "INFO: No config file downloaded. Skipping."
+		return 0
+	fi
+
+	#temporary hack to not make the script fail on TPU vm
+	chown slurm:slurm -R "$SLURM_CONFIG_FILE" || true
+	chmod 600 -R "$SLURM_CONFIG_FILE"
+	echo "INFO: Updated permissions of '$SLURM_CONFIG_FILE'."
 }
 
 PING_METADATA="ping -q -w1 -c1 $METADATA_SERVER"
@@ -88,6 +111,7 @@ SETUP_SCRIPT_FILE=$SCRIPTS_DIR/setup.py
 UTIL_SCRIPT_FILE=$SCRIPTS_DIR/util.py
 
 devel::zip
+config
 
 if [ -f $FLAGFILE ]; then
 	echo "WARNING: Slurm was previously configured, quitting"

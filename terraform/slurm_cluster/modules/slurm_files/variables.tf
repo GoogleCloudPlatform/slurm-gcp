@@ -456,14 +456,12 @@ variable "munge_mount" {
   }
 }
 
-variable "universe_domain" {
-  description = "Domain address for alternate API universe"
-  type        = string
-  default     = null
-}
-
-variable "custom_endpoints" {
-  description = "Alternate set of API endpoints"
-  type        = map(string)
-  default     = null
+variable "endpoint_versions" {
+  description = "Version of the API to use (The compute service is the only API currently supported)"
+  type = object({
+    compute = string
+  })
+  default = {
+    compute = null
+  }
 }

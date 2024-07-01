@@ -89,8 +89,7 @@ locals {
     jobsubmit_lua_tpl = file(coalesce(var.job_submit_lua_tpl, "${local.etc_dir}/job_submit.lua.tpl"))
 
     # Providers
-    universe_domain  = var.universe_domain
-    custom_endpoints = var.custom_endpoints
+    endpoint_versions = var.endpoint_versions
   }
 
   config_yaml        = "config.yaml"
@@ -160,6 +159,7 @@ data "archive_file" "slurm_gcp_devel_zip" {
     fileset(local.scripts_dir, "*.cache"),
     fileset(local.scripts_dir, "*.lock"),
   ])
+
 }
 
 resource "google_storage_bucket_object" "devel" {

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Tuple, Optional
 import argparse
 import base64
 import collections
@@ -34,6 +34,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+from enum import Enum
 from collections import defaultdict, namedtuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
@@ -73,6 +74,7 @@ from google.oauth2 import service_account  # noqa: E402
 import googleapiclient.discovery  # noqa: E402
 import google_auth_httplib2  # noqa: E402
 from googleapiclient.http import set_user_agent  # noqa: E402
+from google.api_core.client_options import ClientOptions  # noqa: E402
 import httplib2  # noqa: E402
 
 if can_tpu:
@@ -100,8 +102,6 @@ else:
     CONFIG_FILE = Path(__file__).with_name("config.yaml")
 API_REQ_LIMIT = 2000
 URI_REGEX = r"[a-z]([-a-z0-9]*[a-z0-9])?"
-
-def_creds, auth_project = google.auth.default()
 
 
 def mkdirp(path: Path) -> None:
@@ -155,6 +155,69 @@ slurmdirs = NSDict(
 yaml.SafeDumper.yaml_representers[
     None
 ] = lambda self, data: yaml.representer.SafeRepresenter.represent_str(self, str(data))
+
+
+class ApiEndpoint(Enum):
+    COMPUTE = "compute"
+    BQ = "bq"
+    STORAGE = "storage"
+    TPU = "tpu"
+    SECRET = "secret_manager"
+
+
+@lru_cache(maxsize=1)
+def default_credentials():
+    return google.auth.default()[0]
+
+
+@lru_cache(maxsize=1)
+def authentication_project():
+    return google.auth.default()[1]
+
+
+def universe_domain() -> str:
+    return instance_metadata("attributes/universe_domain")
+
+
+def endpoint_version(api: ApiEndpoint) -> Optional[str]:
+    if api and api.value in lkp.endpoint_versions:
+        return lkp.endpoint_versions[api.value]
+    return None
+
+
+@lru_cache(maxsize=1)
+def get_credentials() -> Optional[service_account.Credentials]:
+    """Get credentials for service account"""
+    key_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if key_path is not None:
+        credentials = service_account.Credentials.from_service_account_file(
+            key_path, scopes=[f"https://www.{universe_domain()}/auth/cloud-platform"]
+        )
+    else:
+        credentials = default_credentials()
+
+    return credentials
+
+
+def create_client_options(api: ApiEndpoint = None) -> ClientOptions:
+    """Create client options for cloud endpoints"""
+    ep = None
+    ver = endpoint_version(api)
+    ud = universe_domain()
+    if ver:
+        ep = f"https://{api.value}.{ud}/{ver}/"
+    log.debug(
+        f"Using universe domain: {ud}. "
+        + (
+            f"For API: {api.value} using API endpoint: " f"{ep if ep else 'default'}"
+            if api
+            else ""
+        )
+    )
+    return ClientOptions(
+        universe_domain=ud,
+        api_endpoint=ep,
+    )
 
 
 class LogFormatter(logging.Formatter):
@@ -216,7 +279,8 @@ def access_secret_version(project_id, secret_id, version_id="latest"):
     from google.cloud import secretmanager
     from google.api_core import exceptions
 
-    client = secretmanager.SecretManagerServiceClient()
+    co = create_client_options(ApiEndpoint.SECRET)
+    client = secretmanager.SecretManagerServiceClient(client_options=co)
     name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
     try:
         response = client.access_secret_version(request={"name": name})
@@ -296,7 +360,8 @@ def blob_get(file, project=None):
     uri = instance_metadata("attributes/slurm_bucket_path")
     bucket_name, path = parse_bucket_uri(uri)
     blob_name = f"{path}/{file}"
-    storage_client = storage.Client(project=project)
+    co = create_client_options(ApiEndpoint.STORAGE)
+    storage_client = storage.Client(project=project, client_options=co)
     return storage_client.get_bucket(bucket_name).blob(blob_name)
 
 
@@ -308,7 +373,8 @@ def blob_list(prefix="", delimiter=None, project=None):
     uri = instance_metadata("attributes/slurm_bucket_path")
     bucket_name, path = parse_bucket_uri(uri)
     blob_prefix = f"{path}/{prefix}"
-    storage_client = storage.Client(project=project)
+    co = create_client_options(ApiEndpoint.STORAGE)
+    storage_client = storage.Client(project=project, client_options=co)
     # Note: The call returns a response only when the iterator is consumed.
     blobs = storage_client.list_blobs(
         bucket_name, prefix=blob_prefix, delimiter=delimiter
@@ -388,16 +454,8 @@ def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
     """Make thread-safe compute service handle
     creates a new Http for each request
     """
-    try:
-        key_path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
-    except KeyError:
-        key_path = None
-    if key_path is not None:
-        credentials = service_account.Credentials.from_service_account_file(
-            key_path, scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-    elif credentials is None:
-        credentials = def_creds
+
+    credentials = get_credentials()
 
     def build_request(http, *args, **kwargs):
         new_http = httplib2.Http()
@@ -407,16 +465,20 @@ def compute_service(credentials=None, user_agent=USER_AGENT, version="beta"):
             new_http = google_auth_httplib2.AuthorizedHttp(credentials, http=new_http)
         return googleapiclient.http.HttpRequest(new_http, *args, **kwargs)
 
+    ver = endpoint_version(ApiEndpoint.COMPUTE)
+    disc_url = googleapiclient.discovery.DISCOVERY_URI
+    if ver:
+        version = ver
+        disc_url = disc_url.replace("googleapis.com", universe_domain())
+
     log.debug(f"Using version={version} of Google Compute Engine API")
     return googleapiclient.discovery.build(
         "compute",
         version,
         requestBuilder=build_request,
         credentials=credentials,
+        discoveryServiceUrl=disc_url,
     )
-
-
-compute = compute_service()
 
 
 def load_config_data(config):
@@ -846,7 +908,8 @@ def project_metadata(key):
 def bucket_blob_download(bucket_name, blob_name):
     from google.cloud import storage
 
-    storage_client = storage.Client()
+    co = create_client_options("storage")
+    storage_client = storage.Client(client_options=co)
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
     contents = None
@@ -1000,10 +1063,12 @@ def ensure_execute(request):
         break
 
 
-def batch_execute(requests, compute=compute, retry_cb=None, log_err=log.error):
+def batch_execute(requests, retry_cb=None, log_err=log.error):
     """execute list or dict<req_id, request> as batch requests
     retry if retry_cb returns true
     """
+
+    compute = globals()["compute"]
     BATCH_LIMIT = 1000
     if not isinstance(requests, dict):
         requests = {str(k): v for k, v in enumerate(requests)}  # rid generated here
@@ -1060,8 +1125,10 @@ def batch_execute(requests, compute=compute, retry_cb=None, log_err=log.error):
     return done, failed
 
 
-def wait_request(operation, project=None, compute=compute):
+def wait_request(operation, project=None, compute=None):
     """makes the appropriate wait request for a given operation"""
+    if not compute:
+        compute = globals()["compute"]
     if project is None:
         project = lkp.project
     if "zone" in operation:
@@ -1083,8 +1150,10 @@ def wait_request(operation, project=None, compute=compute):
     return req
 
 
-def wait_for_operation(operation, project=None, compute=compute):
+def wait_for_operation(operation, project=None, compute=None):
     """wait for given operation"""
+    if not compute:
+        compute = globals()["compute"]
     if project is None:
         project = parse_self_link(operation["selfLink"]).project
     wait_req = wait_request(operation, project=project, compute=compute)
@@ -1099,20 +1168,12 @@ def wait_for_operation(operation, project=None, compute=compute):
             return result
 
 
-def wait_for_operations(operations, project=None, compute=compute):
+def wait_for_operations(operations, project=None, compute=None):
+    if not compute:
+        compute = globals()["compute"]
     return [
         wait_for_operation(op, project=project, compute=compute) for op in operations
     ]
-
-
-def wait_for_operations_async(operations, project=None, compute=compute):
-    """wait for all operations"""
-
-    def operation_retry(resp):
-        return resp["status"] != "DONE"
-
-    requests = [wait_request(op, project=project, compute=compute) for op in operations]
-    return batch_execute(requests, retry_cb=operation_retry)
 
 
 def get_filtered_operations(
@@ -1121,10 +1182,12 @@ def get_filtered_operations(
     region=None,
     only_global=False,
     project=None,
-    compute=compute,
+    compute=None,
 ):
     """get list of operations associated with group id"""
 
+    if not compute:
+        compute = globals()["compute"]
     if project is None:
         project = lkp.project
     operations = []
@@ -1167,8 +1230,10 @@ def get_filtered_operations(
     return operations
 
 
-def get_insert_operations(group_ids, flt=None, project=None, compute=compute):
+def get_insert_operations(group_ids, flt=None, project=None, compute=None):
     """get all insert operations from a list of operationGroupId"""
+    if not compute:
+        compute = globals()["compute"]
     if project is None:
         project = lkp.project
     if isinstance(group_ids, str):
@@ -1282,7 +1347,8 @@ class TPU:
             raise Exception("TPU pip package not installed")
         self._nodeset = nodeset
         self._parent = f"projects/{lkp.project}/locations/{nodeset.zone}"
-        self._client = tpu.TpuClient()
+        co = create_client_options(ApiEndpoint.TPU)
+        self._client = tpu.TpuClient(client_options=co)
         self.data_disks = []
         for data_disk in nodeset.data_disks:
             ad = tpu.AttachedDisk()
@@ -1517,7 +1583,7 @@ class Lookup:
 
     @property
     def project(self):
-        return self.cfg.project or auth_project
+        return self.cfg.project or authentication_project()
 
     @property
     def control_addr(self):
@@ -1534,6 +1600,10 @@ class Lookup:
     @property
     def control_host_port(self):
         return self.cfg.slurm_control_host_port
+
+    @property
+    def endpoint_versions(self):
+        return self.cfg.endpoint_versions
 
     @property
     def scontrol(self):
@@ -1965,6 +2035,10 @@ if not cfg:
         save_config(cfg, CONFIG_FILE)
 
 lkp = Lookup(cfg)
+
+# Needs to be run after the lookup is complete to get endpoint versions
+compute = compute_service()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
