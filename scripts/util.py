@@ -39,7 +39,7 @@ from collections import defaultdict, namedtuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from functools import lru_cache, reduce, wraps
-from itertools import chain, compress, islice
+from itertools import chain, islice
 from pathlib import Path
 from time import sleep, time
 
@@ -221,15 +221,8 @@ def create_client_options(api: ApiEndpoint = None) -> ClientOptions:
 
 
 class LogFormatter(logging.Formatter):
-    """adds logging flags to the levelname in log records"""
-
     def format(self, record):
         new_fmt = self._fmt
-        flag = getattr(record, "flag", None)
-        if flag is not None:
-            start, level, end = new_fmt.partition("%(levelname)s")
-            if level:
-                new_fmt = f"{start}{level}(%(flag)s){end}"
         # insert function name if record level is DEBUG
         if record.levelno < logging.INFO:
             prefix, msg, suffix = new_fmt.partition("%(message)s")
@@ -238,37 +231,7 @@ class LogFormatter(logging.Formatter):
         return super().format(record)
 
 
-class FlagLogAdapter(logging.LoggerAdapter):
-    """creates log adapters that add a flag to the log record,
-    allowing it to be filtered"""
-
-    def __init__(self, logger, flag, extra=None):
-        if extra is None:
-            extra = {}
-        self.flag = flag
-        super().__init__(logger, extra)
-
-    @property
-    def enabled(self):
-        return cfg.extra_logging_flags.get(self.flag, False)
-
-    def process(self, msg, kwargs):
-        extra = kwargs.setdefault("extra", {})
-        extra.update(self.extra)
-        extra["flag"] = self.flag
-        return msg, kwargs
-
-
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-log = logging.getLogger(__name__)
-logging_flags = [
-    "trace_api",
-    "subproc",
-    "hostlists",
-]
-log_trace_api = FlagLogAdapter(log, "trace_api")
-log_subproc = FlagLogAdapter(log, "subproc")
-log_hostlists = FlagLogAdapter(log, "hostlists")
+log = logging.getLogger()
 
 
 def access_secret_version(project_id, secret_id, version_id="latest"):
@@ -505,9 +468,6 @@ def load_config_data(config):
 
     if not cfg.enable_debug_logging and isinstance(cfg.enable_debug_logging, NSDict):
         cfg.enable_debug_logging = False
-    cfg.extra_logging_flags = NSDict(
-        {flag: cfg.extra_logging_flags.get(flag, False) for flag in logging_flags}
-    )
     return cfg
 
 
@@ -578,18 +538,8 @@ def filter_logging_flags(record):
     return cfg.extra_logging_flags.get(flag, False)
 
 
-def owned_file_handler(filename):
-    """create file handler"""
-    if filename is None:
-        return None
-    chown_slurm(filename)
-    return logging.handlers.WatchedFileHandler(filename, delay=True)
-
-
-def config_root_logger(caller_logger, level="DEBUG", stdout=True, logfile=None):
+def _config_root_logger(logfile: str, level: str) -> None:
     """configure the root logger, disabling all existing loggers"""
-    handlers = list(compress(("stdout_handler", "file_handler"), (stdout, logfile)))
-
     config = {
         "version": 1,
         "disable_existing_loggers": True,
@@ -615,7 +565,6 @@ def config_root_logger(caller_logger, level="DEBUG", stdout=True, logfile=None):
                 "filters": ["logging_flags"],
             },
             "file_handler": {
-                "()": owned_file_handler,
                 "level": logging.DEBUG,
                 "formatter": "stamp",
                 "filters": ["logging_flags"],
@@ -623,28 +572,58 @@ def config_root_logger(caller_logger, level="DEBUG", stdout=True, logfile=None):
             },
         },
         "root": {
-            "handlers": handlers,
+            "handlers": ["stdout_handler", "file_handler"],
             "level": level,
         },
     }
-    if not logfile:
-        del config["handlers"]["file_handler"]
     logging.config.dictConfig(config)
-    loggers = (
-        __name__,
-        "resume",
-        "suspend",
-        "slurmsync",
-        "setup",
-        caller_logger,
+
+
+def get_log_path() -> Path:
+    log_dir = Path(cfg.slurm_log_dir or ".")
+    return (log_dir / Path(sys.argv[0]).name).with_suffix(".log")
+
+
+def init_logs_and_parse(
+    parser: argparse.ArgumentParser, log_path: Optional[str] = None
+) -> argparse.Namespace:
+    parser.add_argument(
+        "--debug",
+        "-d",
+        dest="loglevel",
+        action="store_const",
+        const=logging.DEBUG,
+        default=logging.INFO,
+        help="Enable debugging output",
     )
-    for logger in map(logging.getLogger, loggers):
-        logger.disabled = False
+    parser.add_argument(
+        "--trace-api",
+        "-t",
+        action="store_true",
+        help="Enable detailed api request output",
+    )
+    args = parser.parse_args()
+
+    # Configure root logger
+    loglevel = args.loglevel
+    if cfg.enable_debug_logging:
+        loglevel = logging.DEBUG
+    if args.trace_api:
+        cfg.extra_logging_flags["trace_api"] = True
+
+    if not log_path:
+        log_path = get_log_path()
+        chown_slurm(log_path, mode=0o600)
+
+    _config_root_logger(logfile=log_path, level=loglevel)
+    sys.excepthook = _handle_exception
+
+    return args
 
 
 def log_api_request(request):
     """log.trace info about a compute API request"""
-    if log_trace_api.enabled:
+    if cfg.extra_logging_flags.get("trace_api", False):
         # output the whole request object as pretty yaml
         # the body is nested json, so load it as well
         rep = json.loads(request.to_json())
@@ -652,10 +631,10 @@ def log_api_request(request):
             rep["body"] = json.loads(rep["body"])
         pretty_req = yaml.safe_dump(rep).rstrip()
         # label log message with the calling function
-        log_trace_api.debug(f"{inspect.stack()[1].function}:\n{pretty_req}")
+        log.debug(f"{inspect.stack()[1].function}:\n{pretty_req}")
 
 
-def handle_exception(exc_type, exc_value, exc_trace):
+def _handle_exception(exc_type, exc_value, exc_trace):
     """log exceptions other than KeyboardInterrupt"""
     # TODO does this work?
     if not issubclass(exc_type, KeyboardInterrupt):
@@ -679,7 +658,7 @@ def run(
         args = " ".join(args)
     if not shell and isinstance(args, str):
         args = shlex.split(args)
-    log_subproc.debug(f"run: {args}")
+    log.debug(f"run: {args}")
     result = subprocess.run(
         args,
         stdout=stdout,
@@ -691,14 +670,6 @@ def run(
         **kwargs,
     )
     return result
-
-
-def spawn(cmd, quiet=False, shell=False, **kwargs):
-    """nonblocking spawn of subprocess"""
-    if not quiet:
-        log_subproc.debug(f"spawn: {cmd}")
-    args = cmd if shell else shlex.split(cmd)
-    return subprocess.Popen(args, shell=shell, **kwargs)
 
 
 def chown_slurm(path: Path, mode=None) -> None:
@@ -936,7 +907,6 @@ def to_hostlist(nodenames) -> str:
     tmp_file.close()
 
     hostlist = run(f"{lkp.scontrol} show hostlist {tmp_file.name}").stdout.rstrip()
-    log_hostlists.debug(f"hostlist({len(nodenames)}): {hostlist}".format(hostlist))
     os.remove(tmp_file.name)
     return hostlist
 
@@ -1026,7 +996,6 @@ def to_hostnames(nodelist: str) -> List[str]:
     else:
         hostlist = ",".join(nodelist)
     hostnames = run(f"{lkp.scontrol} show hostnames {hostlist}").stdout.splitlines()
-    log_hostlists.debug(f"hostnames({len(hostnames)}) from {hostlist}")
     return hostnames
 
 
@@ -2041,6 +2010,7 @@ compute = compute_service()
 
 
 if __name__ == "__main__":
+    # TODO: move it to `get_vm_count.py` util file (used by lua job submit plugin)
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )

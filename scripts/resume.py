@@ -21,7 +21,6 @@ import collections
 import json
 import logging
 import os
-import sys
 import yaml
 from itertools import chain
 from pathlib import Path
@@ -29,7 +28,6 @@ from pathlib import Path
 import util
 from util import (
     chunked,
-    dirs,
     ensure_execute,
     execute_with_futures,
     get_insert_operations,
@@ -44,14 +42,9 @@ from util import (
 )
 from util import cfg, lkp, NSDict, TPU
 
-# from util import cfg, lkp, NSDict
 import slurm_gcp_plugins
 
-
-filename = Path(__file__).name
-LOGFILE = (Path(cfg.slurm_log_dir if cfg else ".") / filename).with_suffix(".log")
-
-log = logging.getLogger(filename)
+log = logging.getLogger()
 
 
 global_resume_data = None
@@ -631,12 +624,11 @@ def get_resume_file_data():
         return None
     resume_file = Path(SLURM_RESUME_FILE)
     resume_json = resume_file.read_text()
-    if args.loglevel == logging.DEBUG:
-        (dirs.scripts / "resume_data.json").write_text(resume_json)
+    log.debug(f"resume_json: {resume_json}")
     return NSDict(json.loads(resume_json))
 
 
-def main(nodelist, force=False):
+def main(nodelist):
     """main called when run as script"""
     log.debug(f"ResumeProgram {nodelist}")
     # Filter out nodes not in config.yaml
@@ -665,45 +657,12 @@ def main(nodelist, force=False):
         )
 
 
-parser = argparse.ArgumentParser(
-    description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-)
-parser.add_argument("nodelist", help="list of nodes to resume")
-parser.add_argument(
-    "--force",
-    "-f",
-    "--static",
-    action="store_true",
-    help="Force attempted creation of the nodelist, whether nodes are exclusive or not.",
-)
-parser.add_argument(
-    "--debug",
-    "-d",
-    dest="loglevel",
-    action="store_const",
-    const=logging.DEBUG,
-    default=logging.INFO,
-    help="Enable debugging output",
-)
-parser.add_argument(
-    "--trace-api",
-    "-t",
-    action="store_true",
-    help="Enable detailed api request output",
-)
-
-
 if __name__ == "__main__":
-    args = parser.parse_args()
-
-    if cfg.enable_debug_logging:
-        args.loglevel = logging.DEBUG
-    if args.trace_api:
-        cfg.extra_logging_flags = list(cfg.extra_logging_flags)
-        cfg.extra_logging_flags.append("trace_api")
-    util.chown_slurm(LOGFILE, mode=0o600)
-    util.config_root_logger(filename, level=args.loglevel, logfile=LOGFILE)
-    sys.excepthook = util.handle_exception
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("nodelist", help="list of nodes to resume")
+    args = util.init_logs_and_parse(parser)
 
     global_resume_data = get_resume_file_data()
-    main(args.nodelist, args.force)
+    main(args.nodelist)
