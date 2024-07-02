@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.5.10\]
+
+- Add support for building open source compliant NVIDIA drivers
+- Clean up partial method mutation of stdlib
+- Update slurm-gcp to allow for different universe domains and api endpoints
+
 ## \[6.5.9\]
 
 - Sync script files from bucket
