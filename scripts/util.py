@@ -204,6 +204,8 @@ def create_client_options(api: ApiEndpoint = None) -> ClientOptions:
     ep = None
     ver = endpoint_version(api)
     ud = universe_domain()
+    if ud == "googleapis.com":
+        ud = None
     if ver:
         ep = f"https://{api.value}.{ud}/{ver}/"
     log.debug(
