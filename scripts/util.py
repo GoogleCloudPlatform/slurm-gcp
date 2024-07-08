@@ -204,6 +204,8 @@ def create_client_options(api: ApiEndpoint = None) -> ClientOptions:
     ep = None
     ver = endpoint_version(api)
     ud = universe_domain()
+    if ud == "googleapis.com":
+        ud = None
     if ver:
         ep = f"https://{api.value}.{ud}/{ver}/"
     log.debug(
@@ -1519,6 +1521,7 @@ class TPU:
             "slurm_cluster_name": lkp.cfg.slurm_cluster_name,
             "slurm_bucket_path": lkp.cfg.bucket_path,
             "slurm_names": ";".join(slurm_names),
+            "universe_domain": universe_domain(),
         }
         node.tags = [lkp.cfg.slurm_cluster_name]
         if self.nodeset.service_account:
