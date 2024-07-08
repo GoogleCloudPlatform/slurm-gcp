@@ -1521,6 +1521,7 @@ class TPU:
             "slurm_cluster_name": lkp.cfg.slurm_cluster_name,
             "slurm_bucket_path": lkp.cfg.bucket_path,
             "slurm_names": ";".join(slurm_names),
+            "universe_domain": universe_domain(),
         }
         node.tags = [lkp.cfg.slurm_cluster_name]
         if self.nodeset.service_account:
