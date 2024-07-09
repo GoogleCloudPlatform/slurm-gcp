@@ -55,6 +55,15 @@ function devel::zip() {
 	echo "INFO: Updated permissions of files in '$SCRIPTS_DIR'."
 }
 
+function devel::pip_update() {
+	local REQUIREMENTS="$SCRIPTS_DIR/requirements.txt"
+	if [[ -f "$REQUIREMENTS" ]]; then
+		bash -c "PIP_BREAK_SYSTEM_PACKAGES=1 pip install -U pip"
+		bash -c "PIP_BREAK_SYSTEM_PACKAGES=1 PIP_IGNORE_INSTALLED=1 pip install -U -r \"$REQUIREMENTS\""
+		echo "INFO: Updated pip packages based on $REQUIREMENTS"
+	fi
+}
+
 function config() {
 	local BUCKET="$($CURL $URL/instance/attributes/slurm_bucket_path)"
 	if [[ -z $BUCKET ]]; then
@@ -111,6 +120,7 @@ SETUP_SCRIPT_FILE=$SCRIPTS_DIR/setup.py
 UTIL_SCRIPT_FILE=$SCRIPTS_DIR/util.py
 
 devel::zip
+devel::pip_update
 config
 
 if [ -f $FLAGFILE ]; then
