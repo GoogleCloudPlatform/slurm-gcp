@@ -209,27 +209,13 @@ def create_client_options(api: ApiEndpoint = None) -> ClientOptions:
     """Create client options for cloud endpoints"""
     ver = endpoint_version(api)
     ud = universe_domain()
-    co = ClientOptions()
+    options = {}
     if ud and ud != DEFAULT_UNIVERSE_DOMAIN:
-        try:
-            co.universe_domain = ud
-        except Exception:
-            log.error(
-                "Universe domain is not part of ClientOptions with installed version of google-api-core."
-            )
-            exit(1)
+        options["universe_domain"] = ud
     if ver:
-        co.api_endpoint = f"https://{api.value}.{ud}/{ver}/"
-    log.debug(
-        f"Using universe domain: {ud}. "
-        + (
-            f"For API: {api.value} using API endpoint: "
-            f"{co.api_endpoint if co.api_endpoint else 'default'}"
-            if api
-            else ""
-        )
-    )
-
+        options["api_endpoint"] = f"https://{api.value}.{ud}/{ver}/"
+    co = ClientOptions(**options)
+    log.debug(f"Using ClientOptions = {co} for API: {api.value}")
     return co
 
 
