@@ -47,12 +47,13 @@ locals {
     zone_policy_allow      = length(local.zones) > 0 ? setintersection(toset(data.google_compute_zones.available.names), local.zones) : toset(data.google_compute_zones.available.names)
     zone_policy_deny       = length(local.zones) > 0 ? setsubtract(toset(data.google_compute_zones.available.names), local.zones) : toset([])
     # Additional Features
-    reservation_name     = var.reservation_name
-    maintenance_interval = var.maintenance_interval
-    enable_placement     = var.enable_placement
-    enable_public_ip     = var.enable_public_ip
-    network_tier         = var.network_tier
-    network_storage      = var.network_storage
+    reservation_name      = var.reservation_name
+    maintenance_interval  = var.maintenance_interval
+    enable_placement      = var.enable_placement
+    enable_public_ip      = var.enable_public_ip
+    network_tier          = var.network_tier
+    network_storage       = var.network_storage
+    experimental_features = var.experimental_features
   }
 }
 

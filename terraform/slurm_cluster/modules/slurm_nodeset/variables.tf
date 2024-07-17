@@ -191,3 +191,10 @@ variable "network_storage" {
   }))
   default = []
 }
+
+
+variable "experimental_features" {
+  description = "Experimental features to enable on the nodes"
+  type        = any
+  default     = null
+}
