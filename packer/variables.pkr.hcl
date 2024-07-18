@@ -290,6 +290,12 @@ variable "on_host_maintenance" {
   default = "TERMINATE"
 }
 
+variable "ansible_command" {
+  description = "Specify an alternate ansible executable."
+  type        = string
+  default     = "ansible-playbook"
+}
+
 ###############################
 # CUSTOM ANSIBLE PROVISIONERS #
 ###############################

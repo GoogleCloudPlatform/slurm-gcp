@@ -127,6 +127,7 @@ build {
 
   ### provision Slurm ###
   provisioner "ansible" {
+    command       = "${var.ansible_command}"
     playbook_file = "${local.ansible_dir}/playbook.yml"
     galaxy_file   = "${local.ansible_dir}/requirements.yml"
     ansible_env_vars = [
@@ -145,6 +146,7 @@ build {
     for_each = var.extra_ansible_provisioners
 
     content {
+      command         = "${var.ansible_command}"
       playbook_file   = provisioner.value.playbook_file
       roles_path      = provisioner.value.galaxy_file
       extra_arguments = provisioner.value.extra_arguments
