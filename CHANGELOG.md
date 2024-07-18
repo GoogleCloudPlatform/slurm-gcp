@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## \[6.6.0\]
 
 - Upgrade Slurm to 23.11.8
+- Update NVIDIA driver to 550.90.07.
 
 ## \[6.5.10\]
 
