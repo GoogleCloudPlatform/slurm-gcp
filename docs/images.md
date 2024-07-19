@@ -72,22 +72,22 @@ For the [TPU](./glossary.md#tpu) nodes docker images are also released.
 
 |       Project        | Image Family                        | Arch   | Status         |
 | :------------------: | :---------------------------------- | :----- | :------------- |
-| schedmd-slurm-public | slurm-gcp-6-5-debian-11             | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-5-hpc-rocky-linux-8     | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-5-ubuntu-2004-lts       | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-5-ubuntu-2204-lts-arm64 | ARM64  | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-5-hpc-centos-7          | x86_64 | EOL 2024-01-01 |
+| schedmd-slurm-public | slurm-gcp-6-6-debian-11             | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-6-hpc-rocky-linux-8     | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-6-ubuntu-2004-lts       | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-6-ubuntu-2204-lts-arm64 | ARM64  | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-6-hpc-centos-7          | x86_64 | EOL 2024-01-01 |
 
 ### Published Docker Image Family
 
 |       Project        | Image Family                | Status    |
 | :------------------: | :-------------------------- | :-------- |
-| schedmd-slurm-public | tpu:slurm-gcp-6-5-tf-2.12.1 | Supported |
-| schedmd-slurm-public | tpu:slurm-gcp-6-5-tf-2.13.0 | Supported |
-| schedmd-slurm-public | tpu:slurm-gcp-6-5-tf-2.13.1 | Supported |
-| schedmd-slurm-public | tpu:slurm-gcp-6-5-tf-2.14.0 | Supported |
-| schedmd-slurm-public | tpu:slurm-gcp-6-5-tf-2.14.1 | Supported |
-| schedmd-slurm-public | tpu:slurm-gcp-6-5-tf-2.15.0 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-6-tf-2.12.1 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-6-tf-2.13.0 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-6-tf-2.13.1 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-6-tf-2.14.0 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-6-tf-2.14.1 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-6-tf-2.15.0 | Supported |
 
 ## Custom Image
 
