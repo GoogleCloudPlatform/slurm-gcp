@@ -31,22 +31,15 @@ UNIVERSE_DOMAIN="$($CURL $URL/instance/attributes/universe_domain)"
 STORAGE_CMD="CLOUDSDK_CORE_UNIVERSE_DOMAIN=$UNIVERSE_DOMAIN gcloud storage"
 
 function devel::zip() {
-	local BUCKET="$($CURL $URL/instance/attributes/slurm_bucket_path)"
-	if [[ -z $BUCKET ]]; then
-		echo "ERROR: No bucket path detected."
-		return 1
-	fi
-
 	local SLURM_ZIP_URL="$BUCKET/slurm-gcp-devel.zip"
 	local SLURM_ZIP_FILE="$HOME/slurm-gcp-devel.zip"
-	local SLURM_ZIP_DIR="$HOME/slurm-gcp-devel"
 	eval $(bash -c "$STORAGE_CMD cp $SLURM_ZIP_URL $SLURM_ZIP_FILE")
 	if ! [[ -f "$SLURM_ZIP_FILE" ]]; then
-		echo "INFO: No development files downloaded. Skipping."
-		return 0
+		echo "ERROR: Could not download SlurmGCP scripts."
+		return 1
 	fi
 	unzip -o "$SLURM_ZIP_FILE" -d "$SCRIPTS_DIR"
-	rm -rf "$SLURM_ZIP_FILE" "$SLURM_ZIP_DIR" # Clean up
+	rm -rf "$SLURM_ZIP_FILE"
 	echo "INFO: Finished inflating '$SLURM_ZIP_FILE'."
 
 	#temporary hack to not make the script fail on TPU vm
@@ -56,12 +49,6 @@ function devel::zip() {
 }
 
 function config() {
-	local BUCKET="$($CURL $URL/instance/attributes/slurm_bucket_path)"
-	if [[ -z $BUCKET ]]; then
-		echo "ERROR: No bucket path detected."
-		return 1
-	fi
-
 	local SLURM_CONFIG_URL="$BUCKET/config.yaml"
 	local SLURM_CONFIG_FILE="$SCRIPTS_DIR/config.yaml"
 	eval $(bash -c "$STORAGE_CMD cp $SLURM_CONFIG_URL $SLURM_CONFIG_FILE")
@@ -108,7 +95,12 @@ fi
 mkdir -p $SCRIPTS_DIR
 
 SETUP_SCRIPT_FILE=$SCRIPTS_DIR/setup.py
-UTIL_SCRIPT_FILE=$SCRIPTS_DIR/util.py
+
+BUCKET="$($CURL $URL/instance/attributes/slurm_bucket_path)"
+if [[ -z $BUCKET ]]; then
+	echo "ERROR: No bucket path detected."
+	exit 1
+fi
 
 devel::zip
 config
@@ -187,8 +179,6 @@ function fetch_feature {
 SLURMD_FEATURE="$(fetch_feature)"
 
 echo "INFO: Running python cluster setup script"
-chmod +x $SETUP_SCRIPT_FILE
-python3 $SCRIPTS_DIR/util.py
 if [[ -n "$SLURMD_FEATURE" ]]; then
 	echo "INFO: Running dynamic node setup."
 	exec $SETUP_SCRIPT_FILE --slurmd-feature="$SLURMD_FEATURE"
