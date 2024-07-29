@@ -229,19 +229,6 @@ def setup_munge_key():
     run("systemctl restart munge", timeout=30)
 
 
-def setup_nss_slurm():
-    """install and configure nss_slurm"""
-    # setup nss_slurm
-    util.mkdirp(Path("/var/spool/slurmd"))
-    run(
-        "ln -s {}/lib/libnss_slurm.so.2 /usr/lib64/libnss_slurm.so.2".format(
-            slurmdirs.prefix
-        ),
-        check=False,
-    )
-    run(r"sed -i 's/\(^\(passwd\|group\):\s\+\)/\1slurm /g' /etc/nsswitch.conf")
-
-
 def setup_sudoers():
     content = """
 # Allow SlurmUser to manage the slurm daemons
@@ -452,7 +439,6 @@ def setup_compute(args):
     update_system_config("slurmd", sysconf)
     install_custom_scripts()
 
-    setup_nss_slurm()
     setup_network_storage(log)
 
     has_gpu = run("lspci | grep --ignore-case 'NVIDIA' | wc -l", shell=True).returncode
