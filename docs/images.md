@@ -69,11 +69,11 @@ that are minimal viable images for deploying
 
 |       Project        | Image Family                         | Arch   | Status         |
 | :------------------: | :----------------------------------- | :----- | :------------- |
-| schedmd-slurm-public | slurm-gcp-5-11-debian-11             | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-5-11-hpc-rocky-linux-8     | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-5-11-ubuntu-2004-lts       | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-5-11-ubuntu-2204-lts-arm64 | ARM64  | Supported      |
-| schedmd-slurm-public | slurm-gcp-5-11-hpc-centos-7          | x86_64 | EOL 2024-01-01 |
+| schedmd-slurm-public | slurm-gcp-5-12-debian-11             | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-5-12-hpc-rocky-linux-8     | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-5-12-ubuntu-2004-lts       | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-5-12-ubuntu-2204-lts-arm64 | ARM64  | Supported      |
+| schedmd-slurm-public | slurm-gcp-5-12-hpc-centos-7          | x86_64 | EOL 2024-01-01 |
 
 ## Custom Image
 

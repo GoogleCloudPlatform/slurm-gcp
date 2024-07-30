@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[5.12.0\]
+
+- Update NVIDIA driver version to 550.90.07 which includes CVE fix.
+
 ## \[5.11.1\]
 
 - Update NVIDIA driver to match latest v6 release
