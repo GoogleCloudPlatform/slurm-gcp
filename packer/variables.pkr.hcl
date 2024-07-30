@@ -109,7 +109,7 @@ This value can be:
 > NOTE: Use prefix 'b:' to install via 'git checkout' instead of archive.
 EOD
   type        = string
-  default     = "23.11.7"
+  default     = "23.11.8"
 
   validation {
     condition     = can(regex("^(?P<major>\\d{2})\\.(?P<minor>\\d{2})(?P<end>\\.(?P<patch>\\d+)(?P<sub>-(?P<rev>\\d+\\w*))?|\\-(?P<meta>latest))$|^b:(?P<branch>.+)$", var.slurm_version))
@@ -299,6 +299,12 @@ variable "disk_type" {
 variable "on_host_maintenance" {
   type    = string
   default = "TERMINATE"
+}
+
+variable "ansible_command" {
+  description = "Specify an alternate ansible executable."
+  type        = string
+  default     = "ansible-playbook"
 }
 
 ###############################

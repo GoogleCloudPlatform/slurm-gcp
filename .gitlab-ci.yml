@@ -16,7 +16,6 @@ stages:
 
 variables:
   GOOGLE_APPLICATION_CREDENTIALS: $CI_PROJECT_DIR/sa.json
-  SLURM_VERSION: 23.11.7
   BRANCH: $CI_COMMIT_BRANCH
 
 default:
@@ -31,8 +30,6 @@ default:
   - GCP_SA_EMAIL=$(jq -r .client_email < $GOOGLE_APPLICATION_CREDENTIALS)
   - GCP_SA_ID=$(jq -r .client_id < $GOOGLE_APPLICATION_CREDENTIALS)
 
-  - 'echo Slurm version to build: $SLURM_VERSION'
-  - SLURM_VERSION_ALT=$(tr \. - <<< $SLURM_VERSION)
   - IMAGE_FAMILY_ROOT=slurm-gcp-$BRANCH
 
   - gcloud auth activate-service-account --key-file $GOOGLE_APPLICATION_CREDENTIALS
@@ -52,7 +49,6 @@ default:
   - >
     packer build -var-file builds/$IMAGE_OS.hcl
     -var "project_id=$GCP_PROJECT_ID"
-    -var "slurm_version=$SLURM_VERSION"
     -var "slurmgcp_version=$BRANCH"
     $EXTRA_VARS
     .
