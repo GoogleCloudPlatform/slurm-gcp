@@ -169,19 +169,6 @@ EOF
 
 tpu_setup #will do nothing for normal nodes or the container spawned inside TPU
 
-function fetch_feature {
-	if slurmd_feature="$($CURL $URL/instance/attributes/slurmd_feature)"; then
-		echo "$slurmd_feature"
-	else
-		echo ""
-	fi
-}
-SLURMD_FEATURE="$(fetch_feature)"
-
 echo "INFO: Running python cluster setup script"
-if [[ -n "$SLURMD_FEATURE" ]]; then
-	echo "INFO: Running dynamic node setup."
-	exec $SETUP_SCRIPT_FILE --slurmd-feature="$SLURMD_FEATURE"
-else
-	exec $SETUP_SCRIPT_FILE
-fi
+chmod +x $SETUP_SCRIPT_FILE
+exec $SETUP_SCRIPT_FILE
