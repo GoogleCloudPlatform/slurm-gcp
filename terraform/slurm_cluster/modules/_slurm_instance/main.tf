@@ -20,9 +20,13 @@
 ##########
 
 locals {
-  _hostname  = var.hostname == "" ? "default" : var.hostname
-  _hostnames = [for index in range(local.num_instances) : var.add_hostname_suffix ? format("%s%s%s", local._hostname, var.hostname_suffix_separator, format("%03d", index + 1)) : local._hostname]
-  // hostname      = var.hostname == "" ? "default" : var.hostname
+  _hostnames = [
+    for index in range(local.num_instances) : (
+      var.add_hostname_suffix
+      ? format("%s%s%s", var.hostname, "-", format("%03d", index + 1))
+      : var.hostname
+    )
+  ]
 
   num_instances = length(var.static_ips) == 0 ? var.num_instances : length(var.static_ips)
 
@@ -41,16 +45,15 @@ locals {
     concat(
       [
         {
-          access_config      = var.access_config
-          alias_ip_range     = []
-          ipv6_access_config = []
-          network            = var.network
-          network_ip         = length(var.static_ips) == 0 ? "" : element(local.static_ips, index)
-          nic_type           = null
-          queue_count        = null
-          stack_type         = null
-          subnetwork         = var.subnetwork
-          subnetwork_project = var.subnetwork_project
+          access_config        = var.access_config
+          alias_ip_range       = []
+          ipv6_access_config   = []
+          network              = var.network
+          network_ip           = length(var.static_ips) == 0 ? "" : element(local.static_ips, index)
+          nic_type             = null
+          queue_count          = null
+          stack_type           = null
+          subnetwork_self_link = var.subnetwork_self_link
         }
       ],
       var.additional_networks
@@ -66,7 +69,7 @@ locals {
             # generate unique name for ip address name based on hostname and index in the list
             # regrettably, can't use anything derived from network / subnetwork here, as those are known
             # only after apply
-            ip_address_name = "${local._hostnames[index]}-nic${nic_ind}"
+            ip_address_name = "${var.slurm_cluster_name}-${local._hostnames[index]}-nic${nic_ind}"
           }
         )
       ]
@@ -138,12 +141,11 @@ resource "google_compute_instance_from_template" "slurm_instance" {
           network_tier = access_config.value.network_tier
         }
       }
-      network            = nic.value.network
-      network_ip         = google_compute_address.static_ip[nic.value.ip_address_name].address
-      nic_type           = nic.value.nic_type
-      queue_count        = nic.value.queue_count
-      subnetwork         = nic.value.subnetwork
-      subnetwork_project = nic.value.subnetwork_project
+      network     = nic.value.network
+      network_ip  = var.disable_address_reservation ? nic.value.network_ip : google_compute_address.static_ip[nic.value.ip_address_name].address
+      nic_type    = nic.value.nic_type
+      queue_count = nic.value.queue_count
+      subnetwork  = nic.value.subnetwork_self_link
     }
   }
 
@@ -179,13 +181,13 @@ resource "google_compute_instance_from_template" "slurm_instance" {
 ##############
 
 resource "google_compute_address" "static_ip" {
-  for_each = {
+  for_each = var.disable_address_reservation ? {} : {
     for nic in flatten(
       [for net_cfg in local.network_config : [for nic in net_cfg.network_interfaces : nic]]
     ) : nic.ip_address_name => nic
   }
   name         = each.value.ip_address_name
-  subnetwork   = each.value.subnetwork
+  subnetwork   = each.value.subnetwork_self_link
   address_type = "INTERNAL"
   region       = var.region
   address      = each.value.network_ip

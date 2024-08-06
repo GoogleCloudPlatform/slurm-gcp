@@ -35,12 +35,6 @@ variable "subnetwork" {
   default     = ""
 }
 
-variable "subnetwork_project" {
-  type        = string
-  description = "The project that subnetwork belongs to."
-  default     = ""
-}
-
 variable "region" {
   type        = string
   description = "Region where the instances should be created."

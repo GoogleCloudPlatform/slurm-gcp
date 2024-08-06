@@ -27,22 +27,21 @@ variable "network" {
   default     = ""
 }
 
-variable "subnetwork" {
+variable "subnetwork_self_link" {
   description = "Subnet to deploy to. Only one of network or subnetwork should be specified."
   type        = string
   default     = ""
 }
 
-variable "subnetwork_project" {
-  description = "The project that subnetwork belongs to"
-  type        = string
-  default     = ""
-}
+# variable "subnetwork_project" {
+#   description = "The project that subnetwork belongs to"
+#   type        = string
+#   default     = ""
+# }
 
 variable "hostname" {
   description = "Hostname of instances"
   type        = string
-  default     = ""
 }
 
 variable "add_hostname_suffix" {
@@ -66,15 +65,20 @@ variable "additional_networks" {
     ipv6_access_config = optional(list(object({
       network_tier = string
     })), [])
-    network            = optional(string)
-    network_ip         = optional(string, "")
-    nic_type           = optional(string)
-    queue_count        = optional(number)
-    stack_type         = optional(string)
-    subnetwork         = optional(string)
-    subnetwork_project = optional(string)
+    network              = optional(string)
+    network_ip           = optional(string, "")
+    nic_type             = optional(string)
+    queue_count          = optional(number)
+    stack_type           = optional(string)
+    subnetwork_self_link = optional(string)
   }))
   nullable = false
+}
+
+variable "disable_address_reservation" {
+  type        = bool
+  description = "Disable reserving IP addresses in network for instance"
+  default     = false
 }
 
 variable "static_ips" {
@@ -113,12 +117,6 @@ variable "zone" {
   description = "Zone where the instances should be created. If not specified, instances will be spread across available zones in the region."
   type        = string
   default     = null
-}
-
-variable "hostname_suffix_separator" {
-  description = "Separator character to compose hostname when add_hostname_suffix is set to true."
-  type        = string
-  default     = "-"
 }
 
 variable "metadata" {

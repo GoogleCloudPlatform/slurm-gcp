@@ -38,19 +38,18 @@ locals {
 module "slurm_login_instance" {
   source = "../_slurm_instance"
 
-  access_config       = var.enable_public_ip ? [local.access_config] : []
-  additional_networks = var.additional_networks
-  add_hostname_suffix = true
-  hostname            = "${var.slurm_cluster_name}-login-${var.suffix}"
-  instance_template   = var.instance_template
-  network             = var.network
-  num_instances       = var.num_instances
-  project_id          = var.project_id
-  region              = local.region
-  slurm_cluster_name  = var.slurm_cluster_name
-  slurm_instance_role = "login"
-  static_ips          = var.static_ips
-  subnetwork_project  = var.subnetwork_project
-  subnetwork          = var.subnetwork
-  zone                = var.zone
+  access_config        = var.enable_public_ip ? [local.access_config] : []
+  additional_networks  = var.additional_networks
+  add_hostname_suffix  = true
+  hostname             = "${var.slurm_cluster_name}-login-${var.suffix}"
+  instance_template    = var.instance_template
+  network              = var.network
+  num_instances        = var.num_instances
+  project_id           = var.project_id
+  region               = local.region
+  slurm_cluster_name   = var.slurm_cluster_name
+  slurm_instance_role  = "login"
+  static_ips           = var.static_ips
+  subnetwork_self_link = var.subnetwork
+  zone                 = var.zone
 }
