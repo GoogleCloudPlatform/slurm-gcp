@@ -25,43 +25,7 @@ fi
 
 METADATA_SERVER="metadata.google.internal"
 URL="http://$METADATA_SERVER/computeMetadata/v1"
-HEADER="Metadata-Flavor:Google"
-CURL="curl -sS --fail --header $HEADER"
-UNIVERSE_DOMAIN="$($CURL $URL/instance/attributes/universe_domain)"
-STORAGE_CMD="CLOUDSDK_CORE_UNIVERSE_DOMAIN=$UNIVERSE_DOMAIN gcloud storage"
-
-function devel::zip() {
-	local SLURM_ZIP_URL="$BUCKET/slurm-gcp-devel.zip"
-	local SLURM_ZIP_FILE="$HOME/slurm-gcp-devel.zip"
-	eval $(bash -c "$STORAGE_CMD cp $SLURM_ZIP_URL $SLURM_ZIP_FILE")
-	if ! [[ -f "$SLURM_ZIP_FILE" ]]; then
-		echo "ERROR: Could not download SlurmGCP scripts."
-		return 1
-	fi
-	unzip -o "$SLURM_ZIP_FILE" -d "$SCRIPTS_DIR"
-	rm -rf "$SLURM_ZIP_FILE"
-	echo "INFO: Finished inflating '$SLURM_ZIP_FILE'."
-
-	#temporary hack to not make the script fail on TPU vm
-	chown slurm:slurm -R "$SCRIPTS_DIR" || true
-	chmod 700 -R "$SCRIPTS_DIR"
-	echo "INFO: Updated permissions of files in '$SCRIPTS_DIR'."
-}
-
-function config() {
-	local SLURM_CONFIG_URL="$BUCKET/config.yaml"
-	local SLURM_CONFIG_FILE="$SCRIPTS_DIR/config.yaml"
-	eval $(bash -c "$STORAGE_CMD cp $SLURM_CONFIG_URL $SLURM_CONFIG_FILE")
-	if ! [[ -f "$SLURM_CONFIG_FILE" ]]; then
-		echo "INFO: No config file downloaded. Skipping."
-		return 0
-	fi
-
-	#temporary hack to not make the script fail on TPU vm
-	chown slurm:slurm -R "$SLURM_CONFIG_FILE" || true
-	chmod 600 -R "$SLURM_CONFIG_FILE"
-	echo "INFO: Updated permissions of '$SLURM_CONFIG_FILE'."
-}
+CURL="curl -sS --fail --header Metadata-Flavor:Google"
 
 PING_METADATA="ping -q -w1 -c1 $METADATA_SERVER"
 echo "INFO: $PING_METADATA"
@@ -78,8 +42,7 @@ else
     echo "INFO: Successfully contacted metadata server"
 fi
 
-GOOGLE_DNS=8.8.8.8
-PING_GOOGLE="ping -q -w1 -c1 $GOOGLE_DNS"
+PING_GOOGLE="ping -q -w1 -c1 8.8.8.8"
 echo "INFO: $PING_GOOGLE"
 for i in $(seq 5); do
     [ $i -gt 1 ] && sleep 2;
@@ -93,17 +56,26 @@ else
 fi
 
 mkdir -p $SCRIPTS_DIR
-
-SETUP_SCRIPT_FILE=$SCRIPTS_DIR/setup.py
-
+UNIVERSE_DOMAIN="$($CURL $URL/instance/attributes/universe_domain)"
 BUCKET="$($CURL $URL/instance/attributes/slurm_bucket_path)"
 if [[ -z $BUCKET ]]; then
 	echo "ERROR: No bucket path detected."
 	exit 1
 fi
+STORAGE_CMD="CLOUDSDK_CORE_UNIVERSE_DOMAIN=$UNIVERSE_DOMAIN gcloud storage"
+SCRIPTS_ZIP="$HOME/slurm-gcp-scripts.zip"
+eval $(bash -c "$STORAGE_CMD cp $BUCKET/slurm-gcp-devel.zip $SCRIPTS_ZIP")
+if ! [[ -f "$SCRIPTS_ZIP" ]]; then
+	echo "ERROR: Could not download SlurmGCP scripts."
+	exit 1
+fi
+unzip -o "$SCRIPTS_ZIP" -d "$SCRIPTS_DIR"
+rm -rf "$SCRIPTS_ZIP"
 
-devel::zip
-config
+#temporary hack to not make the script fail on TPU vm
+chown slurm:slurm -R "$SCRIPTS_DIR" || true
+chmod 700 -R "$SCRIPTS_DIR"
+
 
 if [ -f $FLAGFILE ]; then
 	echo "WARNING: Slurm was previously configured, quitting"
@@ -170,5 +142,6 @@ EOF
 tpu_setup #will do nothing for normal nodes or the container spawned inside TPU
 
 echo "INFO: Running python cluster setup script"
+SETUP_SCRIPT_FILE=$SCRIPTS_DIR/setup.py
 chmod +x $SETUP_SCRIPT_FILE
 exec $SETUP_SCRIPT_FILE
