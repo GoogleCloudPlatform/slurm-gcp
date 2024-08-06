@@ -112,8 +112,7 @@ module "instance_template" {
   network                     = var.network
   nic_type                    = local.nic_type
   region                      = var.region
-  subnetwork_project          = var.subnetwork_project
-  subnetwork                  = var.subnetwork
+  subnetwork_self_link        = var.subnetwork_self_link
   tags                        = var.tags
   total_egress_bandwidth_tier = local.total_egress_bandwidth_tier
   additional_networks         = var.additional_networks

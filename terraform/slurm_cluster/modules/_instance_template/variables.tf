@@ -191,14 +191,8 @@ variable "nic_type" {
   default     = null
 }
 
-variable "subnetwork" {
-  description = "The name of the subnetwork to attach this interface to. The subnetwork must exist in the same region this instance will be created in. Either network or subnetwork must be provided."
-  type        = string
-  default     = ""
-}
-
-variable "subnetwork_project" {
-  description = "The ID of the project in which the subnetwork belongs. If it is not provided, the provider project is used."
+variable "subnetwork_self_link" {
+  description = "The subnetwork self-link to attach this interface to. The subnetwork must exist in the same region this instance will be created in. Either network or subnetwork must be provided."
   type        = string
   default     = ""
 }
@@ -219,10 +213,9 @@ variable "additional_networks" {
   description = "Additional network interface details for GCE, if any."
   default     = []
   type = list(object({
-    network            = string
-    subnetwork         = string
-    subnetwork_project = string
-    network_ip         = string
+    network              = string
+    subnetwork_self_link = string
+    network_ip           = string
     access_config = list(object({
       nat_ip       = string
       network_tier = string
