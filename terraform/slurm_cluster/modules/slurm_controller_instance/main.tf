@@ -64,7 +64,6 @@ module "slurm_controller_instance" {
   slurm_cluster_name  = var.slurm_cluster_name
   slurm_instance_role = "controller"
   static_ips          = var.static_ips
-  subnetwork_project  = var.subnetwork_project
   subnetwork          = var.subnetwork
   zone                = var.zone
 
