@@ -27,17 +27,11 @@ variable "network" {
   default     = ""
 }
 
-variable "subnetwork_self_link" {
-  description = "Subnet to deploy to. Only one of network or subnetwork should be specified."
+variable "subnetwork" {
+  description = "Subnetwork self-link to deploy to. Only one of network or subnetwork should be specified."
   type        = string
   default     = ""
 }
-
-# variable "subnetwork_project" {
-#   description = "The project that subnetwork belongs to"
-#   type        = string
-#   default     = ""
-# }
 
 variable "hostname" {
   description = "Hostname of instances"
@@ -65,12 +59,12 @@ variable "additional_networks" {
     ipv6_access_config = optional(list(object({
       network_tier = string
     })), [])
-    network              = optional(string)
-    network_ip           = optional(string, "")
-    nic_type             = optional(string)
-    queue_count          = optional(number)
-    stack_type           = optional(string)
-    subnetwork_self_link = optional(string)
+    network     = optional(string)
+    network_ip  = optional(string, "")
+    nic_type    = optional(string)
+    queue_count = optional(number)
+    stack_type  = optional(string)
+    subnetwork  = optional(string)
   }))
   nullable = false
 }

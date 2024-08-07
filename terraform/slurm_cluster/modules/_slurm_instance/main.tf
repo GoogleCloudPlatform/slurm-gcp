@@ -45,15 +45,15 @@ locals {
     concat(
       [
         {
-          access_config        = var.access_config
-          alias_ip_range       = []
-          ipv6_access_config   = []
-          network              = var.network
-          network_ip           = length(var.static_ips) == 0 ? "" : element(local.static_ips, index)
-          nic_type             = null
-          queue_count          = null
-          stack_type           = null
-          subnetwork_self_link = var.subnetwork_self_link
+          access_config      = var.access_config
+          alias_ip_range     = []
+          ipv6_access_config = []
+          network            = var.network
+          network_ip         = length(var.static_ips) == 0 ? "" : element(local.static_ips, index)
+          nic_type           = null
+          queue_count        = null
+          stack_type         = null
+          subnetwork         = var.subnetwork
         }
       ],
       var.additional_networks
@@ -145,7 +145,7 @@ resource "google_compute_instance_from_template" "slurm_instance" {
       network_ip  = var.disable_address_reservation ? nic.value.network_ip : google_compute_address.static_ip[nic.value.ip_address_name].address
       nic_type    = nic.value.nic_type
       queue_count = nic.value.queue_count
-      subnetwork  = nic.value.subnetwork_self_link
+      subnetwork  = nic.value.subnetwork
     }
   }
 
@@ -187,7 +187,7 @@ resource "google_compute_address" "static_ip" {
     ) : nic.ip_address_name => nic
   }
   name         = each.value.ip_address_name
-  subnetwork   = each.value.subnetwork_self_link
+  subnetwork   = each.value.subnetwork
   address_type = "INTERNAL"
   region       = var.region
   address      = each.value.network_ip

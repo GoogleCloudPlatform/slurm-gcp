@@ -54,18 +54,18 @@ data "google_compute_instance_template" "controller_template" {
 module "slurm_controller_instance" {
   source = "../_slurm_instance"
 
-  access_config        = var.enable_public_ip ? [local.access_config] : []
-  add_hostname_suffix  = false
-  hostname             = "${var.slurm_cluster_name}-controller"
-  instance_template    = var.instance_template
-  network              = var.network
-  project_id           = var.project_id
-  region               = local.region
-  slurm_cluster_name   = var.slurm_cluster_name
-  slurm_instance_role  = "controller"
-  static_ips           = var.static_ips
-  subnetwork_self_link = var.subnetwork
-  zone                 = var.zone
+  access_config       = var.enable_public_ip ? [local.access_config] : []
+  add_hostname_suffix = false
+  hostname            = "${var.slurm_cluster_name}-controller"
+  instance_template   = var.instance_template
+  network             = var.network
+  project_id          = var.project_id
+  region              = local.region
+  slurm_cluster_name  = var.slurm_cluster_name
+  slurm_instance_role = "controller"
+  static_ips          = var.static_ips
+  subnetwork          = var.subnetwork
+  zone                = var.zone
 
   metadata = var.metadata
 

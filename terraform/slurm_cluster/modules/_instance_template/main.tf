@@ -110,7 +110,7 @@ resource "google_compute_instance_template" "tpl" {
 
   network_interface {
     network    = var.network
-    subnetwork = var.subnetwork_self_link
+    subnetwork = var.subnetwork
     network_ip = length(var.network_ip) > 0 ? var.network_ip : null
     nic_type   = local.nic_type
     stack_type = var.stack_type
@@ -140,7 +140,7 @@ resource "google_compute_instance_template" "tpl" {
     for_each = var.additional_networks
     content {
       network    = network_interface.value.network
-      subnetwork = network_interface.value.subnetwork_self_link
+      subnetwork = network_interface.value.subnetwork
       network_ip = length(network_interface.value.network_ip) > 0 ? network_interface.value.network_ip : null
       dynamic "access_config" {
         for_each = network_interface.value.access_config
