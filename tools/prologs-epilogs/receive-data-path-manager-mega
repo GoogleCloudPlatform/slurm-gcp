@@ -30,8 +30,8 @@ fi
 # ensure that dmabuf-import-helper is loaded
 modprobe import-helper
 
-NCCL_PLUGIN_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.2
-RXDM_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.8
+NCCL_PLUGIN_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.4
+RXDM_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.10
 RXDM_CONTAINER=receive-datapath-manager-"${SLURM_JOB_ID}"
 if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 	docker container list --filter "name=receive-datapath-manager-*" --quiet | xargs --no-run-if-empty docker container stop
@@ -57,6 +57,14 @@ if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 		--env LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib64:/var/lib/tcpxo/lib64 \
 		${NCCL_PLUGIN_IMAGE} \
 		install
+
+	# Modify NCCL env vars for Debian 12
+	cat >> /var/lib/tcpxo/lib64/nccl-env-profile.sh  <<- EOF
+export NCCL_FASTRAK_CTRL_DEV=enp0s12
+export NCCL_FASTRAK_IFNAME=enp6s0,enp7s0,enp13s0,enp14s0,enp134s0,enp135s0,enp141s0,enp142s0
+export NCCL_SOCKET_IFNAME=enp0s12
+export NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY=/dev/aperture_devices
+EOF
 
 	# Start FasTrak receive-datapath-manager
 	docker run \
