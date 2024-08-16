@@ -62,13 +62,13 @@ if [[ -z $BUCKET ]]; then
 	echo "ERROR: No bucket path detected."
 	exit 1
 fi
-STORAGE_CMD="CLOUDSDK_CORE_UNIVERSE_DOMAIN=$UNIVERSE_DOMAIN gcloud storage"
+
 SCRIPTS_ZIP="$HOME/slurm-gcp-scripts.zip"
-eval $(bash -c "$STORAGE_CMD cp $BUCKET/slurm-gcp-devel.zip $SCRIPTS_ZIP")
-if ! [[ -f "$SCRIPTS_ZIP" ]]; then
-	echo "ERROR: Could not download SlurmGCP scripts."
-	exit 1
-fi
+export CLOUDSDK_CORE_UNIVERSE_DOMAIN="$UNIVERSE_DOMAIN"
+until gcloud storage cp "$BUCKET/slurm-gcp-devel.zip" "$SCRIPTS_ZIP"; do
+	echo "WARN: Could not download SlurmGCP scripts, retrying in 5 seconds."
+	sleep 5
+done
 unzip -o "$SCRIPTS_ZIP" -d "$SCRIPTS_DIR"
 rm -rf "$SCRIPTS_ZIP"
 
