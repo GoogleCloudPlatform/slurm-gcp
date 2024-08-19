@@ -40,21 +40,9 @@ if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
         gcloud auth configure-docker --quiet us-docker.pkg.dev 2>&1 &>/dev/null
 
 	# Install the nccl, nccl-net lib into /var/lib/tcpxo/lib64/.
-	docker run --rm --gpus all --name nccl-installer --network=host --cap-add=NET_ADMIN \
+	docker run --rm --name nccl-installer \
 		--pull=always \
 		--volume /var/lib:/var/lib \
-		--device /dev/nvidia0:/dev/nvidia0 \
-		--device /dev/nvidia1:/dev/nvidia1 \
-		--device /dev/nvidia2:/dev/nvidia2 \
-		--device /dev/nvidia3:/dev/nvidia3 \
-		--device /dev/nvidia4:/dev/nvidia4 \
-		--device /dev/nvidia5:/dev/nvidia5 \
-		--device /dev/nvidia6:/dev/nvidia6 \
-		--device /dev/nvidia7:/dev/nvidia7 \
-		--device /dev/nvidia-uvm:/dev/nvidia-uvm \
-		--device /dev/nvidiactl:/dev/nvidiactl \
-		--device /dev/dmabuf_import_helper:/dev/dmabuf_import_helper \
-		--env LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib64:/var/lib/tcpxo/lib64 \
 		${NCCL_PLUGIN_IMAGE} \
 		install
 
