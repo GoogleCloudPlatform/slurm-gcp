@@ -58,13 +58,17 @@ if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 		${NCCL_PLUGIN_IMAGE} \
 		install
 
-	# Modify NCCL env vars for Debian 12
-	cat >> /var/lib/tcpxo/lib64/nccl-env-profile.sh  <<- EOF
+	# Modify NCCL env vars for Debian 12. 
+	# /var/lib/tcpxo/lib64/nccl-env-profile.sh is written by the nccl-installer container
+	# above, and assumes interface names of eth{0..8}.
+	if (grep -q "ID=debian" /etc/os-release && lsb_release -rs | grep -q "12"); then
+		cat >> /var/lib/tcpxo/lib64/nccl-env-profile.sh  <<- EOF
 export NCCL_FASTRAK_CTRL_DEV=enp0s12
 export NCCL_FASTRAK_IFNAME=enp6s0,enp7s0,enp13s0,enp14s0,enp134s0,enp135s0,enp141s0,enp142s0
 export NCCL_SOCKET_IFNAME=enp0s12
 export NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY=/dev/aperture_devices
 EOF
+	fi
 
 	# Start FasTrak receive-datapath-manager
 	docker run \
