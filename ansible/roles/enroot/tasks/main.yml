@@ -1,0 +1,56 @@
+---
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- name: Include OS Family Dependent Vars
+  ansible.builtin.include_vars: '{{ item }}'
+  with_first_found:
+  - '{{ ansible_os_family|lower }}.yml'
+
+- name: Check if enroot is installed
+  ansible.builtin.stat:
+    path: "{{ enroot_installation_path }}/bin/enroot"
+  register: enroot_binary
+
+- name: Install enroot
+  when: not enroot_binary.stat.exists
+  block:
+  - name: Wait for DPKG Locks
+    ansible.builtin.shell: >
+      while fuser /var/lib/dpkg/{{ item }} >/dev/null 2>&1; do
+        sleep 5
+      done
+    with_items:
+    - lock
+    - lock-frontend
+    when:
+    - ansible_os_family == 'Debian'
+
+  - name: Install enroot build dependencies
+    ansible.builtin.package:
+      name: '{{ enroot_build_dependencies }}'
+      state: present
+
+  - name: Download enroot
+    ansible.builtin.git:
+      repo: '{{ enroot_url }}'
+      version: '{{ enroot_version }}'
+      dest: '{{ paths.build }}/enroot'
+      recursive: true
+
+  - name: Build enroot
+    ansible.builtin.shell: |
+      cd {{ paths.build }}/enroot
+      prefix={{ enroot_installation_path}} sysconfdir=/etc make -j {{ ansible_processor_vcpus }} install
+      make setcap
