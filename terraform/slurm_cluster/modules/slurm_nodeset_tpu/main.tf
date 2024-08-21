@@ -74,18 +74,9 @@ locals {
   }
 
   service_account = {
-    email  = coalesce(data.google_service_account.this.email, data.google_compute_default_service_account.this.email)
+    email  = try(var.service_account.email, null)
     scopes = try(var.service_account.scopes, ["https://www.googleapis.com/auth/cloud-platform"])
   }
-}
-
-data "google_service_account" "this" {
-  account_id = coalesce(try(var.service_account.email, null), "NOT_SERVICE_ACCOUNT")
-  project    = var.project_id
-}
-
-data "google_compute_default_service_account" "this" {
-  project = var.project_id
 }
 
 data "google_compute_subnetwork" "nodeset_subnetwork" {
