@@ -27,7 +27,6 @@ limitations under the License.
 
 | Name | Version |
 |------|---------|
-| <a name="provider_google"></a> [google](#provider\_google) | >= 3.53 |
 | <a name="provider_local"></a> [local](#provider\_local) | ~> 2.0 |
 
 ## Modules
@@ -40,8 +39,6 @@ limitations under the License.
 
 | Name | Type |
 |------|------|
-| [google_compute_default_service_account.this](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/compute_default_service_account) | data source |
-| [google_service_account.this](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/service_account) | data source |
 | [local_file.startup](https://registry.terraform.io/providers/hashicorp/local/latest/docs/data-sources/file) | data source |
 
 ## Inputs

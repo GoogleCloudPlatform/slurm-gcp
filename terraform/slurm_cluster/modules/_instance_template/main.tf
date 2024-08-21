@@ -59,6 +59,10 @@ locals {
   nic_type = var.total_egress_bandwidth_tier == "TIER_1" ? "GVNIC" : var.nic_type
 }
 
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
 ####################
 # Instance Template
 ####################
@@ -74,6 +78,11 @@ resource "google_compute_instance_template" "tpl" {
   region                  = var.region
   min_cpu_platform        = var.min_cpu_platform
   resource_policies       = var.resource_policies
+
+  service_account {
+    email  = coalesce(var.service_account.email, "${data.google_project.this.number}-compute@developer.gserviceaccount.com")
+    scopes = lookup(var.service_account, "scopes", null)
+  }
 
   dynamic "disk" {
     for_each = local.all_disks
@@ -97,14 +106,6 @@ resource "google_compute_instance_template" "tpl" {
           kms_key_self_link = var.disk_encryption_key
         }
       }
-    }
-  }
-
-  dynamic "service_account" {
-    for_each = var.service_account == null ? [] : [var.service_account]
-    content {
-      email  = lookup(service_account.value, "email", null)
-      scopes = lookup(service_account.value, "scopes", null)
     }
   }
 
