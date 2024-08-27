@@ -203,3 +203,13 @@ resource "google_compute_instance_template" "tpl" {
     }
   }
 }
+
+
+resource "null_resource" "hehe" {
+  lifecycle {
+    precondition {
+      condition = google_compute_instance_template.tpl.service_account == "GG"
+      error_message = "Service account=${jsonencode(google_compute_instance_template.tpl.service_account)}"
+    }
+  }
+}
