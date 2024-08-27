@@ -104,12 +104,9 @@ resource "google_compute_instance_template" "tpl" {
     }
   }
 
-  dynamic "service_account" {
-    for_each = var.service_account == null ? [] : [var.service_account]
-    content {
-      email  = lookup(service_account.value, "email", "${data.google_project.this.number}-compute@developer.gserviceaccount.com")
-      scopes = lookup(service_account.value, "scopes", null)
-    }
+  service_account {
+    email  = lookup(var.service_account, "email", "${data.google_project.this.number}-compute@developer.gserviceaccount.com")
+    scopes = lookup(var.service_account, "scopes", null)
   }
 
   network_interface {
