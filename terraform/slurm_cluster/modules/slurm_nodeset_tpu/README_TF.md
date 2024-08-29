@@ -39,9 +39,7 @@ No modules.
 | Name | Type |
 |------|------|
 | [null_resource.nodeset_tpu](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [google_compute_default_service_account.this](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/compute_default_service_account) | data source |
 | [google_compute_subnetwork.nodeset_subnetwork](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/compute_subnetwork) | data source |
-| [google_service_account.this](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/service_account) | data source |
 
 ## Inputs
 
