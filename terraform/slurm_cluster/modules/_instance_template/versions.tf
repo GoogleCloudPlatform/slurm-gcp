@@ -23,7 +23,7 @@ terraform {
       version = ">= 3.88"
     }
     google-private = {
-      source  = "hashicorp/google"
+      source  = "hashicorp/google-private"
       version = ">= 1.0.0"
     }
   }

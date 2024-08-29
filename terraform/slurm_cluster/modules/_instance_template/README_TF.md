@@ -44,7 +44,7 @@ No modules.
 
 | Name | Type |
 |------|------|
-| [google-private_google_compute_instance_template.tpl](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_compute_instance_template) | resource |
+| [google-private_google_compute_instance_template.tpl](https://registry.terraform.io/providers/hashicorp/google-private/latest/docs/resources/google_compute_instance_template) | resource |
 
 ## Inputs
 
