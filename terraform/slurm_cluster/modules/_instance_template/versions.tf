@@ -22,6 +22,10 @@ terraform {
       source  = "hashicorp/google"
       version = ">= 3.88"
     }
+    google-private = {
+      source  = "hashicorp/google"
+      version = ">= 1.0.0"
+    }
   }
   provider_meta "google" {
     module_name = "blueprints/terraform/terraform-google-vm:instance_template/v8.0.1"

@@ -186,7 +186,7 @@ variable "network" {
 }
 
 variable "nic_type" {
-  description = "The type of vNIC to be used on this interface. Possible values: GVNIC, VIRTIO_NET."
+  description = "The type of vNIC to be used on this interface. Possible values: GVNIC, VIRTIO_NET, RDMA, IRDMA, MRDMA."
   type        = string
   default     = null
 }

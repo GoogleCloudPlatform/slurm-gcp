@@ -28,12 +28,13 @@ limitations under the License.
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >=0.13.0 |
 | <a name="requirement_google"></a> [google](#requirement\_google) | >= 3.88 |
+| <a name="requirement_google-private"></a> [google-private](#requirement\_google-private) | >= 1.0.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_google"></a> [google](#provider\_google) | >= 3.88 |
+| <a name="provider_google-private"></a> [google-private](#provider\_google-private) | >= 1.0.0 |
 
 ## Modules
 
@@ -43,8 +44,7 @@ No modules.
 
 | Name | Type |
 |------|------|
-| [google_compute_instance_template.tpl](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_instance_template) | resource |
-| [google_project.this](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/project) | data source |
+| [google-private_google_compute_instance_template.tpl](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_compute_instance_template) | resource |
 
 ## Inputs
 
@@ -74,7 +74,7 @@ No modules.
 | <a name="input_name_prefix"></a> [name\_prefix](#input\_name\_prefix) | Name prefix for the instance template | `string` | `"default-instance-template"` | no |
 | <a name="input_network"></a> [network](#input\_network) | The name or self\_link of the network to attach this interface to. Use network attribute for Legacy or Auto subnetted networks and subnetwork for custom subnetted networks. | `string` | `""` | no |
 | <a name="input_network_ip"></a> [network\_ip](#input\_network\_ip) | Private IP address to assign to the instance if desired. | `string` | `""` | no |
-| <a name="input_nic_type"></a> [nic\_type](#input\_nic\_type) | The type of vNIC to be used on this interface. Possible values: GVNIC, VIRTIO\_NET. | `string` | `null` | no |
+| <a name="input_nic_type"></a> [nic\_type](#input\_nic\_type) | The type of vNIC to be used on this interface. Possible values: GVNIC, VIRTIO\_NET, RDMA, IRDMA, MRDMA. | `string` | `null` | no |
 | <a name="input_on_host_maintenance"></a> [on\_host\_maintenance](#input\_on\_host\_maintenance) | Instance availability Policy | `string` | `"MIGRATE"` | no |
 | <a name="input_preemptible"></a> [preemptible](#input\_preemptible) | Allow the instance to be preempted | `bool` | `false` | no |
 | <a name="input_project_id"></a> [project\_id](#input\_project\_id) | The GCP project ID | `string` | `null` | no |
