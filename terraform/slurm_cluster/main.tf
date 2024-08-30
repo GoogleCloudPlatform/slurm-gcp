@@ -48,7 +48,7 @@ locals {
   viewers = toset(flatten([
     formatlist("serviceAccount:%s", [for x in local.controller_sa : x.email]),
     formatlist("serviceAccount:%s", [for x in local.compute_sa : x.email]),
-    formatlist("serviceAccount:%s", [for x in local.compute_tpu_sa : x.email]),
+    formatlist("serviceAccount:%s", [for x in local.compute_tpu_sa : x.email if x.email != null]),
     formatlist("serviceAccount:%s", [for x in local.login_sa : x.email]),
   ]))
 }
