@@ -42,6 +42,11 @@
       name: '{{ enroot_build_dependencies }}'
       state: present
 
+  - name: Install enroot runtime dependencies
+    ansible.builtin.package:
+      name: '{{ enroot_runtime_dependencies }}'
+      state: present
+
   - name: Download enroot
     ansible.builtin.git:
       repo: '{{ enroot_url }}'
