@@ -21,3 +21,11 @@ enroot_build_dependencies:
 - libmd-dev
 - libtool
 - make
+
+enroot_runtime_dependencies:
+- curl
+- gawk
+- jq
+- squashfs-tools
+- parallel
+- zstd

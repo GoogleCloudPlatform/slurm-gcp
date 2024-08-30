@@ -21,3 +21,9 @@ enroot_build_dependencies:
 - libmd-devel
 - libtool
 - make
+
+enroot_runtime_dependencies:
+- jq
+- squashfs-tools
+- parallel
+- zstd
