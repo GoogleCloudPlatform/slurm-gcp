@@ -59,3 +59,15 @@
     dest: '{{ slurmd_override_path }}'
     mode: 0o644
   notify: Reload SystemD configuration
+
+- name: Create sackd override directory
+  file:
+    path: '{{ slurmd_override_path | dirname }}'
+    state: directory
+
+- name: Sackd SystemD overrides
+  template:
+    src: systemd/sackd_overrides.j2
+    dest: '{{ slurmd_override_path }}'
+    mode: 0o644
+  notify: Reload SystemD configuration
