@@ -68,6 +68,6 @@
 - name: Sackd SystemD overrides
   template:
     src: systemd/sackd_overrides.j2
-    dest: '{{ slurmd_override_path }}'
+    dest: '{{ sackd_override_path }}'
     mode: 0o644
   notify: Reload SystemD configuration
