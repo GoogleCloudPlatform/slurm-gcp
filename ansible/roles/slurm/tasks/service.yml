@@ -62,7 +62,7 @@
 
 - name: Create sackd override directory
   file:
-    path: '{{ slurmd_override_path | dirname }}'
+    path: '{{ sackd_override_path | dirname }}'
     state: directory
 
 - name: Sackd SystemD overrides
