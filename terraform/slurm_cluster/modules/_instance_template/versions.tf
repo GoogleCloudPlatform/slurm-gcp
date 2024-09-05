@@ -24,7 +24,7 @@ terraform {
     }
     google-private = {
       source  = "hashicorp/google-private"
-      version = ">= 1.0.0"
+      version = ">= 0.0.1962"
     }
   }
   provider_meta "google" {
