@@ -53,6 +53,7 @@
     install_gcsfuse: true
     install_pmix: true
     install_pyxis: true
+    update_kernel: true
 
   pre_tasks:
   - name: Minimum Ansible Version Check
@@ -117,6 +118,7 @@
     vars:
       reboot: false
       tpu_docker_image: true
+      update_kernel: "{{ update_kernel }}"
   - role: selinux
     vars:
       reboot: false
