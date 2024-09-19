@@ -141,7 +141,6 @@ module "instance_template" {
       slurm_bucket_path   = var.slurm_bucket_path
       slurm_cluster_name  = var.slurm_cluster_name
       slurm_instance_role = local.slurm_instance_role
-      VmDnsSetting        = "GlobalOnly"
     },
   )
 
