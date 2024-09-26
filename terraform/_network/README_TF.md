@@ -41,16 +41,16 @@ No resources.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_auto_create_subnetworks"></a> [auto\_create\_subnetworks](#input\_auto\_create\_subnetworks) | When set to true, the network is created in 'auto subnet mode' and it will<br>create a subnet for each region automatically across the 10.128.0.0/9<br>address range. When set to false, the network is created in 'custom subnet mode'<br>so the user can explicitly connect subnetwork resources. | `bool` | `false` | no |
-| <a name="input_delete_default_internet_gateway_routes"></a> [delete\_default\_internet\_gateway\_routes](#input\_delete\_default\_internet\_gateway\_routes) | If set, ensure that all routes within the network specified whose names begin<br>with 'default-route' and with a next hop of 'default-internet-gateway' are<br>deleted. | `bool` | `false` | no |
+| <a name="input_auto_create_subnetworks"></a> [auto\_create\_subnetworks](#input\_auto\_create\_subnetworks) | When set to true, the network is created in 'auto subnet mode' and it will<br/>create a subnet for each region automatically across the 10.128.0.0/9<br/>address range. When set to false, the network is created in 'custom subnet mode'<br/>so the user can explicitly connect subnetwork resources. | `bool` | `false` | no |
+| <a name="input_delete_default_internet_gateway_routes"></a> [delete\_default\_internet\_gateway\_routes](#input\_delete\_default\_internet\_gateway\_routes) | If set, ensure that all routes within the network specified whose names begin<br/>with 'default-route' and with a next hop of 'default-internet-gateway' are<br/>deleted. | `bool` | `false` | no |
 | <a name="input_description"></a> [description](#input\_description) | An optional description of this resource. The resource must be recreated to modify this field. | `string` | `""` | no |
 | <a name="input_firewall_rules"></a> [firewall\_rules](#input\_firewall\_rules) | List of additional firewall rules. | `list(map(string))` | `[]` | no |
-| <a name="input_mtu"></a> [mtu](#input\_mtu) | The network MTU. Must be a value between 1460 and 1500 inclusive. If set to 0<br>(meaning MTU is unset), the network will default to 1460 automatically. | `number` | `0` | no |
+| <a name="input_mtu"></a> [mtu](#input\_mtu) | The network MTU. Must be a value between 1460 and 1500 inclusive. If set to 0<br/>(meaning MTU is unset), the network will default to 1460 automatically. | `number` | `0` | no |
 | <a name="input_network_name"></a> [network\_name](#input\_network\_name) | The name of the network being created. | `string` | n/a | yes |
 | <a name="input_project_id"></a> [project\_id](#input\_project\_id) | The ID of the project where this VPC will be created. | `string` | n/a | yes |
 | <a name="input_routes"></a> [routes](#input\_routes) | List of routes being created in this VPC. | `list(map(string))` | `[]` | no |
 | <a name="input_routing_mode"></a> [routing\_mode](#input\_routing\_mode) | The network routing mode (default 'GLOBAL') | `string` | `"GLOBAL"` | no |
-| <a name="input_secondary_ranges"></a> [secondary\_ranges](#input\_secondary\_ranges) | Secondary ranges that will be used in some of the subnets | <pre>map(list(object({<br>    range_name    = string,<br>    ip_cidr_range = string<br>  })))</pre> | `{}` | no |
+| <a name="input_secondary_ranges"></a> [secondary\_ranges](#input\_secondary\_ranges) | Secondary ranges that will be used in some of the subnets | <pre>map(list(object({<br/>    range_name    = string,<br/>    ip_cidr_range = string<br/>  })))</pre> | `{}` | no |
 | <a name="input_shared_vpc_host"></a> [shared\_vpc\_host](#input\_shared\_vpc\_host) | Makes this project a Shared VPC host if 'true' (default 'false') | `bool` | `false` | no |
 | <a name="input_subnets"></a> [subnets](#input\_subnets) | The list of subnets being created. | `list(map(string))` | `[]` | no |
 

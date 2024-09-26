@@ -70,11 +70,11 @@ limitations under the License.
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_config"></a> [config](#input\_config) | Cluster configuration. Use 'module.slurm\_files.config' as value. | `any` | n/a | yes |
-| <a name="input_enable_cleanup_compute"></a> [enable\_cleanup\_compute](#input\_enable\_cleanup\_compute) | Enables automatic cleanup of compute nodes and resource policies (e.g.<br>placement groups) managed by this module, when cluster is destroyed.<br><br>NOTE: Requires Python and script dependencies.<br><br>*WARNING*: Toggling this may impact the running workload. Deployed compute nodes<br>may be destroyed and their jobs will be requeued. | `bool` | `false` | no |
+| <a name="input_enable_cleanup_compute"></a> [enable\_cleanup\_compute](#input\_enable\_cleanup\_compute) | Enables automatic cleanup of compute nodes and resource policies (e.g.<br/>placement groups) managed by this module, when cluster is destroyed.<br/><br/>NOTE: Requires Python and script dependencies.<br/><br/>*WARNING*: Toggling this may impact the running workload. Deployed compute nodes<br/>may be destroyed and their jobs will be requeued. | `bool` | `false` | no |
 | <a name="input_project_id"></a> [project\_id](#input\_project\_id) | Project ID to create resources in. | `string` | n/a | yes |
 | <a name="input_slurm_cluster_name"></a> [slurm\_cluster\_name](#input\_slurm\_cluster\_name) | Cluster name, used for resource naming and slurm accounting. | `string` | n/a | yes |
-| <a name="input_slurm_user"></a> [slurm\_user](#input\_slurm\_user) | Name of the slurm user.<br>Defaults to "slurm". | `string` | `"slurm"` | no |
-| <a name="input_slurmcmd_timeout"></a> [slurmcmd\_timeout](#input\_slurmcmd\_timeout) | The wait time between slurmcmd service runs in seconds.<br>It default to 30. | `number` | `30` | no |
+| <a name="input_slurm_user"></a> [slurm\_user](#input\_slurm\_user) | Name of the slurm user.<br/>Defaults to "slurm". | `string` | `"slurm"` | no |
+| <a name="input_slurmcmd_timeout"></a> [slurmcmd\_timeout](#input\_slurmcmd\_timeout) | The wait time between slurmcmd service runs in seconds.<br/>It default to 30. | `number` | `30` | no |
 
 ## Outputs
 
