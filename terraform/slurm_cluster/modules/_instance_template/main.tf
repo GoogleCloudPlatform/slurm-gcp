@@ -113,7 +113,7 @@ resource "google_compute_instance_template" "tpl" {
     network            = var.network
     subnetwork         = var.subnetwork
     subnetwork_project = var.subnetwork_project
-    network_ip         = length(var.network_ip) > 0 ? var.network_ip : null
+    network_ip         = try(coalesce(var.network_ip), null)
     nic_type           = local.nic_type
     stack_type         = var.stack_type
     dynamic "access_config" {
@@ -144,7 +144,7 @@ resource "google_compute_instance_template" "tpl" {
       network            = network_interface.value.network
       subnetwork         = network_interface.value.subnetwork
       subnetwork_project = network_interface.value.subnetwork_project
-      network_ip         = length(network_interface.value.network_ip) > 0 ? network_interface.value.network_ip : null
+      network_ip         = try(coalesce(network_interface.value.network_ip), null)
       dynamic "access_config" {
         for_each = network_interface.value.access_config
         content {
