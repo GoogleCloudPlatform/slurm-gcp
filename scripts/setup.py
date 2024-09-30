@@ -23,6 +23,7 @@ import subprocess
 import sys
 import stat
 import time
+import yaml
 from pathlib import Path
 
 import util
@@ -331,6 +332,36 @@ def configure_dirs():
     scripts_log.symlink_to(dirs.log)
 
 
+def configure_cloud_ops():
+    cloudOpsStatus = run(
+        "systemctl is-active --quiet google-cloud-ops-agent.service"
+    ).returncode
+    if cloudOpsStatus == 0:
+        try:
+            with open("/etc/google-cloud-ops-agent/config.yaml", "r") as f:
+                file = yaml.safe_load(f)
+            file["logging"]["processors"]["add_cluster_info"]["fields"][
+                'labels."cluster_name"'
+            ]["static_value"] = f"{cfg.slurm_cluster_name}"
+            file["logging"]["processors"]["add_cluster_info"]["fields"][
+                'labels."hostname"'
+            ]["static_value"] = f"{lkp.hostname}"
+
+            with open("/etc/google-cloud-ops-agent/config.yaml", "w") as f:
+                yaml.dump(file, f, sort_keys=False)
+
+        except Exception as e:
+            log.exception(
+                "Cloud Ops Agent setup has encountered an exception while trying to edit its configuration"
+            )
+            raise e
+
+        run("systemctl restart google-cloud-ops-agent.service", timeout=30)
+
+        log.info("Check status of cloud-ops agent")
+        run("systemctl status google-cloud-ops-agent.service")
+
+
 def setup_controller(args):
     """Run controller setup"""
     log.info("Setting up controller")
@@ -477,6 +508,7 @@ def setup_compute(args):
 def main(args):
     start_motd()
     configure_dirs()
+    configure_cloud_ops()
 
     # call the setup function for the instance type
     setup = dict.get(

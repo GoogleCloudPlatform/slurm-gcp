@@ -14,66 +14,54 @@
 
 logging:
   receivers:
-    slurmdbd:
+    slurm_daemon:
       type: files
       include_paths:
       - /var/log/slurm/slurmdbd.log
-    slurmrestd:
-      type: files
-      include_paths:
-      - /var/log/slurm/slurmrestd.log
-    slurmctld:
-      type: files
-      include_paths:
       - /var/log/slurm/slurmctld.log
-    slurmd:
-      type: files
-      include_paths:
       - /var/log/slurm/slurmd-*.log
-    slurm_resume:
-      type: files
-      include_paths:
-      - /var/log/slurm/resume.log
-    slurm_suspend:
+      - /var/log/slurm/slurmrestd.log
+      record_log_file_path: true
+    slurm:
       type: files
       include_paths:
       - /var/log/slurm/suspend.log
-    slurm_sync:
-      type: files
-      include_paths:
       - /var/log/slurm/slurmsync.log
+      - /var/log/slurm/resume.log
+      record_log_file_path: true
     setup:
       type: files
       include_paths:
       - /slurm/scripts/setup.log
+      record_log_file_path: true
   processors:
     parse_slurmlog:
       type: parse_regex
       field: message
-      regex: "^\[(?<time>\S+)\] (?<message>((?<severity>(fatal|error|verbose|debug[0-9]?)):)?.*)$"
-      #time_key: time
-      #time_format: "%Y-%M-%dT%H:%M:%S.%L"
+      regex: '^\[(?<time>\S+)\] (?<message>((?<severity>(fatal|error|verbose|debug[0-9]?)):)?.*)$'
     parse_slurmlog2:
       type: parse_regex
       field: message
-      regex: "^(?<time>\S+ \S+) (?<message>(?<severity>(CRITICAL|ERROR|WARNING|INFO|DEBUG))(\(\S+\))?:.*)$"
-      #time_key: time
-      #time_format: "%Y-%M-%d %H:%M:%S,%L"
+      regex: '^(?<time>\S+ \S+) (?<message>(?<severity>(CRITICAL|ERROR|WARNING|INFO|DEBUG))(\(\S+\))?:.*)$'
+    add_cluster_info:
+      type: modify_fields
+      fields:
+        labels."cluster_name":
+          static_value: placeholder_clustername
+        labels."hostname":
+          static_value: placeholder_hostname
   service:
     pipelines:
       slurmlog_pipeline:
         receivers:
-        - slurmdbd
-        - slurmrestd
-        - slurmctld
-        - slurmd
+        - slurm_daemon
         processors:
         - parse_slurmlog
+        - add_cluster_info
       slurmlog2_pipeline:
         receivers:
-        - slurm_resume
-        - slurm_suspend
-        - slurm_sync
+        - slurm
         - setup
         processors:
         - parse_slurmlog2
+        - add_cluster_info
