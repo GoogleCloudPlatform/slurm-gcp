@@ -41,8 +41,8 @@ if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 
 	# Install the nccl, nccl-net lib into /var/lib/tcpxo/lib64/.
 	docker run --rm --name nccl-installer \
-		--pull=always \
-		--volume /var/lib:/var/lib \
+		--network=host \
+		-v /var/lib:/var/lib \
 		${NCCL_PLUGIN_IMAGE} \
 		install
 
