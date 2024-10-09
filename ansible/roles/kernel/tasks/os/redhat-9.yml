@@ -12,17 +12,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-- name: Install {{ansible_os_family}} Family Kernel Packages
+- name: Install {{ansible_os_family}} Family Kernel Package
   dnf:
     name:
     - kernel
+    - '{{ ansible_distribution | lower }}-release'
+    state: latest
+    update_cache: yes
+  when: update_kernel
+
+- name: Install {{ansible_os_family}} Family Kernel Helper Packages
+  dnf:
+    name:
     - kernel-devel
     - kernel-headers
     - kernel-modules
     - kernel-tools
     - kernel-tools-libs
     #- kernel-tools-libs-devel
-    - '{{ ansible_distribution | lower }}-release'
     state: latest
     update_cache: yes
 - block:
