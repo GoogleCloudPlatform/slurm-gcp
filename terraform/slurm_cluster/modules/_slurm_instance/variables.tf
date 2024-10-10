@@ -138,13 +138,13 @@ variable "labels" {
 #########
 
 variable "slurm_instance_role" {
-  description = "Slurm instance type. Must be one of: controller; login; compute."
+  description = "Slurm instance type. Must be one of: controller; login; dbd; compute."
   type        = string
   default     = null
 
   validation {
-    condition     = contains(["controller", "login", "compute"], lower(var.slurm_instance_role))
-    error_message = "Must be one of: controller; login; compute."
+    condition     = contains(["controller", "login", "dbd", "compute"], lower(var.slurm_instance_role))
+    error_message = "Must be one of: controller; login; dbd; compute."
   }
 }
 
