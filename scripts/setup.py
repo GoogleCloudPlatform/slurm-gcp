@@ -143,6 +143,9 @@ def run_custom_scripts():
     if lkp.instance_role == "controller":
         # controller has all scripts, but only runs controller.d
         custom_dirs = [custom_dir / "controller.d"]
+    elif lkp.instance_role == "dbd":
+        # compute setup with compute.d and nodeset.d
+        custom_dirs = [custom_dir / "dbd.d"]
     elif lkp.instance_role == "compute":
         # compute setup with compute.d and nodeset.d
         custom_dirs = [custom_dir / "compute.d", custom_dir / "nodeset.d"]
@@ -165,6 +168,8 @@ def run_custom_scripts():
         for script in custom_scripts:
             if "/controller.d/" in str(script):
                 timeout = lkp.cfg.get("controller_startup_scripts_timeout", 300)
+            elif "/dbd.d/" in str(script):
+                timeout = lkp.cfg.get("dbd_startup_scripts_timeout", 300)
             elif "/compute.d/" in str(script) or "/nodeset.d/" in str(script):
                 timeout = lkp.cfg.get("compute_startup_scripts_timeout", 300)
             elif "/login.d/" in str(script):
@@ -331,6 +336,28 @@ def configure_dirs():
     scripts_log.symlink_to(dirs.log)
 
 
+def setup_dbd(args):
+    """run dbd node setup"""
+    log.info("Setting up dbd")
+    install_custom_scripts()
+    install_slurmdbd_conf(lkp)
+    setup_network_storage(log)
+    setup_sudoers()
+    if not cfg.cloudsql_secret:
+        configure_mysql()
+    run("systemctl restart munge")
+    run("systemctl enable slurmdbd", timeout=30)
+    run("systemctl restart slurmdbd", timeout=30)
+    run("systemctl enable --now slurmcmd.timer", timeout=30)
+
+    run_custom_scripts()
+
+    log.info("Check status of cluster services")
+    run("systemctl status munge", timeout=30)
+    run("systemctl status slurmdbd", timeout=30)
+
+    log.info("Done setting up dbd")
+
 def setup_controller(args):
     """Run controller setup"""
     log.info("Setting up controller")
@@ -338,7 +365,8 @@ def setup_controller(args):
     install_custom_scripts()
 
     install_slurm_conf(lkp)
-    install_slurmdbd_conf(lkp)
+    if not lkp.dbd_separate:
+        install_slurmdbd_conf(lkp)
 
     gen_cloud_conf(lkp)
     gen_cloud_gres_conf(lkp)
@@ -348,8 +376,10 @@ def setup_controller(args):
     install_topology_conf(lkp)
     install_jobsubmit_lua(lkp)
 
+    #if slurmdbd
     setup_jwt_key()
     setup_munge_key()
+
     setup_sudoers()
 
     if cfg.controller_secondary_disk:
@@ -358,14 +388,15 @@ def setup_controller(args):
 
     run_custom_scripts()
 
-    if not cfg.cloudsql_secret:
+
+    if not lkp.dbd_separate and not cfg.cloudsql_secret:
         configure_mysql()
 
-    run("systemctl enable slurmdbd", timeout=30)
-    run("systemctl restart slurmdbd", timeout=30)
-
-    # Wait for slurmdbd to come up
-    time.sleep(5)
+    if not lkp.dbd_separate:
+        run("systemctl enable slurmdbd", timeout=30)
+        run("systemctl restart slurmdbd", timeout=30)
+        # Wait for slurmdbd to come up
+        time.sleep(5)
 
     sacctmgr = f"{slurmdirs.prefix}/bin/sacctmgr -i"
     result = run(
@@ -391,7 +422,8 @@ def setup_controller(args):
 
     log.info("Check status of cluster services")
     run("systemctl status munge", timeout=30)
-    run("systemctl status slurmdbd", timeout=30)
+    if not lkp.dbd_separate:
+        run("systemctl status slurmdbd", timeout=30)
     run("systemctl status slurmctld", timeout=30)
     run("systemctl status slurmrestd", timeout=30)
 
@@ -482,6 +514,7 @@ def main(args):
     setup = dict.get(
         {
             "controller": setup_controller,
+            "dbd": setup_dbd,
             "compute": setup_compute,
             "login": setup_login,
         },

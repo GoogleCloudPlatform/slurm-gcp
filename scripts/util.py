@@ -406,6 +406,7 @@ def install_custom_scripts(check_hash=False):
             "login": ["login"],
             "compute": compute_tokens,
             "controller": ["controller", "prolog", "epilog"],
+            "dbd": ["dbd"],
         },
         lkp.instance_role,
         [],
@@ -1592,6 +1593,20 @@ class Lookup:
     @property
     def control_host(self):
         return self.cfg.slurm_control_host
+    
+    @property
+    def dbd_separate(self):
+        return self.cfg.dbd_location.separate
+
+    @property
+    def dbd_host(self):
+        if self.cfg.dbd_location.separate:
+            return self.cfg.dbd_location.dbd_addr
+        return self.cfg.slurm_control_host
+
+    @property
+    def dbd_host_addr(self):
+        return host_lookup(self.dbd_host())
 
     @cached_property
     def control_host_addr(self):
