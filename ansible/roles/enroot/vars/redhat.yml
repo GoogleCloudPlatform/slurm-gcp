@@ -27,3 +27,9 @@ enroot_runtime_dependencies:
 - squashfs-tools
 - parallel
 - zstd
+
+enroot_optional_runtime_dependencies:
+- fuse-overlayfs
+- libnvidia-container-tools
+- pigz
+- squashfuse

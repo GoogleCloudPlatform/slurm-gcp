@@ -47,6 +47,12 @@
       name: '{{ enroot_runtime_dependencies }}'
       state: present
 
+  - name: Install enroot optional runtime dependencies
+    ansible.builtin.package:
+      name: '{{ enroot_optional_runtime_dependencies }}'
+      state: present
+    when: enroot_install_optional_deps
+
   - name: Download enroot
     ansible.builtin.git:
       repo: '{{ enroot_url }}'
