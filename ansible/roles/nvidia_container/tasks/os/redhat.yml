@@ -13,10 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: De-Armor Nvidia GPG key
-  command: "gpg --dearmor -o {{ nvidia_gpg_key }} /tmp/gpgkey"
-  changed_when: false
-
 - name: Add Nvidia Container Repo
   ansible.builtin.yum_repository:
     name: nvidia
