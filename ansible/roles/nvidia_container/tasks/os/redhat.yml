@@ -14,8 +14,6 @@
 # limitations under the License.
 
 - name: Add Nvidia Container Repo
-  ansible.builtin.yum_repository:
-    name: nvidia
-    description: Nvidia YUM repo
-    baseurl: "{{ mellanox_repo_url }}/rpm/"
-    gpgcakey: "{{ nvidia_gpg_key_url }}"
+  ansible.builtin.get_url:
+    url: '{{ nvidia_repo_file_rhel }}'
+    dest: /etc/yum.repos.d/nvidia-container-toolkit.repo
