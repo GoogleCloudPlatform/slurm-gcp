@@ -17,5 +17,5 @@
   ansible.builtin.yum_repository:
     name: nvidia
     description: Nvidia YUM repo
-    baseurl: "{{ mellanox_repo_url }}/rpm/"
+    baseurl: "{{ nvidia_repo_url }}/rpm/"
     gpgcakey: "{{ nvidia_gpg_key_url }}"
