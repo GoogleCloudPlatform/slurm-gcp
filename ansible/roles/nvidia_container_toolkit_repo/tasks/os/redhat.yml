@@ -15,5 +15,5 @@
 
 - name: Add Nvidia Container Repo
   ansible.builtin.get_url:
-    url: '{{ nvidia_repo_file_rhel }}'
+    url: '{{ nvidia_repo_file_rpm }}'
     dest: /etc/yum.repos.d/nvidia-container-toolkit.repo
