@@ -15,3 +15,4 @@
 
 dependencies:
 - role: nvidia_container
+  when: enroot_install_optional_deps
