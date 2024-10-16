@@ -14,5 +14,6 @@
 # limitations under the License.
 
 nvidia_gpg_key_url: https://nvidia.github.io/libnvidia-container/gpgkey
-nvidia_repo_url: https://nvidia.github.io/libnvidia-container/stable/
-nvidia_deb_gpg_key: /etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg
+nvidia_repo_url_deb: https://nvidia.github.io/libnvidia-container/stable/deb
+nvidia_gpg_key_deb: /etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg
+nvidia_repo_file_rhel: https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
