@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Add Nvidia Container Repo
-  ansible.builtin.get_url:
-    url: '{{ nvidia_repo_file_rhel }}'
-    dest: /etc/yum.repos.d/nvidia-container-toolkit.repo
+nvidia_gpg_key_url: https://nvidia.github.io/libnvidia-container/gpgkey
+nvidia_repo_url_deb: https://nvidia.github.io/libnvidia-container/stable/deb
+nvidia_gpg_key_deb: /etc/apt/keyrings/nvidia-container-toolkit-keyring.asc
+nvidia_repo_file_rpm: https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo

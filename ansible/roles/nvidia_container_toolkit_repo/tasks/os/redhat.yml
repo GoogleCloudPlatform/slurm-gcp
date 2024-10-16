@@ -13,22 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Collect Nvidia Container Repo GPG Key
-  ansible.builtin.get_url:
-    url: "{{ nvidia_gpg_key_url }}"
-    dest: /tmp/gpgkey
-    mode: '0644'
-    force: true
-
-- name: De-Armor Nvidia GPG key
-  command: "gpg --dearmor --no-tty -o {{ nvidia_deb_gpg_key }} /tmp/gpgkey"
-  changed_when: false
-
 - name: Add Nvidia Container Repo
-  ansible.builtin.apt_repository:
-    repo: "deb [arch=amd64 signed-by={{ nvidia_deb_gpg_key }}] {{ nvidia_repo_url }}/deb/$(ARCH) /"
-    filename: nvidia-container-toolkit.list
-
-- name: Update repositories cache
-  ansible.builtin.apt:
-    update_cache: yes
+  ansible.builtin.get_url:
+    url: '{{ nvidia_repo_file_rpm }}'
+    dest: /etc/yum.repos.d/nvidia-container-toolkit.repo

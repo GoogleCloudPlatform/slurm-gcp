@@ -13,7 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-nvidia_gpg_key_url: https://nvidia.github.io/libnvidia-container/gpgkey
-nvidia_repo_url_deb: https://nvidia.github.io/libnvidia-container/stable/deb
-nvidia_gpg_key_deb: /etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg
-nvidia_repo_file_rhel: https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
+- name: Collect Nvidia Container Repo GPG Key
+  ansible.builtin.get_url:
+    url: "{{ nvidia_gpg_key_url }}"
+    dest: "{{ nvidia_gpg_key_deb }}"
+    mode: '0644'
+    force: true
+
+- name: Add Nvidia Container Repo
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by={{ nvidia_gpg_key_deb }}] {{ nvidia_repo_url_deb }}/$(ARCH) /"
+    filename: nvidia-container-toolkit

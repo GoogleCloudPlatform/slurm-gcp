@@ -14,5 +14,5 @@
 # limitations under the License.
 
 dependencies:
-- role: nvidia_container
+- role: nvidia_container_toolkit_repo
   when: enroot_install_optional_deps
