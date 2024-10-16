@@ -13,6 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-dependencies:
-- role: nvidia_container_toolkit_repo
-  when: enroot_install_optional_deps
+- name: Collect Nvidia Container Repo GPG Key
+  ansible.builtin.get_url:
+    url: "{{ nvidia_gpg_key_url }}"
+    dest: "{{ nvidia_deb_gpg_key }}"
+    mode: '0644'
+    force: true
+
+- name: Add Nvidia Container Repo
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by={{ nvidia_deb_gpg_key }}] {{ nvidia_repo_url_deb }}/$(ARCH) /"
+    filename: nvidia-container-toolkit.list
