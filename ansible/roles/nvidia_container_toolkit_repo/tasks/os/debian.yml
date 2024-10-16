@@ -23,4 +23,4 @@
 - name: Add Nvidia Container Repo
   ansible.builtin.apt_repository:
     repo: "deb [arch=amd64 signed-by={{ nvidia_gpg_key_deb }}] {{ nvidia_repo_url_deb }}/$(ARCH) /"
-    filename: nvidia-container-toolkit.list
+    filename: nvidia-container-toolkit
