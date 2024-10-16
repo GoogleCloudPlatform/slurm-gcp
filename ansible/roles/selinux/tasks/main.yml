@@ -30,5 +30,5 @@
     - name: Reboot
       reboot:
       when: status.reboot_required and reboot
-    when: stat_result.exists
+    when: stat_result.stat.exists
   when: ansible_os_family == "RedHat"
