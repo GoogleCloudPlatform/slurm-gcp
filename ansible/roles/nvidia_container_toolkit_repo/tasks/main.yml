@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# this version has not been tagged and released but includes an important fix
-# that enables the use of enroot with service accounts and users from external
-# organizations whose UIDs exceed 2**31
-# https://github.com/NVIDIA/enroot/issues/195
-enroot_version: 09ae4b2c18a18ed5ab34b7697006aa18697c4cec
-enroot_url: https://github.com/NVIDIA/enroot/
-enroot_installation_path: "{{ paths.install }}"
-enroot_install_optional_deps: true
+- name: Include OS Family Dependent Tasks
+  include_tasks: '{{ item }}'
+  with_first_found:
+  - os/{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml
+  - os/{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml
+  - os/{{ ansible_distribution|lower }}.yml
+  - os/{{ ansible_os_family|lower }}-{{ ansible_distribution_version }}.yml
+  - os/{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml
+  - os/{{ ansible_os_family|lower }}.yml
