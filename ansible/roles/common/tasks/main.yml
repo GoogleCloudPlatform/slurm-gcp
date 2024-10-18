@@ -47,3 +47,12 @@
   template:
     src: ld.so.conf.d/usr-local.conf.j2
     dest: /etc/ld.so.conf.d/usr-local.conf
+
+- name: Mark image for first boot
+  copy:
+    content: ""
+    dest: /.google_hpc_firstrun
+    force: false
+    group: root
+    owner: root
+    mode: 0660
