@@ -72,10 +72,10 @@ state we will also include if it is tested or not.
 
 |       Project        | Image Family                        | Arch   | TPU Status  |
 | :------------------: | :---------------------------------- | :----- | :---------- |
-| schedmd-slurm-public | slurm-gcp-6-7-debian-11             | x86_64 | Untested    |
-| schedmd-slurm-public | slurm-gcp-6-7-hpc-rocky-linux-8     | x86_64 | Tested      |
-| schedmd-slurm-public | slurm-gcp-6-7-ubuntu-2004-lts       | x86_64 | Untested    |
-| schedmd-slurm-public | slurm-gcp-6-7-ubuntu-2204-lts-arm64 | ARM64  | Untested    |
+| schedmd-slurm-public | slurm-gcp-6-8-debian-11             | x86_64 | Untested    |
+| schedmd-slurm-public | slurm-gcp-6-8-hpc-rocky-linux-8     | x86_64 | Tested      |
+| schedmd-slurm-public | slurm-gcp-6-8-ubuntu-2004-lts       | x86_64 | Untested    |
+| schedmd-slurm-public | slurm-gcp-6-8-ubuntu-2204-lts-arm64 | ARM64  | Untested    |
 
 ## Terraform
 
