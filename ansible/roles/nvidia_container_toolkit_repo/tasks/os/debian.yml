@@ -13,6 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+- name: Check and create keyring folder
+  ansible.builtin.file:
+    path: "{{ apt_keyring }}"
+    state: directory
+    mode: '0755'
+
 - name: Collect Nvidia Container Repo GPG Key
   ansible.builtin.get_url:
     url: "{{ nvidia_gpg_key_url }}"
