@@ -70,6 +70,7 @@ locals {
     nodeset          = local.nodeset
     nodeset_dyn      = local.nodeset_dyn
     nodeset_tpu      = local.nodeset_tpu
+    dbd_location     = var.dbd_location
 
     # hybrid
     hybrid                  = var.enable_hybrid

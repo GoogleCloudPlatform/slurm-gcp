@@ -465,3 +465,22 @@ variable "endpoint_versions" {
     compute = null
   }
 }
+
+variable "dbd_location" {
+  type = object({
+    separate  = bool
+    dbd_addr  = string
+  })
+  default = {
+    separate = false
+    dbd_addr = null
+  }
+  description = <<EOD
+Use this variable to specify the location of your dbd.
+If separate is false then dbd is installed the same machine as the controller.
+If separate is true, then dbd_addr specifies it, either by having the address 
+of it or be being null, in that case, a new VM is created that hosts the dbd.
+This is useful in case multiple clusters are to be connected together by slurm 
+multicluster.
+EOD
+}
