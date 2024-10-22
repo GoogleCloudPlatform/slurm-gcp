@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apt_keyring: /etc/apt/keyrings
 nvidia_gpg_key_url: https://nvidia.github.io/libnvidia-container/gpgkey
 nvidia_repo_url_deb: https://nvidia.github.io/libnvidia-container/stable/deb
-nvidia_gpg_key_deb: /etc/apt/keyrings/nvidia-container-toolkit-keyring.asc
+nvidia_gpg_key_deb: "{{ apt_keyring }}/nvidia-container-toolkit-keyring.asc"
 nvidia_repo_file_rpm: https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
