@@ -30,7 +30,7 @@ variable "network" {
 variable "subnetwork" {
   description = "Subnet to deploy to. Only one of network or subnetwork should be specified."
   type        = string
-  default     = ""
+  default     = null
 }
 
 variable "subnetwork_project" {
