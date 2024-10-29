@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[5.12.1\]
+
+- Update modules to be compatible with terraform-provider-google 6.x
+- Update NVIDIA driver version to 550.90.12 which includes CVE fixes
+
 ## \[5.12.0\]
 
 - Update NVIDIA driver version to 550.90.07 which includes CVE fix.
