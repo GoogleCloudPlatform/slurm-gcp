@@ -38,7 +38,7 @@ variable "subnetwork" {
 variable "subnetwork_project" {
   type        = string
   description = "The project that subnetwork belongs to."
-  default     = ""
+  default     = null
 }
 
 variable "region" {
