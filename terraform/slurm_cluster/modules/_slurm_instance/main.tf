@@ -145,7 +145,6 @@ resource "google_compute_instance_from_template" "slurm_instance" {
       slurm_cluster_name  = var.slurm_cluster_name
       slurm_instance_role = local.slurm_instance_role
       startup-script      = data.local_file.startup.content
-      VmDnsSetting        = "GlobalOnly"
     },
   )
 

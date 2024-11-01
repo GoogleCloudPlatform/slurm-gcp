@@ -18,47 +18,51 @@ logging:
       type: files
       include_paths:
       - /var/log/slurm/slurmdbd.log
+      record_log_file_path: true
     slurmrestd:
       type: files
       include_paths:
       - /var/log/slurm/slurmrestd.log
+      record_log_file_path: true
     slurmctld:
       type: files
       include_paths:
       - /var/log/slurm/slurmctld.log
+      record_log_file_path: true
     slurmd:
       type: files
       include_paths:
       - /var/log/slurm/slurmd-*.log
+      record_log_file_path: true
     slurm_resume:
       type: files
       include_paths:
       - /var/log/slurm/resume.log
+      record_log_file_path: true
     slurm_suspend:
       type: files
       include_paths:
       - /var/log/slurm/suspend.log
+      record_log_file_path: true
     slurm_sync:
       type: files
       include_paths:
       - /var/log/slurm/slurmsync.log
+      record_log_file_path: true
     setup:
       type: files
       include_paths:
       - /slurm/scripts/setup.log
+      record_log_file_path: true
   processors:
     parse_slurmlog:
       type: parse_regex
       field: message
-      regex: "^\[(?<time>\S+)\] (?<message>((?<severity>(fatal|error|verbose|debug[0-9]?)):)?.*)$"
-      #time_key: time
-      #time_format: "%Y-%M-%dT%H:%M:%S.%L"
+      regex: '^\[(?<time>\S+)\] (?<message>((?<severity>(fatal|error|verbose|debug[0-9]?)):)?.*)$'
     parse_slurmlog2:
       type: parse_regex
       field: message
-      regex: "^(?<time>\S+ \S+) (?<message>(?<severity>(CRITICAL|ERROR|WARNING|INFO|DEBUG))(\(\S+\))?:.*)$"
-      #time_key: time
-      #time_format: "%Y-%M-%d %H:%M:%S,%L"
+      regex: '^(?<time>\S+ \S+) (?<message>(?<severity>(CRITICAL|ERROR|WARNING|INFO|DEBUG))(\(\S+\))?:.*)$'
   service:
     pipelines:
       slurmlog_pipeline:

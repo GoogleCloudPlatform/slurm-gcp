@@ -75,7 +75,6 @@ def instance_properties(nodeset, model, placement_group, labels=None):
         "startup-script": (
             Path(cfg.slurm_scripts_dir or util.dirs.scripts) / "startup.sh"
         ).read_text(),
-        "VmDnsSetting": "GlobalOnly",
     }
     info_metadata = {
         item.get("key"): item.get("value") for item in template_info.metadata["items"]
