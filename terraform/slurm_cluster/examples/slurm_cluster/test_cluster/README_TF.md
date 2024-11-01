@@ -87,7 +87,7 @@ No resources.
 | <a name="input_source_image_project"></a> [source\_image\_project](#input\_source\_image\_project) | Project where the source image comes from. If it is not provided, the provider project is used. | `string` | `""` | no |
 | <a name="input_subnets"></a> [subnets](#input\_subnets) | The list of subnets being created. | `list(map(string))` | `[]` | no |
 | <a name="input_subnetwork"></a> [subnetwork](#input\_subnetwork) | Default subnet to deploy to. | `string` | `"default"` | no |
-| <a name="input_subnetwork_project"></a> [subnetwork\_project](#input\_subnetwork\_project) | The project that subnetwork belongs to | `string` | `""` | no |
+| <a name="input_subnetwork_project"></a> [subnetwork\_project](#input\_subnetwork\_project) | The project that subnetwork belongs to | `string` | `null` | no |
 
 ## Outputs
 
