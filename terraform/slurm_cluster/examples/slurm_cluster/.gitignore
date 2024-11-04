@@ -1,7 +1,0 @@
-*.bak
-*.conf
-*.py
-*.sh
-*.yaml
-*.service
-*.timer
