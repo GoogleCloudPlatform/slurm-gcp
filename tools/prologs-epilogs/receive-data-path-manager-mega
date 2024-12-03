@@ -30,8 +30,8 @@ fi
 # ensure that dmabuf-import-helper is loaded
 modprobe import-helper
 
-NCCL_PLUGIN_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.4
-RXDM_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.10
+NCCL_PLUGIN_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.7
+RXDM_IMAGE=us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.13
 RXDM_CONTAINER=receive-datapath-manager-"${SLURM_JOB_ID}"
 if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 	docker container list --filter "name=receive-datapath-manager-*" --quiet | xargs --no-run-if-empty docker container stop
@@ -44,7 +44,7 @@ if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 		--network=host \
 		-v /var/lib:/var/lib \
 		${NCCL_PLUGIN_IMAGE} \
-		install
+		install --install-nccl
 
 	# Modify NCCL env vars for Debian 12.
 	# /var/lib/tcpxo/lib64/nccl-env-profile.sh is written by the nccl-installer container
