@@ -39,6 +39,8 @@ if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 	export PATH=${PATH}:/usr/local/lib/google-cloud-sdk/bin/
 	gcloud auth configure-docker --quiet us-docker.pkg.dev 2>&1 &>/dev/null
 
+	rm -rf /var/lib/tcpxo/lib64 || true
+
 	# Install the nccl, nccl-net lib into /var/lib/tcpxo/lib64/.
 	docker run --rm --name nccl-installer \
 		--network=host \
