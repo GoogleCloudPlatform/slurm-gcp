@@ -17,6 +17,12 @@
 output "instance_template" {
   description = "Instance template details"
   value       = module.instance_template
+
+
+  precondition {
+    condition     = var.disk_type != "local-ssd" || var.disk_labels != {}
+    error_message = "Both `var.disk_type` 'local-ssd'  and `var.disk_labels` cannot be set"
+  }
 }
 
 output "self_link" {
