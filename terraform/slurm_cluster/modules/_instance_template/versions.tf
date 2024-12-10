@@ -24,7 +24,7 @@ terraform {
     }
     google-beta = {
       source  = "hashicorp/google-beta"
-      version = ">= 3.88"
+      version = ">= 6.13.0"
     }
   }
   provider_meta "google" {
