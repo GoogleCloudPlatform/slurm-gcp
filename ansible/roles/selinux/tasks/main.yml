@@ -14,14 +14,26 @@
 # limitations under the License.
 
 - block:
-  - name: Disable SELinux
-    selinux:
-      configfile: '{{selinux_conf}}'
-      state: disabled
-      policy: targeted
-    register: status
+  - name: Check SELinux
+    stat:
+      path: "{{ selinux_conf }}"
+    register: stat_result
 
-  - name: Reboot
-    reboot:
-    when: status.reboot_required and reboot
+  - block:
+    - name: Ensure SELinux is set to disabled mode
+      ansible.builtin.lineinfile:
+        path: "{{ selinux_conf }}"
+        regexp: '^SELINUX='
+        line: SELINUX=disabled
+
+    - name: Ensure SELinux is set to targeted mode
+      ansible.builtin.lineinfile:
+        path: "{{ selinux_conf }}"
+        regexp: '^SELINUXTYPE='
+        line: SELINUXTYPE=targeted
+
+    - name: Reboot
+      reboot:
+      when: reboot
+    when: stat_result.stat.exists
   when: ansible_os_family == "RedHat"
