@@ -57,33 +57,6 @@
     src: tmpfiles.d/slurm.conf.j2
     dest: /etc/tmpfiles.d/slurm.conf
 
-- name: Copy Scripts
-  copy:
-    src: scripts/{{item}}
-    dest: '{{slurm_paths.scripts}}/{{item}}'
-    owner: '{{slurm_user.user}}'
-    group: '{{slurm_user.group}}'
-    mode: 0o755
-  with_items:
-  - conf.py
-  - resume.py
-  - setup.py
-  - setup_network_storage.py
-  - startup.sh
-  - slurmsync.py
-  - suspend.py
-  - util.py
-  - load_bq.py
-
-- name: Copy slurm_gcp_plugins
-  copy:
-    src: scripts/slurm_gcp_plugins
-    dest: '{{ slurm_paths.scripts }}/'
-    owner: '{{slurm_user.user}}'
-    group: '{{slurm_user.group}}'
-    mode: '0644'
-    directory_mode: '0755'
-
 - name: Copy Jobs
   copy:
     src: jobs/
