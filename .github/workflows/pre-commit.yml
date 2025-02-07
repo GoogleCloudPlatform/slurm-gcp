@@ -37,6 +37,10 @@ jobs:
         python-version: '3.10'
         check-latest: true
         cache: 'pip'
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.5.7"
+        terraform_wrapper: false
     - uses: terraform-linters/setup-tflint@v4
       with:
         tflint_version: v0.49.0
