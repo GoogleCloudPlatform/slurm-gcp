@@ -22,7 +22,15 @@
 
   when: reboot
 
-- name: Install {{ansible_os_family}} Family Kernel Packages
+- name: Install {{ansible_os_family}} Family Kernel Package
+  dnf:
+    name:
+    - kernel
+    state: latest
+    update_cache: yes
+  when: update_kernel
+
+- name: Install {{ansible_os_family}} Family Kernel Helper Packages
   yum:
     name:
     - kernel
