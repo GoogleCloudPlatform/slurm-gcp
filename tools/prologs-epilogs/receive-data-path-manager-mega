@@ -87,7 +87,7 @@ if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 			docker logs --tail 10 ${RXDM_CONTAINER} || true
 			sleep 2
 			counter=$((counter + 1))
-			if [[ "$counter" -gt 10 ]]; then
+			if [[ "$counter" -gt 60 ]]; then
 				echo "FAILED to restart rxdm on $(hostname)"
 				exit 1
 				break
