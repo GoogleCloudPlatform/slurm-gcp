@@ -22,3 +22,5 @@
   - os/{{ ansible_os_family|lower }}-{{ ansible_distribution_version }}.yml
   - os/{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml
   - os/{{ ansible_os_family|lower }}.yml
+  # this should only be disabled for images that already have an NVIDIA repository installed
+  when: install_nvidia_repo
