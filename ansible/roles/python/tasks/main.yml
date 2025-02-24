@@ -23,31 +23,6 @@
   - '{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml'
   - '{{ ansible_os_family|lower }}.yml'
 
-- name: Install Python
-  ansible.builtin.shell: |
-    #!/bin/bash
-
-    INSTALL_DIR="/slurm/python"
-    mkdir -p "${INSTALL_DIR}"
-    cd "${INSTALL_DIR}" || exit 1
-
-    curl -LO "https://www.python.org/ftp/python/3.13.1/Python-3.13.1.tgz"
-    tar -xzf "Python-3.13.1.tgz" -C "${INSTALL_DIR}"
-    cd "$INSTALL_DIR/Python-3.13.1" || exit 1
-    ./configure --prefix="/slurm/python"
-    make altinstall
-    cd "${INSTALL_DIR}" || exit 1
-    rm -rf Python-3.13.1*
-  args:
-    executable: /bin/bash
-    creates: /slurm/python/bin/python3.13
-
-- name: Create virtualenv for tool
-  ansible.builtin.pip:
-    name: pip==25.0
-    virtualenv: "/slurm/python/venv"
-    virtualenv_command: /slurm/python/bin/python3.13 -m venv --copies
-
 - name: Install Packages
   package:
     name: '{{python_packages}}'
@@ -58,20 +33,34 @@
     cmd: alternatives --set python3 /usr/bin/python3.8
   when: python38_installed
 
+- name: Upgrade Pip
+  pip:
+    name:
+    - pip
+    extra_args: --upgrade {{ extra_pip_args }}
+    executable: pip3
+    state: present
+
 - name: Copy Pip Requirements File
   copy:
-    src: ../files/slurm-gcp-requirements.txt
-    dest: /tmp/requirements.txt
+    src: '{{ item | basename }}'
+    dest: /tmp/{{ item | basename }}
+  with_first_found:
+  - '{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}_requirements.txt'
+  - '{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}_requirements.txt'
+  - '{{ ansible_distribution|lower }}_requirements.txt'
+  - '{{ ansible_os_family|lower }}-{{ ansible_distribution_version }}_requirements.txt'
+  - '{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}_requirements.txt'
+  - '{{ ansible_os_family|lower }}_requirements.txt'
   register: requirements_file
 
-#TODO investigate whether this workaround is still needed
 - name: Install pyyaml workaround
   shell:
     cmd: pip3 install "Cython<3.0" pyyaml --no-build-isolation {{ extra_pip_args }}
 
 - name: Install Pip Packages
   pip:
-    requirements: /tmp/requirements.txt
+    requirements: '{{ requirements_file.results[0].dest }}'
     extra_args: --upgrade --ignore-installed {{ extra_pip_args }}
-    virtualenv: "/slurm/python/venv"
+    executable: pip3
     state: present
