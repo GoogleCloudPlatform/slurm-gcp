@@ -5,7 +5,7 @@ certifi==2023.7.22
 charset-normalizer==3.2.0
 decorator==5.1.1
 docopt==0.6.2
-google-api-core==2.19.0
+google-api-core==2.24.1
 google-api-python-client==2.93.0
 google-auth==2.38.0
 google-auth-httplib2==0.2.0
@@ -13,10 +13,10 @@ google-cloud-bigquery==3.29.0
 google-cloud-core==2.4.1
 google-cloud-secret-manager==2.23.0
 google-cloud-storage==2.10.0
-google-cloud-tpu==1.10.0
+google-cloud-tpu==1.23.0
 google-crc32c==1.5.0
 google-resumable-media==2.5.0
-googleapis-common-protos==1.59.1
+googleapis-common-protos==1.67.0
 grpcio==1.70.0
 grpcio-status==1.70.0
 httplib2==0.22.0
@@ -31,7 +31,7 @@ pickleshare==0.7.5
 pipreqs==0.4.13
 prometheus-client==0.17.1
 prompt-toolkit==3.0.39
-proto-plus==1.22.3
+proto-plus==1.26.0
 protobuf==5.29.3
 ptyprocess==0.7.0
 pyasn1==0.5.0
