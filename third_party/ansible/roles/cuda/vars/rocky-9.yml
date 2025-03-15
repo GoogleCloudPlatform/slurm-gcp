@@ -1,0 +1,4 @@
+---
+cuda_repo_subfolder: rhel9
+
+# vim:ft=ansible:
