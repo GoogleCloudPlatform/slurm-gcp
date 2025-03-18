@@ -64,11 +64,6 @@
     dest: /tmp/requirements.txt
   register: requirements_file
 
-#TODO investigate whether this workaround is still needed
-- name: Install pyyaml workaround
-  shell:
-    cmd: pip3 install "Cython<3.0" pyyaml --no-build-isolation {{ extra_pip_args }}
-
 - name: Install Pip Packages
   pip:
     requirements: /tmp/requirements.txt
