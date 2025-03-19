@@ -113,9 +113,9 @@
   - name: Check Support on Ubuntu
     when: ansible_distribution == "Ubuntu"
     ansible.builtin.assert:
-      that: ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '==')
+      that: ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '==') or ansible_distribution_version is version('24.04', '==')
       fail_msg: |
-        When building Slurm-GCP on Ubuntu, use release 20.04 or 22.04
+        When building Slurm-GCP on Ubuntu, use release 20.04/22.04/24.04
   - name: Freeze kernel before running playbook
     when: ansible_os_family == "Debian"
     ansible.builtin.dpkg_selections:
