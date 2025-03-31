@@ -163,7 +163,7 @@
     - ansible_architecture == "x86_64"
   - role: cloudagents
     when:
-    - ansible_architecture == "x86_64"
+    - ansible_architecture == "x86_64" or (ansible_distribution == "Ubuntu" and ansible_distribution_version is version('24.04', '=='))
   - logrotate
   - python
   - role: ldap
