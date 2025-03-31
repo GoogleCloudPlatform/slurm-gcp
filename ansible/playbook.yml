@@ -179,10 +179,10 @@
   - role: gcsfuse
     when:
     - install_gcsfuse
-    - ansible_architecture == "x86_64"
+    - ansible_architecture == "x86_64" or (ansible_distribution == "Ubuntu" and ansible_distribution_version is version('24.04', '=='))
   - role: cloudagents
     when:
-    - ansible_architecture == "x86_64"
+    - ansible_architecture == "x86_64" or (ansible_distribution == "Ubuntu" and ansible_distribution_version is version('24.04', '=='))
   - logrotate
   - python
   - role: ldap
