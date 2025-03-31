@@ -179,10 +179,7 @@
   - role: gcsfuse
     when:
     - install_gcsfuse
-    - ansible_architecture == "x86_64"
   - role: cloudagents
-    when:
-    - ansible_architecture == "x86_64"
   - logrotate
   - python
   - role: ldap
