@@ -101,10 +101,6 @@ function tpu_setup {
 		echo "$word"
 	}
 
-	input_string=$($CURL $URL/instance/attributes/slurm_names)
-	worker_id=$($CURL $URL/instance/attributes/tpu-env | awk '/WORKER_ID/ {print $2}' | tr -d \')
-	real_name=$(parse_metadata $worker_id $input_string)
-
 	#Prepare to docker pull with gcloud
 	mkdir -p /root/.docker
 	cat << EOF > /root/.docker/config.json
@@ -135,7 +131,7 @@ EOF
 	# 	TPU_FLAGS="--privileged"
 	# fi
 
-	docker run -d $CGROUP_FLAGS $TPU_FLAGS --net=host --name=slurmd --hostname=$real_name --entrypoint=/usr/bin/systemd --restart unless-stopped $docker_image
+	docker run -d $CGROUP_FLAGS $TPU_FLAGS --net=host --name=slurmd --hostname=$(hostname -s) --domainname=$(hostname -d) --entrypoint=/usr/bin/systemd --restart unless-stopped $docker_image
 	exit 0
 }
 
