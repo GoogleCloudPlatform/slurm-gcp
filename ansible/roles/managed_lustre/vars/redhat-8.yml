@@ -1,5 +1,5 @@
 ---
-# Copyright 2024 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-kernel_packages:
-- linux-image*
-kernel_headers_package: linux-headers-gcp
+lustre_repo_url: https://us-yum.pkg.dev/projects/lustre-client-binaries/lustre-client-rocky-8
+managed_lustre_packages:
+- kmod-lustre-client
+- lustre-client

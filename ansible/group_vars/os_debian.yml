@@ -13,5 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-kernel_package: linux-image-cloud-{{ deb_arch }}
+kernel_packages:
+- linux-image*
 kernel_headers_package: linux-headers-cloud-{{ deb_arch }}

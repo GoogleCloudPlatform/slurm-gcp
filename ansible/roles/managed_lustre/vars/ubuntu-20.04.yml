@@ -1,5 +1,5 @@
 ---
-# Copyright 2024 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-kernel_packages:
-- linux-image*
-kernel_headers_package: linux-headers-gcp
+managed_lustre_repo_url: https://us-apt.pkg.dev/projects/lustre-client-binaries
+managed_lustre_packages:
+- lustre-client-modules-{{ ansible_kernel }}
+- lustre-client-utils
