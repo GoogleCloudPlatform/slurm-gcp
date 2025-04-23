@@ -129,7 +129,11 @@
       fail_msg: |
         Managed Lustre is only compatible with Rocky 8, Ubuntu 20.04, and Ubuntu 22.04
   - name: Freeze kernel before running playbook
-    ansible.builtin.shell: "apt-mark hold {{ item }}"
+    ansible.builtin.command:
+      argv:
+      - apt-mark
+      - hold
+      - "{{ item }}"
     loop: "{{ kernel_packages }}"
     when: ansible_os_family == "Debian"
 
@@ -187,7 +191,11 @@
 
   post_tasks:
   - name: Re-enable kernel upgrades by apt-get upgrade
-    ansible.builtin.shell: "apt-mark unhold {{ item }}"
+    ansible.builtin.command:
+      argv:
+      - apt-mark
+      - unhold
+      - "{{ item }}"
     loop: "{{ kernel_packages }}"
     when:
     - ansible_os_family == "Debian"

@@ -14,5 +14,8 @@
 # limitations under the License.
 
 kernel_packages:
-- linux-image*
+- linux-modules-nvidia-*-server-open-gcp
+- linux-image-gcp
+- linux-headers-gcp
+- linux-gcp
 kernel_headers_package: linux-headers-gcp
