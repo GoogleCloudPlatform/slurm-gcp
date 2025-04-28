@@ -1,5 +1,5 @@
 ---
-# Copyright 2024 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-kernel_packages:
-- linux-modules-nvidia-*-server-open-gcp
-- linux-image-gcp
-- linux-headers-gcp
-- linux-gcp
-kernel_headers_package: linux-headers-gcp
+- name: Add gpg key for Managed Lustre Client repo
+  ansible.builtin.get_url:
+    url: https://us-apt.pkg.dev/doc/repo-signing-key.gpg
+    dest: /etc/apt/keyrings/lustre-client.asc
+    mode: '0644'
+    force: true
+
+- name: Install Managed Lustre Client Repo
+  ansible.builtin.apt_repository:
+    filename: lustre-client
+    repo: deb [ signed-by=/etc/apt/keyrings/lustre-client.asc ] {{ managed_lustre_repo_url }} lustre-client-ubuntu-{{ ansible_distribution_release }} main
+    state: present
+    update_cache: true

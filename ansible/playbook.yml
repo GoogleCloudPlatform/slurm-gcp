@@ -56,6 +56,7 @@
     install_cuda: true
     install_ompi: true
     install_lustre: true
+    install_managed_lustre: false
     install_gcsfuse: true
     install_pmix: true
     install_pyxis: true
@@ -116,11 +117,25 @@
       that: ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '==')
       fail_msg: |
         When building Slurm-GCP on Ubuntu, use release 20.04 or 22.04
+  - name: Check Lustre Install Options
+    ansible.builtin.assert:
+      that: not (install_lustre and install_managed_lustre)
+      fail_msg: |
+        install_lustre and install_managed_lustre are mutually exclusive Options
+  - name: Check Managed Lustre Install Options
+    when: install_managed_lustre
+    ansible.builtin.assert:
+      that: (ansible_distribution == "Ubuntu" and (ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '=='))) or (ansible_distribution == "Rocky" and ansible_distribution_major_version is version('8', '=='))
+      fail_msg: |
+        Managed Lustre is only compatible with Rocky 8, Ubuntu 20.04, and Ubuntu 22.04
   - name: Freeze kernel before running playbook
+    ansible.builtin.command:
+      argv:
+      - apt-mark
+      - hold
+      - "{{ item }}"
+    loop: "{{ kernel_packages }}"
     when: ansible_os_family == "Debian"
-    ansible.builtin.dpkg_selections:
-      name: "{{ kernel_package }}"
-      selection: hold
 
   roles:
   - motd
@@ -157,6 +172,10 @@
     when:
     - install_lustre
     - ansible_architecture == "x86_64"
+  - role: managed_lustre
+    when:
+    - install_managed_lustre
+    - ansible_architecture == "x86_64"
   - role: gcsfuse
     when:
     - install_gcsfuse
@@ -172,9 +191,12 @@
 
   post_tasks:
   - name: Re-enable kernel upgrades by apt-get upgrade
+    ansible.builtin.command:
+      argv:
+      - apt-mark
+      - unhold
+      - "{{ item }}"
+    loop: "{{ kernel_packages }}"
     when:
     - ansible_os_family == "Debian"
     - allow_kernel_upgrades
-    ansible.builtin.dpkg_selections:
-      name: "{{ kernel_package }}"
-      selection: install
