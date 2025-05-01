@@ -41,6 +41,13 @@
       - os/{{ ansible_os_family|lower }}.yml
   when: install_managed_lustre
 
+- name: Update lnet to use GKE compatible port
+  ansible.builtin.lineinfile:
+    path: /etc/modprobe.d/lnet.conf
+    regexp: '^options lnet accept_port='
+    line: options lnet accept_port={{managed_lustre_port}}
+    create: yes
+
 - name: Wait for DPKG Locks
   ansible.builtin.shell: >
     while fuser /var/lib/dpkg/{{ item }} >/dev/null 2>&1; do
