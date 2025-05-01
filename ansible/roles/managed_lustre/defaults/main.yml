@@ -14,3 +14,4 @@
 # limitations under the License.
 
 install_managed_lustre: false
+managed_lustre_port: 988
