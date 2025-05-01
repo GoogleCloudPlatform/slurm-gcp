@@ -14,3 +14,4 @@
 # limitations under the License.
 
 install_managed_lustre: false
+add_managed_lustre_gke_support: false
