@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+kernel_append: "{{ '-64k' if '64k' in ansible_kernel else '' }}"
 kernel_packages:
-- linux-modules-nvidia-*-server-open-gcp
-- linux-image-gcp
-- linux-headers-gcp
-- linux-gcp
-kernel_headers_package: linux-headers-gcp
+- linux-modules-nvidia-*-server-open-gcp{{kernel_append}}
+- linux-image-gcp{{kernel_append}}
+- linux-headers-gcp{{kernel_append}}
+- linux-gcp{{kernel_append}}
+kernel_headers_package: linux-headers-gcp{{kernel_append}}
