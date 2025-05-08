@@ -17,6 +17,6 @@
   ansible.builtin.yum_repository:
     name: lustre-client-rocky-8
     description: Lustre Client
-    baseurl: '{{ lustre_repo_url }}'
+    baseurl: '{{ managed_lustre_repo_url }}'
     enabled: true
     gpgcheck: false
