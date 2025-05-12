@@ -21,27 +21,15 @@ taken into account. This guide will cover them and their recommended solutions.
 
 There are two deployment methods for cloud cluster management:
 
-- [GCP Marketplace](#gcp-marketplace)
 - [Terraform](#terraform)
-
-## GCP Marketplace
-
-This deployment method leverages
-[GCP Marketplace](./glossary.md#gcp-marketplace) to make setting up clusters a
-breeze without leaving your browser. While this method is simpler and less
-flexible, it is great for exploring what `slurm-gcp` is!
-
-See the [Marketplace Guide](./marketplace.md) for setup instructions and more
-information.
 
 ## Terraform
 
 This deployment method leverages [Terraform](./glossary.md#terraform) to deploy
 and manage cluster infrastructure. While this method can be more complex, it is
-a robust option. `slurm-gcp` provides terraform modules that enables you to
-create a Slurm cluster with ease.
+a robust option. Cluster toolkit provides modules that enables you to create a Slurm cluster with ease.
 
-See the [slurm_cluster module](../terraform/slurm_cluster/README.md) for
+See the [Cluster toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md) for
 details.
 
 If you are unfamiliar with [terraform](./glossary.md#terraform), then please
@@ -51,15 +39,18 @@ to get you familiar.
 
 ### Quickstart Examples
 
-See the [test cluster][test-cluster] example for an extensible and robust
-example. It can be configured to handle creation of all supporting resources
+See the [toolkit_quickstart][quickstart] for an extensible and robust
+example. It can be configured to handle the creation of all supporting resources
 (e.g. network, service accounts) or leave that to you. Slurm can be configured
 with partitions and nodesets as desired.
 
-> **NOTE:** It is recommended to use the
-> [slurm_cluster module](../terraform/slurm_cluster/README.md) in your own
-> [terraform project](./glossary.md#terraform-project). It may be useful to copy
-> and modify one of the provided examples.
+> **NOTE:** For deploying with
+> [Cluster toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md),
+> use the command `gclusster deploy <your_config>.yaml`,
+> which manages the underlying infrastructure deployment
+> instead of the standard Terraform workflow involving
+> `terraform init`, `terraform validate`, and `terraform apply`.
+> Please refer to the [Create the cluster deployment folder][deployment].
 
 Alternatively, see
 [HPC Blueprints](https://cloud.google.com/hpc-toolkit/docs/setup/hpc-blueprint)
@@ -69,4 +60,5 @@ examples.
 
 <!-- Links -->
 
-[test-cluster]: ../terraform/slurm_cluster/examples/slurm_cluster/test_cluster/README.md
+[quickstart]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md#quickstart
+[deployment]: https://cloud.google.com/cluster-toolkit/docs/quickstarts/slurm-cluster#create_the_cluster_deployment_folder
