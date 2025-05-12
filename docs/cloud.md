@@ -21,6 +21,7 @@ taken into account. This guide will cover them and their recommended solutions.
 
 There are two deployment methods for cloud cluster management:
 
+- [Cluster Toolkit](https://cloud.google.com/cluster-toolkit/docs/overview)
 - [Terraform](#terraform)
 
 ## Terraform
