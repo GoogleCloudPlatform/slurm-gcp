@@ -284,20 +284,18 @@ Simultaneous Multithreading (SMT) on/off.
 
 ### How do I automate custom cluster configurations?
 
-The [Slurm cluster module](../terraform/slurm_cluster/README.md) provide
-multiple variables (`controller_startup_scripts`, `compute_startup_scripts`,
-`partition_startup_scripts`) which allow you input a list of scripts which will
-be run on different sets of hosts at set-up time. The scripts are run
-synchronousely and a non-zero exit will fail the setup step of the instance.
-Generally, `controller_startup_scripts` will run only on the controller node;
-`compute_startup_scripts` will run on the log and all compute nodes, and
-`partition_startup_scripts` will on all compute nodes within that partition. See
-[Slurm cluster module variables](../terraform/slurm_cluster/variables.tf) for
-details.
+For automating custom configurations of your cluster, we recommend using the 
+[Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit). 
+The Cluster Toolkit is an open-source project offered by Google Cloud designed
+to simplify the deployment of AI/ML and HPC environments on Google Cloud.
 
-If you want to install software, it is recommended to bake it into the image.
-Doing so will speed up the deployment of bursted compute nodes. See
-[customize image](./images.md#customize) for more information.
+For installing software and core configurations,
+it's highly recommended to bake them into a custom VM image beforehand
+to significantly speed up deployment, especially when scaling.
+
+See [customize images](./images.md#customize)
+for more information. More details on the Cluster Toolkit are available
+[here](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/docs/vm-images.md).
 
 ### How do I replace the controller?
 
