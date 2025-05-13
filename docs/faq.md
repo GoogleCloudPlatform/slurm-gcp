@@ -83,7 +83,7 @@ out. Tickets can be submitted via
 ### How do I move data for a job?
 
 Data can be migrated to and from external sources using a workflow of dependent
-jobs. A [workflow submission script](../jobs/submit_workflow.py.py) and
+jobs. A [workflow submission script](https://github.com/GoogleCloudPlatform/slurm-gcp/blob/master/jobs/README.md#submit_workflowpy) and
 [helper jobs](../jobs/data_migrate/) are provided. See
 [README](../jobs/README.md) for more information.
 
@@ -115,25 +115,27 @@ jobs. A [workflow submission script](../jobs/submit_workflow.py.py) and
 Enhancement requests can be submitted to
 [SchedMD's Bugzilla](https://bugs.schedmd.com).
 
-### How do I use Terraform?
+### How do I modify Slurm config files with Terraform?
+To modify Slurm configuration files when deploying with Terraform on Google Cloud,
+the recommended approach is to use the Google Cloud Cluster Toolkit's Slurm module.
 
-Please see
-[Terraform documentation](https://learn.hashicorp.com/collections/terraform/gcp-get-started).
+Since release 6.8.6 all slurm-gcp terraform modules have been moved to
+[Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md)
 
-For the [Slurm terraform modules](../terraform/slurm_cluster/), please refer to
-their module API as documented in their README's. Additionally, please see the
-[Slurm terraform examples](../terraform/slurm_cluster/examples/) for sample
-usage.
+When using the Cluster Toolkit's Slurm Terraform module,
+you modify configuration files by providing custom configuration template files.
 
-### How do I modify Slurm config files?
+You specify the paths to your custom template files using the following input parameters:
 
-Presuming [slurm_cluster terraform module](../terraform/slurm_cluster/README.md)
-was used to deploy the cluster, see
-[input parameters](../terraform/slurm_cluster/README_TF.md#inputs):
+- slurm_conf_tpl: Path to your custom slurm.conf template.
+- cgroup_conf_tpl: Path to your custom cgroup.conf template.
+- slurmdbd_conf_tpl: Path to your custom slurmdbd.conf template (if using SlurmDBD).
 
-- slurm_conf_tpl
-- cgroup_conf_tpl
-- slurmdbd_conf_tpl
+Provide the local file paths for these parameters in your module configuration
+to use your custom configurations instead of the default ones.
+
+Please see [Terraform documentation](https://developer.hashicorp.com/terraform/tutorials/gcp-get-started)
+for general information on using Terraform on GCP.
 
 ### What are GCP preemptible VMs?
 
@@ -225,7 +227,7 @@ across all instances and allows easy user control with
 
 ### What Slurm image do I use for production?
 
-By default, the [slurm_cluster](../terraform/slurm_cluster/README.md) terraform
+By default, the slurm_cluster terraform
 module uses the latest Slurm image family (e.g.
 `slurm-gcp-6-9-hpc-rocky-linux-8`). As new Slurm image families are released,
 coenciding with periodic Slurm releases, the terraform module will be updated to
