@@ -284,8 +284,8 @@ Simultaneous Multithreading (SMT) on/off.
 
 ### How do I automate custom cluster configurations?
 
-For automating custom configurations of your cluster, we recommend using the 
-[Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit). 
+For automating custom configurations of your cluster, we recommend using the
+[Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit).
 The Cluster Toolkit is an open-source project offered by Google Cloud designed
 to simplify the deployment of AI/ML and HPC environments on Google Cloud.
 
