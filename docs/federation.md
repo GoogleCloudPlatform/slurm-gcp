@@ -26,7 +26,8 @@ This guide focuses on setting up a
 [Federation](#federation) is a superset of [multi-cluster](#multi-cluster). By
 setting up federation, you are also setting up multi-cluster.
 
-If using [Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit),
+If using
+[slurm_cluster terraform module][slurm-gcp],
 please refer to [multiple-slurmdbd](#multiple-slurmdbd) section.
 
 > **NOTE:** [slurmdbd](./glossary.md#slurmdbd) and the database (e.g. mariadb,
@@ -132,7 +133,8 @@ please refer to [multiple-slurmdbd](#multiple-slurmdbd) section.
 
    > **WARNING:** When setting up Slurm Federation,
    > the [Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit)
-   > cannot use the database provisioned/configured via the `cloudsql` input of the slurm_cluster Terraform module,
+   > cannot use the database provisioned/configured via the `cloudsql` input of the 
+   > [slurm_cluster terraform module][slurm-gcp],
    > because that database setup is incompatible with Federation requirements.
 
 1. Update each *slurm.conf* with:
@@ -153,3 +155,7 @@ please refer to [multiple-slurmdbd](#multiple-slurmdbd) section.
 ### Additional Requirements
 
 - All clusters must know where each [slurmdbd](./glossary.md#slurmdbd) is.
+
+<!-- Links -->
+
+[slurm-gcp]: https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/main/community/modules/internal/slurm-gcp
