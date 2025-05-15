@@ -89,6 +89,8 @@ their `slurm.conf`, by default.
 
 ## Terraform
 
+> **NOTE:** Since it only supports v5, some links are only meant to be used on the v5 branch.
+
 [Terraform](./glossary.md#terraform) is used to manage the cloud resources
 within your hybrid cluster. The
 [slurm_cluster](../terraform/slurm_cluster/README.md) module, when in hybrid
@@ -104,6 +106,8 @@ checkout out the [documentation](https://www.terraform.io/docs) and
 to get you familiar.
 
 ### Quickstart Examples
+
+> **NOTE:** Since it only supports v5, some links are only meant to be used on the v5 branch.
 
 See the [test cluster][test-cluster] example for an extensible and robust
 example. It can be configured to handle creation of all supporting resources
@@ -285,4 +289,4 @@ is critical.
 
 <!-- Links -->
 
-[test-cluster]: ../terraform/slurm_cluster/examples/slurm_cluster/test_cluster/README.md
+[test-cluster]: ./glossary.md#terraform-project
