@@ -365,9 +365,15 @@ must have correct permissions and [GCP IAM roles](#iam-roles) to create, delete,
 and modify resources as defined in the [terraform project](#terraform-project).
 
 ## Terraform Project
-
-A terraform project is any directory that contains a set of terraform files
-(`*.tf`) which define providers, resources, and data.
+Since release 6.8.6 all slurm-gcp terraform modules have been moved to 
+[Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/main/community/modules/internal/slurm-gcp).
+These modules are used within a standard Terraform project, which is any directory that contains a set of Terraform files (`*.tf`) defining
+providers, resources, and data. The typical workflow for using these modules in your project involves the following commands:
+- `terraform init` to get the plugins
+- `terraform validate` to validate the configuration
+- `terraform plan -var-file=example.tfvars` to see the infrastructure plan
+- `terraform apply -var-file=example.tfvars` to apply the infrastructure build
+- `terraform destroy -var-file=example.tfvars` to destroy the built infrastructure
 
 ## Terraform Registry
 
