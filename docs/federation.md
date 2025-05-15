@@ -26,7 +26,7 @@ This guide focuses on setting up a
 [Federation](#federation) is a superset of [multi-cluster](#multi-cluster). By
 setting up federation, you are also setting up multi-cluster.
 
-If using [slurm_cluster terraform module](../terraform/slurm_cluster/README.md),
+If using [Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit),
 please refer to [multiple-slurmdbd](#multiple-slurmdbd) section.
 
 > **NOTE:** [slurmdbd](./glossary.md#slurmdbd) and the database (e.g. mariadb,
@@ -123,15 +123,17 @@ please refer to [multiple-slurmdbd](#multiple-slurmdbd) section.
    mysql, etc..).
 
    > **NOTE:**
-   > [slurm_cluster terraform module](../terraform/slurm_cluster/README.md)
-   > conflates the controller instance and the database instance.
+   > When the controller and database roles are combined onto a single instance
+   > (as completed by infrastructure provisioning),
+   > the [Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit)
+   > is responsible for configuring both the controller and database software and services on that single instance.
 
 1. Deploy Slurm clusters by any chosen methods (e.g. cloud, hybrid, etc..).
 
-   > **WARNING:** If using the
-   > [slurm_cluster terraform module](../terraform/slurm_cluster/README.md), do
-   > not use the `cloudsql` input, as this does not work with a federation
-   > setup.
+   > **WARNING:** When setting up Slurm Federation,
+   > the [Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit)
+   > cannot use the database provisioned/configured via the `cloudsql` input of the slurm_cluster Terraform module,
+   > because that database setup is incompatible with Federation requirements.
 
 1. Update each *slurm.conf* with:
 
