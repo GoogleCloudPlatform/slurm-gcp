@@ -40,7 +40,7 @@ for the Slurm HTC guide.
 To make slurm.conf changes in slurm-gcp in accordance with HTC recommendations,
 the currently supported method is to pass a slurm.conf template file into the
 controller module with input variables
-[\*\_tpl](../terraform/slurm_cluster/modules/slurm_controller_instance/README_TF.md#inputs).
+[\*\_tpl](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/community/modules/scheduler/schedmd-slurm-gcp-v6-controller/README.md).
 
 Currently, the terraform modules expose these template files which get rendered
 into the corresponding slurm configuration files:
@@ -84,7 +84,7 @@ See [setup.py](../scripts/setup.py#L147) for details.
 ## Example
 
 See
-[HTC example](../terraform/slurm_cluster/examples/slurm_cluster/cloud/htc/README.md).
+[HTC example](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/community/examples/htc-slurm.yaml).
 
 ## Hardware Recommendations
 
@@ -119,5 +119,9 @@ Example minimum system requirements ~ 100k jobs a day / 500 node
 OS level settings may need to be adjusted to optimize for HTC workloads or
 general operation. This can be achieved though building
 [custom images](./images.md#custom-image) or minimally though
-[startup scripts](../terraform/slurm_cluster/README_TF.md#inputs) for the
-compute instances.
+[startup scripts][startup-script] 
+for the compute instances.
+
+<!-- Links -->
+
+[startup-script]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/modules/scripts/startup-script/README.md
