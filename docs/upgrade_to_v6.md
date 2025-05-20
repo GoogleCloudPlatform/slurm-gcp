@@ -23,6 +23,8 @@ Please review [CHANGELOG](../CHANGELOG.md) for documented changes.
 
 ## Terraform
 
+> **NOTE:** Since it only supports v6, some links are only meant to be used on the v6 branch.
+
 ### Added Modules
 
 - [\_instance_template](../terraform/slurm_cluster/modules/_instance_template/README_TF.md)
