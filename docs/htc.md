@@ -119,7 +119,7 @@ Example minimum system requirements ~ 100k jobs a day / 500 node
 OS level settings may need to be adjusted to optimize for HTC workloads or
 general operation. This can be achieved though building
 [custom images](./images.md#custom-image) or minimally though
-[startup scripts][startup-script] 
+[startup scripts][startup-script]
 for the compute instances.
 
 <!-- Links -->

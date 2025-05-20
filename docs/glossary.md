@@ -365,7 +365,7 @@ must have correct permissions and [GCP IAM roles](#iam-roles) to create, delete,
 and modify resources as defined in the [terraform project](#terraform-project).
 
 ## Terraform Project
-Since release 6.8.6 all slurm-gcp terraform modules have been moved to 
+Since release 6.8.6 all slurm-gcp terraform modules have been moved to
 [Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/main/community/modules/internal/slurm-gcp),
 where you can also find the [quickstart](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md#quickstart) guide.
 These modules are used within a standard Terraform project, which is any directory that contains a set of Terraform files (`*.tf`) defining

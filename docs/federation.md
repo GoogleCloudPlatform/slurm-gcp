@@ -133,7 +133,7 @@ please refer to [multiple-slurmdbd](#multiple-slurmdbd) section.
 
    > **WARNING:** When setting up Slurm Federation,
    > the [Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit)
-   > cannot use the database provisioned/configured via the `cloudsql` input of the 
+   > cannot use the database provisioned/configured via the `cloudsql` input of the
    > [slurm_cluster terraform module][slurm-gcp],
    > because that database setup is incompatible with Federation requirements.
 
