@@ -91,8 +91,8 @@ For the [TPU](./glossary.md#tpu) nodes docker images are also released.
 
 ## Custom Image
 
-To create [slurm_cluster](../terraform/slurm_cluster/README.md) compliant images
-yourself, a custom Slurm image can be created. [Packer](./glossary.md#packer)
+To create slurm_cluster compliant images yourself, a custom Slurm image can be created.
+[Packer](./glossary.md#packer)
 and [Ansible](./glossary.md#ansible) are used to orchestrate custom image
 creation.
 
@@ -119,7 +119,8 @@ how the build will happen. Custom packages and other image configurations can be
 added by a few methods. All methods below may be used together in any
 combination, if desired.
 
-- Role [scripts](./ansible/roles/scripts) runs all scripts globbed from
+- Role [scripts](https://github.com/GoogleCloudPlatform/slurm-gcp/tree/master/ansible/roles/scripts)
+  runs all scripts globbed from
   [scripts.d](../ansible/scripts.d). This method is intended for simple
   configuration scripts.
 - Image configuration can be extended by specifying extra custom playbooks using
