@@ -33,6 +33,12 @@
     # state: latest
     update_cache: yes
 
+- name: Install dnf-command(config-manager) on Rocky 8
+  package:
+    name: dnf-command(config-manager)
+    state: present
+  when: ansible_distribution == "Rocky"
+
 - name: Enable CentOS 8 PowerTools Repository
   command: dnf config-manager --set-enabled powertools
   when: ansible_distribution == "Rocky"

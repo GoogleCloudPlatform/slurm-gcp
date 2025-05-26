@@ -18,10 +18,12 @@
     that:
     - tf_version in tf_versions_to_tpu_mapping.keys()
     fail_msg: The tf_version {{tf_version}} is not supported
+  when: tf_version != "none"
 
 - name: Calculate python310 variable
   set_fact:
     python310: "{{ tf_version.split('.')[1] | int >= 13 or (tf_version.split('.')[1] | int == 12 and tf_version.split('.')[2] | int >= 1) }}"
+  when: tf_version != "none"
 
 - name: Generate wheel variable
   set_fact:
@@ -29,12 +31,14 @@
       https://storage.googleapis.com/cloud-tpu-tpuvm-artifacts/tensorflow/tf-{{ tf_version
       }}/tensorflow-{{ tf_version }}-{% if python310 %}cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64{%
       else %}cp38-cp38-linux_x86_64{% endif %}.whl
+  when: tf_version != "none"
 
 - name: Generate tpu_so variable
   set_fact:
     tpu_so: >-
       https://storage.googleapis.com/cloud-tpu-tpuvm-artifacts/libtpu/{{ tf_versions_to_tpu_mapping[tf_version]
       }}/libtpu.so
+  when: tf_version != "none"
 
 - name: Install Tensorflow package
   pip:
@@ -51,11 +55,20 @@
     mode: '0555'
     owner: root
     group: root
+  when: tf_version != "none"
 
 - name: Copy startup service file
   copy:
     src: startup.service
     dest: /etc/systemd/system/startup.service
+    owner: root
+    group: root
+    mode: 0o644
+
+- name: Set memlock limit
+  copy:
+    src: 100-tpu.conf
+    dest: /etc/security/limits.d/100-tpu.conf
     owner: root
     group: root
     mode: 0o644
