@@ -7,55 +7,60 @@
 
 - [Cloud Cluster Guide](#cloud-cluster-guide)
   - [Overview](#overview)
-  - [GCP Marketplace](#gcp-marketplace)
+  - [Cluster Toolkit](#cluster-toolkit)
   - [Terraform](#terraform)
-    - [Quickstart Examples](#quickstart-examples)
+  - [Quickstart Examples](#quickstart-examples)
 
 <!-- mdformat-toc end -->
 
 ## Overview
 
 This guide focuses on setting up a cloud [Slurm cluster](./glossary.md#slurm).
-With cloud, there are decisions that need to be made and certain considerations
-taken into account. This guide will cover them and their recommended solutions.
+in the cloud. Deploying in a cloud environment involves various decisions and
+considerations, which this guide will cover, along with recommended solutions.
 
-There are two deployment methods for cloud cluster management:
+There are two primary deployment methods for cloud cluster management:
 
-- [Cluster Toolkit](https://cloud.google.com/cluster-toolkit/docs/overview)
-- [Terraform](#terraform)
+- [Cluster Toolkit](#cluster-toolkit)
+- [Terraform](#terraform) 
+
+## Cluster Toolkit
+The Cluster Toolkit provides a set of modules designed to simplify Slurm cluster
+creation. While it leverages Terraform for underlying infrastructure deployment
+and management, the Cluster Toolkit offers an abstraction layer that streamlines
+the operational process, making it a powerful and convenient deployment option.
+
+For detailed information, please refer to the
+[Cluster Toolkit documentation](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md).
+
+> **NOTE:** When deploying with the
+> [Cluster toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md),
+> use the command `gclusster deploy <your_config>.yaml`. This command manages the
+> underlying infrastructure deployment automatically, replacing the standard
+> Terraform workflow (e.g., `terraform init`, `terraform validat`, `terraform apply`).
+> Please refer to [Create the cluster deployment folder][deployment] for more details.
 
 ## Terraform
 
-This deployment method leverages [Terraform](./glossary.md#terraform) to deploy
-and manage cluster infrastructure. While this method can be more complex, it is
-a robust option. Cluster toolkit provides modules that enables you to create a Slurm cluster with ease.
+This deployment method directly utilizes [Terraform](./glossary.md#terraform) to deploy
+and manage cluster infrastructure.While potentially more complex than using the Cluster
+Toolkit, it offers greater flexibility and customization capabilities.
 
-See the [Cluster toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md) for
-details.
-
-If you are unfamiliar with [terraform](./glossary.md#terraform), then please
-checkout out the [documentation](https://www.terraform.io/docs) and
-[starter guide](https://learn.hashicorp.com/collections/terraform/gcp-get-started)
-to get you familiar.
+If you are unfamiliar with [terraform](./glossary.md#terraform), we recommend reviewing the
+[official Terraform documentation](https://www.terraform.io/docs) and the
+[Terraform starter guide](https://learn.hashicorp.com/collections/terraform/gcp-get-started)
+to familiarize yourself with its core concepts and operations.
 
 ### Quickstart Examples
 
-See the [toolkit_quickstart][quickstart] for an extensible and robust
-example. It can be configured to handle the creation of all supporting resources
-(e.g. network, service accounts) or leave that to you. Slurm can be configured
-with partitions and nodesets as desired.
+Refer to [toolkit_quickstart][quickstart] for an extensible and robust
+example. This can be configured to handle the creation of all supporting resources
+(e.g., network, service accounts) or allow you to manage them manually. Slurm can also
+be configured with partitions and nodesets as desired.
 
-> **NOTE:** For deploying with
-> [Cluster toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md),
-> use the command `gclusster deploy <your_config>.yaml`,
-> which manages the underlying infrastructure deployment
-> instead of the standard Terraform workflow involving
-> `terraform init`, `terraform validate`, and `terraform apply`.
-> Please refer to the [Create the cluster deployment folder][deployment].
-
-Alternatively, see
+Alternatively,you can find 
 [HPC Blueprints](https://cloud.google.com/hpc-toolkit/docs/setup/hpc-blueprint)
-for
+within
 [HPC Toolkit](https://cloud.google.com/blog/products/compute/new-google-cloud-hpc-toolkit)
 examples.
 
