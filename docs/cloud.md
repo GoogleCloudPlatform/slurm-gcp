@@ -22,7 +22,7 @@ considerations, which this guide will cover, along with recommended solutions.
 There are two primary deployment methods for cloud cluster management:
 
 - [Cluster Toolkit](#cluster-toolkit)
-- [Terraform](#terraform) 
+- [Terraform](#terraform)
 
 ## Cluster Toolkit
 The Cluster Toolkit provides a set of modules designed to simplify Slurm cluster
@@ -58,7 +58,7 @@ example. This can be configured to handle the creation of all supporting resourc
 (e.g., network, service accounts) or allow you to manage them manually. Slurm can also
 be configured with partitions and nodesets as desired.
 
-Alternatively,you can find 
+Alternatively,you can find
 [HPC Blueprints](https://cloud.google.com/hpc-toolkit/docs/setup/hpc-blueprint)
 within
 [HPC Toolkit](https://cloud.google.com/blog/products/compute/new-google-cloud-hpc-toolkit)
