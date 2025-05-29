@@ -1,5 +1,5 @@
 ---
-# Copyright 2024 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apt_keyring: /etc/apt/keyrings
-nvidia_gpg_key_url: https://nvidia.github.io/libnvidia-container/gpgkey
-nvidia_repo_url_deb: https://nvidia.github.io/libnvidia-container/stable/deb
-nvidia_gpg_key_deb: "{{ apt_keyring }}/nvidia-container-toolkit-keyring.asc"
-nvidia_repo_file_rpm: https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
-install_nvidia_repo: true
+distribution: "{{ ansible_distribution | lower }}{{ ansible_distribution_major_version }}"
+nvidia_keyring_url: "{{ nvidia_repo_url }}/cuda-keyring_1.1-1_all.deb"
+nvidia_keyring_filename: /tmp/{{ nvidia_keyring_url | basename }}

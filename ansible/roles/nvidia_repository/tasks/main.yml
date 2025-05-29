@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Include OS Family Dependent Tasks
-  include_tasks: '{{ item }}'
+- name: Include OS Family Dependent Vars
+  ansible.builtin.include_vars: "{{ item }}"
   with_first_found:
-  - os/{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml
-  - os/{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml
-  - os/{{ ansible_distribution|lower }}.yml
-  - os/{{ ansible_os_family|lower }}-{{ ansible_distribution_version }}.yml
-  - os/{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml
-  - os/{{ ansible_os_family|lower }}.yml
+  - "{{ ansible_distribution | lower }}.yml"
+  - "{{ ansible_os_family | lower }}.yml"
+
   # this should only be disabled for images that already have an NVIDIA repository installed
+- name: Include OS Family Dependent Tasks
+  ansible.builtin.include_tasks: "{{ item }}"
+  with_first_found:
+  - os/{{ ansible_os_family | lower }}.yml
   when: install_nvidia_repo

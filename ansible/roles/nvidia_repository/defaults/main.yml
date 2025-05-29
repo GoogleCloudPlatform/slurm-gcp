@@ -13,6 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-dependencies:
-- role: nvidia_repository
-  when: enroot_install_optional_deps
+# distribution is defined per-distribution in ../vars/*.yml files
+nvidia_repo_url: https://developer.download.nvidia.com/compute/cuda/repos/{{ distribution }}/{{ ansible_architecture }}
+install_nvidia_repo: true
