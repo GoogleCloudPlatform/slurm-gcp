@@ -13,6 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-dependencies:
-- role: nvidia_repository
-  when: enroot_install_optional_deps
+- name: Add NVIDIA repository
+  ansible.builtin.command: dnf config-manager --add-repo {{ nvidia_repo_url }}/cuda-{{ distribution }}.repo
+  creates: /etc/yum.repos.d/cuda-{{ distribution }}.repo

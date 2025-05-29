@@ -1,5 +1,5 @@
 ---
-# Copyright 2024 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Add Nvidia Container Repo
-  ansible.builtin.get_url:
-    url: '{{ nvidia_repo_file_rpm }}'
-    dest: /etc/yum.repos.d/nvidia-container-toolkit.repo
+distribution: "{{ ansible_distribution | lower }}{{ ansible_distribution_version | replace('.','') }}"
+nvidia_keyring_url: "{{ nvidia_repo_url }}/cuda-keyring_1.1-1_all.deb"
+nvidia_keyring_filename: /tmp/{{ nvidia_keyring_url | basename }}

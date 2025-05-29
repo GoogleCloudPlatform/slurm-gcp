@@ -1,0 +1,63 @@
+---
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- name: Download NVIDIA repository package
+  ansible.builtin.get_url:
+    url: "{{ nvidia_keyring_url }}"
+    dest: "{{ nvidia_keyring_filename }}"
+
+- name: Install NVIDIA repository package
+  ansible.builtin.apt:
+    deb: "{{ nvidia_keyring_filename }}"
+    state: present
+
+- name: Update apt cache to include new repository
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 0
+
+- name: Delete NVIDIA repository files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+  - /etc/apt/preferences.d/cuda-repository-pin-600
+  - "{{ nvidia_keyring_filename }}"
+
+- name: Lower NVIDIA repo priority below OS repos and block known broken package
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/nvidia-repository-lower-priority
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      Package: nsight-compute
+      Pin: origin *ubuntu.com*
+      Pin-Priority: -1
+
+      Package: nsight-systems
+      Pin: origin *ubuntu.com*
+      Pin-Priority: -1
+
+      Package: *
+      Pin: release l=NVIDIA CUDA
+      Pin-Priority: 400
+
+      # The 1.17.7 release contains bugs that break enroot functionality on Slurm clusters
+      # e.g., https://github.com/NVIDIA/enroot/issues/232
+      # This pinning makes the version uninstallable by default
+      Package: nvidia-container-toolkit nvidia-container-toolkit-base libnvidia-container-tools libnvidia-container1
+      Pin: version 1.17.7-1
+      Pin-Priority: 100
