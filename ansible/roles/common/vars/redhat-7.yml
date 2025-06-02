@@ -32,11 +32,13 @@ common_packages:
 - jq
 - libtool
 - make
+- nfs-utils
 - openssl-devel
 - pciutils
 - pdsh
 - pkgconfig
 - python3
+- sudo
 - tmux
 - unzip
 - valgrind
