@@ -16,13 +16,12 @@
 ## Overview
 
 This guide focuses on setting up a cloud [Slurm cluster](./glossary.md#slurm).
-in the cloud. Deploying in a cloud environment involves various decisions and
+Deploying in a cloud environment involves various decisions and
 considerations, which this guide will cover, along with recommended solutions.
 
-There are two primary deployment methods for cloud cluster management:
+The primary deployment method for cloud cluster management is:
 
 - [Cluster Toolkit](#cluster-toolkit)
-- [Terraform](#terraform)
 
 ## Cluster Toolkit
 The Cluster Toolkit provides a set of modules designed to simplify Slurm cluster
@@ -35,7 +34,7 @@ For detailed information, please refer to the
 
 > **NOTE:** When deploying with the
 > [Cluster toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md),
-> use the command `gclusster deploy <your_config>.yaml`. This command manages the
+> use the command `gcluster deploy <your_config>.yaml`. This command manages the
 > underlying infrastructure deployment automatically, replacing the standard
 > Terraform workflow (e.g., `terraform init`, `terraform validat`, `terraform apply`).
 > Please refer to [Create the cluster deployment folder][deployment] for more details.
