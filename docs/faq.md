@@ -226,9 +226,8 @@ across all instances and allows easy user control with
 
 ### What Slurm image do I use for production?
 
-By default, the slurm_cluster terraform
-module uses the latest Slurm image family (e.g.
-`slurm-gcp-6-9-hpc-rocky-linux-8`). As new Slurm image families are released,
+By default, Slurm clusters using Cluster Toolkit make use of the latest
+`slurm-gcp-6-9-hpc-rocky-linux-8 image`. As new Slurm image families are released,
 coenciding with periodic Slurm releases, the terraform module will be updated to
 track the newest image family by setting it as the new default. This update can
 be considered a breaking change.
