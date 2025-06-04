@@ -20,6 +20,9 @@
 
 <!-- mdformat-toc end -->
 
+> **NOTE:** Hybrid clusters are exclusively supported on v5. Please switch to the
+> `v5` branch in the repository for the corresponding code and documentation.
+
 ## Overview
 
 This guide focuses on setting up a hybrid [Slurm cluster](./glossary.md#slurm).
@@ -88,6 +91,8 @@ The compute resources in GCP use
 their `slurm.conf`, by default.
 
 ## Terraform
+
+> **NOTE:** Since it only supports v5, some links are only meant to be used on the v5 branch.
 
 [Terraform](./glossary.md#terraform) is used to manage the cloud resources
 within your hybrid cluster. The
@@ -285,4 +290,4 @@ is critical.
 
 <!-- Links -->
 
-[test-cluster]: ../terraform/slurm_cluster/examples/slurm_cluster/test_cluster/README.md
+[test-cluster]: ./glossary.md#terraform-project
