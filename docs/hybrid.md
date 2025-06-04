@@ -20,6 +20,9 @@
 
 <!-- mdformat-toc end -->
 
+> **NOTE:** Hybrid clusters are exclusively supported on v5. Please switch to the
+> `v5` branch in the repository for the corresponding code and documentation.
+
 ## Overview
 
 This guide focuses on setting up a hybrid [Slurm cluster](./glossary.md#slurm).
@@ -106,8 +109,6 @@ checkout out the [documentation](https://www.terraform.io/docs) and
 to get you familiar.
 
 ### Quickstart Examples
-
-> **NOTE:** Since it only supports v5, some links are only meant to be used on the v5 branch.
 
 See the [test cluster][test-cluster] example for an extensible and robust
 example. It can be configured to handle creation of all supporting resources
