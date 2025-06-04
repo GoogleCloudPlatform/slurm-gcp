@@ -16,8 +16,7 @@
     - [How do I connect to Slurm instances?](#how-do-i-connect-to-slurm-instances)
   - [For Administrators](#for-administrators)
     - [How do I contribute to `slurm-gcp` or `slurm`?](#how-do-i-contribute-to-slurm-gcp-or-slurm)
-    - [How do I use Terraform?](#how-do-i-use-terraform)
-    - [How do I modify Slurm config files?](#how-do-i-modify-slurm-config-files)
+    - [How do I modify Slurm config files with Terraform?](#how-do-i-modify-slurm-config-files-with-terraform)
     - [What are GCP preemptible VMs?](#what-are-gcp-preemptible-vms)
     - [How do I reduce compute costs?](#how-do-i-reduce-compute-costs)
     - [How do I limit user access to only using login nodes?](#how-do-i-limit-user-access-to-only-using-login-nodes)
@@ -83,7 +82,7 @@ out. Tickets can be submitted via
 ### How do I move data for a job?
 
 Data can be migrated to and from external sources using a workflow of dependent
-jobs. A [workflow submission script](../jobs/submit_workflow.py.py) and
+jobs. A [workflow submission script](https://github.com/GoogleCloudPlatform/slurm-gcp/blob/master/jobs/README.md#submit_workflowpy) and
 [helper jobs](../jobs/data_migrate/) are provided. See
 [README](../jobs/README.md) for more information.
 
@@ -115,25 +114,27 @@ jobs. A [workflow submission script](../jobs/submit_workflow.py.py) and
 Enhancement requests can be submitted to
 [SchedMD's Bugzilla](https://bugs.schedmd.com).
 
-### How do I use Terraform?
+### How do I modify Slurm config files with Terraform?
+To modify Slurm configuration files when deploying with Terraform on Google Cloud,
+the recommended approach is to use the Google Cloud Cluster Toolkit's Slurm module.
 
-Please see
-[Terraform documentation](https://learn.hashicorp.com/collections/terraform/gcp-get-started).
+Since release 6.8.6 all slurm-gcp terraform modules have been moved to
+[Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/README.md)
 
-For the [Slurm terraform modules](../terraform/slurm_cluster/), please refer to
-their module API as documented in their README's. Additionally, please see the
-[Slurm terraform examples](../terraform/slurm_cluster/examples/) for sample
-usage.
+When using the Cluster Toolkit's Slurm Terraform module,
+you modify configuration files by providing custom configuration template files.
 
-### How do I modify Slurm config files?
+You specify the paths to your custom template files using the following input parameters:
 
-Presuming [slurm_cluster terraform module](../terraform/slurm_cluster/README.md)
-was used to deploy the cluster, see
-[input parameters](../terraform/slurm_cluster/README_TF.md#inputs):
+- slurm_conf_tpl: Path to your custom slurm.conf template.
+- cgroup_conf_tpl: Path to your custom cgroup.conf template.
+- slurmdbd_conf_tpl: Path to your custom slurmdbd.conf template (if using SlurmDBD).
 
-- slurm_conf_tpl
-- cgroup_conf_tpl
-- slurmdbd_conf_tpl
+Provide the local file paths for these parameters in your module configuration
+to use your custom configurations instead of the default ones.
+
+Please see [Terraform documentation](https://developer.hashicorp.com/terraform/tutorials/gcp-get-started)
+for general information on using Terraform on GCP.
 
 ### What are GCP preemptible VMs?
 
@@ -225,9 +226,8 @@ across all instances and allows easy user control with
 
 ### What Slurm image do I use for production?
 
-By default, the [slurm_cluster](../terraform/slurm_cluster/README.md) terraform
-module uses the latest Slurm image family (e.g.
-`slurm-gcp-6-9-hpc-rocky-linux-8`). As new Slurm image families are released,
+By default, Slurm clusters using Cluster Toolkit make use of the latest
+`slurm-gcp-6-9-hpc-rocky-linux-8 image`. As new Slurm image families are released,
 coenciding with periodic Slurm releases, the terraform module will be updated to
 track the newest image family by setting it as the new default. This update can
 be considered a breaking change.
@@ -282,20 +282,18 @@ Simultaneous Multithreading (SMT) on/off.
 
 ### How do I automate custom cluster configurations?
 
-The [Slurm cluster module](../terraform/slurm_cluster/README.md) provide
-multiple variables (`controller_startup_scripts`, `compute_startup_scripts`,
-`partition_startup_scripts`) which allow you input a list of scripts which will
-be run on different sets of hosts at set-up time. The scripts are run
-synchronousely and a non-zero exit will fail the setup step of the instance.
-Generally, `controller_startup_scripts` will run only on the controller node;
-`compute_startup_scripts` will run on the log and all compute nodes, and
-`partition_startup_scripts` will on all compute nodes within that partition. See
-[Slurm cluster module variables](../terraform/slurm_cluster/variables.tf) for
-details.
+For automating custom configurations of your cluster, we recommend using the
+[Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit).
+The Cluster Toolkit is an open-source project offered by Google Cloud designed
+to simplify the deployment of AI/ML and HPC environments on Google Cloud.
 
-If you want to install software, it is recommended to bake it into the image.
-Doing so will speed up the deployment of bursted compute nodes. See
-[customize image](./images.md#customize) for more information.
+For installing software and core configurations,
+it's highly recommended to bake them into a custom VM image beforehand
+to significantly speed up deployment, especially when scaling.
+
+See [customize images](./images.md#customize)
+for more information. More details on the Cluster Toolkit are available
+[here](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/docs/vm-images.md).
 
 ### How do I replace the controller?
 
