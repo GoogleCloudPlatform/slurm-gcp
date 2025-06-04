@@ -91,10 +91,9 @@ For the [TPU](./glossary.md#tpu) nodes docker images are also released.
 
 ## Custom Image
 
-To create slurm_cluster compliant images yourself, a custom Slurm image can be created.
-[Packer](./glossary.md#packer)
-and [Ansible](./glossary.md#ansible) are used to orchestrate custom image
-creation.
+To create Slurm images for your `slurm_cluster` deployments,
+you'll typically use [Packer](./glossary.md#packer)
+and [Ansible](./glossary.md#ansible) to orchestrate the process.
 
 Custom images can be built from a supported private or public image (e.g.
 hpc-centos-7, centos-7). Additionally, ansible roles or scripts can be added
