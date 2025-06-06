@@ -42,6 +42,8 @@ Additionally, there was one optional supporting cluster module.
 
 ### v5 Background
 
+> **NOTE:** Since it only supports v5, some links are only meant to be used on the v5 branch.
+
 v5 has one Slurm module which creates the Slurm cluster.
 
 - [slurm_cluster](../terraform/slurm_cluster/README.md)

@@ -39,7 +39,7 @@ first it is important to take into account the following considerations.
   because TPU names cannot be chosen or known before starting them up.
 - python 3.7 or above is needed for the TPU API module to work. In consequence
   TPU nodes will not work with all the OS, like for example CentOS 7, see more
-  in the [compatibility matrix](#slurm-gcp-compatiblity-matrix).
+  in the [compatibility matrix](#slurm-gcp-compaitiblity-matrix).
 
 TPUs are configured in Slurm with what is called a nodeset_tpu, this is like a
 regular nodeset but for TPU nodes, and it takes into account the differences
@@ -81,9 +81,9 @@ state we will also include if it is tested or not.
 
 Terraform is used for creating the configuration for Slurm to spin up TPU nodes.
 
-See the [slurm_cluster module](../terraform/slurm_cluster/README.md) and the
-[slurm_nodeset_tpu module](../terraform/slurm_cluster/modules/slurm_nodeset_tpu/README.md)
-for details.
+Since release 6.8.6, all slurm-gcp Terraform modules have been moved to Cluster Toolkit:
+[slurm_cluster module][slurm-gcp] and the
+[slurm_nodeset_tpu module][nodeset_tpu] for details.
 
 If you are unfamiliar with [terraform](./glossary.md#terraform), then please
 checkout out the [documentation](https://www.terraform.io/docs) and
@@ -93,13 +93,13 @@ to get you familiar.
 ### Quickstart Examples
 
 See the
-[simple_cloud_tpu](../terraform/slurm_cluster/examples/slurm_cluster/simple_cloud_tpu/README.md)
+[simple_cloud_tpu][tpu_quickstart]
 example for an extensible and robust example. It can be configured to handle
 creation of all supporting resources (e.g. network, service accounts) or leave
 that to you. Slurm can be configured with partitions and nodesets as desired.
 
 > **NOTE:** It is recommended to use the
-> [slurm_cluster module](../terraform/slurm_cluster/README.md) in your own
+> [slurm_cluster module][slurm-gcp] in your own
 > [terraform project](./glossary.md#terraform-project). It may be useful to copy
 > and modify one of the provided examples.
 
@@ -174,3 +174,6 @@ Static TPU nodes can be configured the same way as regular nodes are, stating
 the count of it in "node_count_static" variable of each nodeset_tpu.
 
 <!-- Links -->
+[slurm-gcp]: https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/main/community/modules/internal/slurm-gcp
+[nodeset_tpu]: https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/main/community/modules/internal/slurm-gcp/nodeset_tpu
+[tpu_quickstart]: https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/community/modules/internal/slurm-gcp/nodeset_tpu/README.md
