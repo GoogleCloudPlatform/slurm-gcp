@@ -48,10 +48,10 @@ if [[ ${SLURM_SCRIPT_CONTEXT} == "prolog_slurmd" ]]; then
 		${NCCL_PLUGIN_IMAGE} \
 		install --install-nccl
 
-        # Modify NCCL env vars for Debian 12.
+        # Modify NCCL env vars for Debian 12 and Ubuntu.
         # /var/lib/tcpxo/lib64/nccl-env-profile.sh is written by the nccl-installer container
         # above, and assumes interface names of eth{0..8}.
-	if (grep -q "ID=debian" /etc/os-release && lsb_release -rs | grep -q "12"); then
+	if ( (grep -q "ID=debian" /etc/os-release && lsb_release -rs | grep -q "12") || (grep -q "ID=ubuntu" /etc/os-release) ); then
 		cat >>/var/lib/tcpxo/lib64/nccl-env-profile.sh <<-EOF
 			export NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY=/dev/aperture_devices
 			export LD_LIBRARY_PATH=/var/lib/tcpxo/lib64:\${LD_LIBRARY_PATH}
