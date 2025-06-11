@@ -16,10 +16,8 @@
 set -e
 
 # invoke RxDMv2 on a3-megagpu-8g only
-/usr/bin/curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/machine-type | grep -q "/a3-megagpu-8g$"
-IS_A3_MEGA=$?
-if [[ "${IS_A3_MEGA}" -ne 0 ]]; then
-	exit 0
+if ! /usr/bin/curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/machine-type | grep -q "/a3-megagpu-8g$"; then
+    exit 0
 fi
 
 # do not invoke RxDM on 1-node jobs
