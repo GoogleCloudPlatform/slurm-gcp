@@ -15,4 +15,5 @@
 
 - name: Add NVIDIA repository
   ansible.builtin.command: dnf config-manager --add-repo {{ nvidia_repo_url }}/cuda-{{ distribution }}.repo
-  creates: /etc/yum.repos.d/cuda-{{ distribution }}.repo
+  args:
+    creates: /etc/yum.repos.d/cuda-{{ distribution }}.repo

@@ -52,7 +52,12 @@ logging:
     setup:
       type: files
       include_paths:
-      - /slurm/scripts/setup.log
+      - /var/log/slurm/setup.log
+      record_log_file_path: true
+    chs_health_check:
+      type: files
+      include_paths:
+      - /var/log/slurm/chs_health_check.log
       record_log_file_path: true
   processors:
     parse_slurmlog:
@@ -79,5 +84,6 @@ logging:
         - slurm_suspend
         - slurm_sync
         - setup
+        - chs_health_check
         processors:
         - parse_slurmlog2
