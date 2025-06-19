@@ -14,5 +14,6 @@
 # limitations under the License.
 
 - name: Add NVIDIA repository
-  ansible.builtin.command: dnf config-manager --add-repo {{ nvidia_repo_url }}/cuda-{{ distribution }}.repo
-  creates: /etc/yum.repos.d/cuda-{{ distribution }}.repo
+  ansible.builtin.command:
+    cmd: dnf config-manager --add-repo {{ nvidia_repo_url }}/cuda-{{ distribution }}.repo
+    creates: /etc/yum.repos.d/cuda-{{ distribution }}.repo

@@ -57,6 +57,7 @@
     install_ompi: true
     install_lustre: true
     install_managed_lustre: false
+    slurm_patch_files: []
     install_gcsfuse: true
     install_pmix: true
     install_pyxis: true

@@ -1,0 +1,341 @@
+From 7c4bd7182cb77e9943df9d2d7131ecc242e37d5c Mon Sep 17 00:00:00 2001
+From: Nathan Rini <nate@schedmd.com>
+Date: Thu, 5 Jun 2025 09:51:51 -0600
+Subject: [PATCH 1/7] Allow _run_command_child_exec() to fail
+
+Instead of calling _exit(127) on failure, change _run_command_child_exec()
+to have a return code to indicate why execve() or fexecve() failed.
+
+Ticket: 22853
+---
+ src/common/run_command.c | 44 ++++++++++++++++++++++++----------------
+ 1 file changed, 27 insertions(+), 17 deletions(-)
+
+diff --git a/src/common/run_command.c b/src/common/run_command.c
+index 027c4a00e2..6748f313cd 100644
+--- a/src/common/run_command.c
++++ b/src/common/run_command.c
+@@ -70,8 +70,8 @@ static pthread_mutex_t proc_count_mutex = PTHREAD_MUTEX_INITIALIZER;
+ #define MAX_POLL_WAIT 500
+
+ /* Function prototypes */
+-static void _run_command_child_exec(int fd, const char *path, char **argv,
+-				    char **env);
++static int _run_command_child_exec(int fd, const char *path, char **argv,
++				   char **env);
+ static void _run_command_child_pre_exec(void);
+
+ extern void run_command_add_to_script(char **script_body, char *new_str)
+@@ -246,13 +246,17 @@ static void _run_command_child(run_command_args_t *args, int write_fd,
+ 	dup2(write_fd, STDERR_FILENO);
+ 	dup2(write_fd, STDOUT_FILENO);
+
+-	if (launcher_argv)
+-		_run_command_child_exec(script_launcher_fd, script_launcher,
+-					launcher_argv, args->env);
++	if (launcher_argv) {
++		(void) _run_command_child_exec(script_launcher_fd,
++					       script_launcher, launcher_argv,
++					       args->env);
++		_exit(127);
++	}
+
+ 	_run_command_child_pre_exec();
+-	_run_command_child_exec(-1, args->script_path, args->script_argv,
+-				args->env);
++	(void) _run_command_child_exec(-1, args->script_path, args->script_argv,
++				       args->env);
++	_exit(127);
+ }
+
+ static void _log_str_array(char *prefix, char **array)
+@@ -304,23 +308,29 @@ static char **_setup_launcher_argv(run_command_args_t *args)
+ 	return launcher_argv;
+ }
+
+-/*
+- * Wrapper for execv/execve. This should never return.
+- */
+-static void _run_command_child_exec(int fd, const char *path, char **argv,
+-				    char **env)
++/* Wrapper for execv/execve */
++static int _run_command_child_exec(int fd, const char *path, char **argv,
++				   char **env)
+ {
+ 	extern char **environ;
++	int rc = EINVAL;
+
+ 	if (!env || !env[0])
+ 		env = environ;
+
+-	if (fd >= 0)
++	if (fd >= 0) {
+ 		fexecve(fd, argv, env);
+-	else
++		rc = errno;
++		log_flag(SCRIPT, "%s: fexecve(fd=%d, %s) failed: %s",
++			 __func__, fd, path, slurm_strerror(rc));
++	} else {
+ 		execve(path, argv, env);
+-	error("%s: execv(%s): %m", __func__, path);
+-	_exit(127);
++		rc = errno;
++		log_flag(SCRIPT, "%s: execve(%s) failed: %s",
++			 __func__, path, slurm_strerror(rc));
++	}
++
++	return rc;
+ }
+
+ /*
+@@ -353,7 +363,7 @@ extern void run_command_launcher(int argc, char **argv)
+
+ 	xassert(script_path);
+ 	_run_command_child_pre_exec();
+-	_run_command_child_exec(-1, script_path, script_argv, NULL);
++	(void) _run_command_child_exec(-1, script_path, script_argv, NULL);
+ 	_exit(127);
+ }
+
+--
+2.45.2
+
+
+From e1383ba7875b75b18526afb8053243c64e48eaf3 Mon Sep 17 00:00:00 2001
+From: Nathan Rini <nate@schedmd.com>
+Date: Fri, 6 Jun 2025 14:22:10 -0600
+Subject: [PATCH 2/7] Fail back to direct exec() when unable call
+ script_launcher
+
+Attempt to use script_launcher in _run_command_child() but gracefully fail
+back to calling script_path directly via exec().
+
+Regression from 27f054b6fb.
+
+Ticket: 22853
+Changelog: slurmstepd - Avoid job failure due to slurmstepd not existing
+ in job's container while attempting to run TaskEpilog or TaskProlog.
+---
+ src/common/run_command.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/common/run_command.c b/src/common/run_command.c
+index 6748f313cd..6bb5a0ab76 100644
+--- a/src/common/run_command.c
++++ b/src/common/run_command.c
+@@ -247,10 +247,12 @@ static void _run_command_child(run_command_args_t *args, int write_fd,
+ 	dup2(write_fd, STDOUT_FILENO);
+
+ 	if (launcher_argv) {
+-		(void) _run_command_child_exec(script_launcher_fd,
+-					       script_launcher, launcher_argv,
+-					       args->env);
+-		_exit(127);
++		int rc = _run_command_child_exec(script_launcher_fd,
++						 script_launcher, launcher_argv,
++						 args->env);
++		debug("%s: Unable to use script launcher %s (fd:%d) to call %s: %s",
++		      __func__, script_launcher, script_launcher_fd,
++		      launcher_argv[2], slurm_strerror(rc));
+ 	}
+
+ 	_run_command_child_pre_exec();
+--
+2.45.2
+
+
+From 28081b35ddf50a421b9e4ee5d1cce87de49a6239 Mon Sep 17 00:00:00 2001
+From: Nathan Rini <nate@schedmd.com>
+Date: Fri, 6 Jun 2025 14:11:27 -0600
+Subject: [PATCH 3/7] Fail back to direct exec() in run_command_launcher()
+
+Attempt to use script_path in run_command_launcher() but gracefully fail
+back to calling command directly via exec().
+
+Regression from 27f054b6fb.
+
+Ticket: 22853
+---
+ src/common/run_command.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/src/common/run_command.c b/src/common/run_command.c
+index 6bb5a0ab76..1eb3e04eb2 100644
+--- a/src/common/run_command.c
++++ b/src/common/run_command.c
+@@ -360,12 +360,21 @@ static void _run_command_child_pre_exec(void)
+
+ extern void run_command_launcher(int argc, char **argv)
+ {
++	int rc = EINVAL;
+ 	char *script_path = argv[RUN_COMMAND_LAUNCHER_ARGC - 1];
+ 	char **script_argv = &argv[RUN_COMMAND_LAUNCHER_ARGC];
+
+ 	xassert(script_path);
+ 	_run_command_child_pre_exec();
+-	(void) _run_command_child_exec(-1, script_path, script_argv, NULL);
++
++	if ((rc = _run_command_child_exec(-1, script_path, script_argv, NULL)))
++		debug("%s: Unable to use command launcher %s to call %s: %s",
++		      __func__, script_path, script_argv[0],
++		      slurm_strerror(rc));
++
++	(void) _run_command_child_exec(-1, argv[RUN_COMMAND_LAUNCHER_ARGC],
++				       (argv + RUN_COMMAND_LAUNCHER_ARGC),
++				       NULL);
+ 	_exit(127);
+ }
+
+--
+2.45.2
+
+
+From 6bd1b332837465eb665ed2e3b76afb8940d56057 Mon Sep 17 00:00:00 2001
+From: Nathan Rini <nate@schedmd.com>
+Date: Mon, 9 Jun 2025 15:57:33 -0600
+Subject: [PATCH 4/7] slurmstepd - Add missing comma in
+ _run_script_and_set_env()
+
+Preplare for next commit.
+
+Ticket: 22853
+---
+ src/slurmd/slurmstepd/task.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/slurmd/slurmstepd/task.c b/src/slurmd/slurmstepd/task.c
+index 902d2eb126..df684caa22 100644
+--- a/src/slurmd/slurmstepd/task.c
++++ b/src/slurmd/slurmstepd/task.c
+@@ -192,7 +192,7 @@ _run_script_and_set_env(const char *name, const char *path,
+ 		.max_wait = -1,
+ 		.script_path = path,
+ 		.script_type = name,
+-		.status = &status
++		.status = &status,
+ 	};
+
+ 	if (path == NULL || path[0] == '\0')
+--
+2.45.2
+
+
+From f8b3e0a0031cda72b22a74a3f5bccfa429bd38f5 Mon Sep 17 00:00:00 2001
+From: Nathan Rini <nate@schedmd.com>
+Date: Mon, 9 Jun 2025 15:27:45 -0600
+Subject: [PATCH 5/7] slurmstepd - Avoid checking script path in
+ _run_script_and_set_env()
+
+Set run_command() args.ignore_path_exec_check to avoid TOCTOU of checking
+if the script path as it may only exist inside of the Job's container.
+
+Regression from 27f054b6fb.
+
+Ticket: 22853
+Changelog: slurmstepd - Avoid checking if TaskEpilog and TaskProlog exist
+ before attempting to execute scripts as they may only exist inside of job
+ container's mount namespace.
+---
+ src/slurmd/slurmstepd/task.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/slurmd/slurmstepd/task.c b/src/slurmd/slurmstepd/task.c
+index df684caa22..9166ae4ba7 100644
+--- a/src/slurmd/slurmstepd/task.c
++++ b/src/slurmd/slurmstepd/task.c
+@@ -193,6 +193,7 @@ _run_script_and_set_env(const char *name, const char *path,
+ 		.script_path = path,
+ 		.script_type = name,
+ 		.status = &status,
++		.ignore_path_exec_check = true,
+ 	};
+
+ 	if (path == NULL || path[0] == '\0')
+--
+2.45.2
+
+
+From 64bf224b4cb7fe533a8f45c775845cffeab5552f Mon Sep 17 00:00:00 2001
+From: Nathan Rini <nate@schedmd.com>
+Date: Mon, 9 Jun 2025 15:47:49 -0600
+Subject: [PATCH 6/7] Add direct_exec to run_command() args
+
+Allow caller to always execute script directly instead of using script
+launcher even if run_command_init() was able to resolve one during
+startup. The mount namespace may have changed between after
+run_command_init() which could result in any exec() against the script
+launcher no longer being possible.
+
+Ticket: 22853
+---
+ src/common/run_command.c | 2 +-
+ src/common/run_command.h | 5 +++++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/common/run_command.c b/src/common/run_command.c
+index 1eb3e04eb2..eb1038f3a1 100644
+--- a/src/common/run_command.c
++++ b/src/common/run_command.c
+@@ -246,7 +246,7 @@ static void _run_command_child(run_command_args_t *args, int write_fd,
+ 	dup2(write_fd, STDERR_FILENO);
+ 	dup2(write_fd, STDOUT_FILENO);
+
+-	if (launcher_argv) {
++	if (launcher_argv && !args->direct_exec) {
+ 		int rc = _run_command_child_exec(script_launcher_fd,
+ 						 script_launcher, launcher_argv,
+ 						 args->env);
+diff --git a/src/common/run_command.h b/src/common/run_command.h
+index 59e2e27439..f7bf5bf720 100644
+--- a/src/common/run_command.h
++++ b/src/common/run_command.h
+@@ -46,6 +46,11 @@ typedef struct {
+ 	void *cb_arg;
+ 	char **env;
+ 	bool ignore_path_exec_check;
++	/*
++	 * if True, always execute script directly instead of using script
++	 * launcher even if available
++	 */
++	bool direct_exec;
+ 	uint32_t job_id;
+ 	int max_wait;
+ 	bool orphan_on_shutdown;
+--
+2.45.2
+
+
+From 57079bc4674c4a76fcee30917aa6e715c94042b5 Mon Sep 17 00:00:00 2001
+From: Nathan Rini <nate@schedmd.com>
+Date: Mon, 9 Jun 2025 15:49:15 -0600
+Subject: [PATCH 7/7] slurmstepd - Avoid using script launcher via
+ _run_script_and_set_env()
+
+Set run_command() args.direct_exec to avoid trying to exec() slurmstepd
+which may no longer be in the job's mount namespace resulting in
+TaskProlog and TaskEpilog always failing to link.
+
+Regression from 27f054b6fb.
+
+Ticket: 22853
+Changelog: slurmstepd - Avoid regression requiring slurmstepd (and all
+ library dependencies) needing to exist inside of job container's mount
+ namespace to execute TaskProlog and TaskEpilog.
+---
+ src/slurmd/slurmstepd/task.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/slurmd/slurmstepd/task.c b/src/slurmd/slurmstepd/task.c
+index 9166ae4ba7..fb42e5bb32 100644
+--- a/src/slurmd/slurmstepd/task.c
++++ b/src/slurmd/slurmstepd/task.c
+@@ -194,6 +194,7 @@ _run_script_and_set_env(const char *name, const char *path,
+ 		.script_type = name,
+ 		.status = &status,
+ 		.ignore_path_exec_check = true,
++		.direct_exec = true,
+ 	};
+
+ 	if (path == NULL || path[0] == '\0')
+--
+2.45.2

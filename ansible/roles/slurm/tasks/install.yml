@@ -44,6 +44,15 @@
     depth: '1'
   when: slurm_version.startswith("b:")
 
+- name: Apply Slurm patches
+  ansible.posix.patch:
+    src: ../files/patches/{{ item }}
+    basedir: '{{slurm_paths.src}}'
+    remote_src: false
+    strip: 1
+  loop: "{{ slurm_patch_files }}"
+  when: slurm_patch_files != [] and handle_services
+
 - name: Configure
   shell:
     cmd: >

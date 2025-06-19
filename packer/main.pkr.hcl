@@ -25,13 +25,14 @@ locals {
   scripts_dir = "../scripts"
 
   ansible_vars = {
-    slurm_version    = var.slurm_version
-    install_cuda     = var.install_cuda
-    nvidia_version   = var.nvidia_version
-    install_ompi     = var.install_ompi
-    install_lustre   = var.install_lustre
-    install_gcsfuse  = var.install_gcsfuse
-    monitoring_agent = var.monitoring_agent
+    slurm_version     = var.slurm_version
+    install_cuda      = var.install_cuda
+    nvidia_version    = var.nvidia_version
+    slurm_patch_files = var.slurm_patch_files
+    install_ompi      = var.install_ompi
+    install_lustre    = var.install_lustre
+    install_gcsfuse   = var.install_gcsfuse
+    monitoring_agent  = var.monitoring_agent
   }
 
   parse_version = regex("^(?P<major>\\d+)(?:\\.(?P<minor>\\d+))?(?:\\.(?P<patch>\\d+))?|(?P<branch>\\w+)$", var.slurmgcp_version)

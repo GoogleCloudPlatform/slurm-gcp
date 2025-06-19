@@ -145,6 +145,12 @@ variable "install_cuda" {
   default     = true
 }
 
+variable "slurm_patch_files" {
+  description = "Name of .patch file (or files) that should be applied to Slurm during image building, assumed to be stored under /ansible/roles/slurm/tasks/files/patch/"
+  type        = list(string)
+  default     = []
+}
+
 variable "nvidia_version" {
   description = "choose the major nvidia version to install via runfile. Must match a version file in ansible cuda role."
   type        = string
