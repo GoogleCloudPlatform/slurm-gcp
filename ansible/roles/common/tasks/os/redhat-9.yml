@@ -19,8 +19,15 @@
     # state: latest
     update_cache: yes
 
+- name: Install dnf-command(config-manager) on Rocky 9
+  package:
+    name: dnf-command(config-manager)
+    state: present
+  when: ansible_distribution == "Rocky"
+
 - name: Enable Rocky 9 PowerTools Repository
-  command: dnf config-manager --set-enabled crb
+  command: |
+    dnf config-manager --set-enabled crb
   when: ansible_distribution == "Rocky"
 
 - name: Enable RHEL 9 CodeReady Repository

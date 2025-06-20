@@ -49,10 +49,11 @@
       apps: /opt/apps
       modulefiles: /opt/apps/modulefiles
     install_ompi: true
-    install_lustre: true
+    install_lustre: false
     install_gcsfuse: true
     install_pmix: true
     install_pyxis: true
+    install_tpu: true
 
   pre_tasks:
   - name: Minimum Ansible Version Check
@@ -86,9 +87,9 @@
   - name: Check Support on Rocky Linux
     when: ansible_distribution == "Rocky"
     ansible.builtin.assert:
-      that: ansible_distribution_major_version is version('8', '==')
+      that: ansible_distribution_major_version is version('8', '==') or ansible_distribution_major_version is version('9', '==')
       fail_msg: |
-        When building Slurm-GCP on Rocky Linux, use release 8
+        When building Slurm-GCP on Rocky Linux, use release 8 or 9
   - name: Check Support on RedHat Linux
     when: ansible_distribution == "RedHat"
     ansible.builtin.assert:
@@ -143,16 +144,18 @@
     - install_pyxis
   - role: ompi
     when: install_ompi
-  - role: lustre
-    when:
-    - install_lustre
-    - ansible_architecture == "x86_64"
   - role: gcsfuse
     when:
     - install_gcsfuse
+    - ansible_architecture == "x86_64"
+  - role: cloudagents
+    when:
     - ansible_architecture == "x86_64"
   - logrotate
   - python
   - role: ldap
     when: ansible_os_family != 'Debian'
   - scripts
+  - role: tpu
+    when:
+    - install_tpu
