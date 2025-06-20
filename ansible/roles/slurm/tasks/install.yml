@@ -48,10 +48,10 @@
   ansible.posix.patch:
     src: ../files/patches/{{ item }}
     basedir: '{{slurm_paths.src}}'
-    remote_src: false
     strip: 1
   loop: "{{ slurm_patch_files }}"
-  when: slurm_patch_files != [] and handle_services
+  ignore_errors: true
+  when: slurm_patch_files != []
 
 - name: Configure
   shell:
