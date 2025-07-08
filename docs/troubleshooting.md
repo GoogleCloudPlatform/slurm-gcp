@@ -56,7 +56,7 @@ $ scontrol setdebugflags +power
 ## Instance startup-script failed
 
 Upon startup-script failure, all users should be notified via `wall` and `motd`.
-Check `/slurm/scripts/setup.log` for details about the failure.
+Check `/var/log/slurm/setup.log` for details about the failure.
 
 ## Quota limits
 
