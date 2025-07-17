@@ -18,7 +18,6 @@
     src: slurmcmd.service.j2
     dest: /usr/lib/systemd/system/slurmcmd.service
   vars:
-    service_user: '{{slurm_user.user}}'
     service_path: '{{slurm_paths.scripts}}'
 
 - name: Install Timer
