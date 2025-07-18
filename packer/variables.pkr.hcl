@@ -145,6 +145,12 @@ variable "install_cuda" {
   default     = true
 }
 
+variable "install_pyxis" {
+  description = "enable installation of enroot/pyxis"
+  type        = bool
+  default     = true
+}
+
 variable "slurm_patch_files" {
   description = "Name of .patch file (or files) that should be applied to Slurm during image building, assumed to be stored under /ansible/roles/slurm/tasks/files/patch/"
   type        = list(string)

@@ -28,6 +28,7 @@ locals {
     slurm_version     = var.slurm_version
     install_cuda      = var.install_cuda
     nvidia_version    = var.nvidia_version
+    install_pyxis     = var.install_pyxis
     slurm_patch_files = var.slurm_patch_files
     install_ompi      = var.install_ompi
     install_lustre    = var.install_lustre
