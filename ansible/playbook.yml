@@ -62,6 +62,7 @@
     install_pmix: true
     install_pyxis: true
     allow_kernel_upgrades: true
+    enroot_install_optional_deps: "{{ true if ansible_architecture == 'x86_64' else false }}"
 
   pre_tasks:
   - name: Minimum Ansible Version Check
