@@ -126,9 +126,9 @@
   - name: Check Managed Lustre Install Options
     when: install_managed_lustre
     ansible.builtin.assert:
-      that: (ansible_distribution == "Ubuntu" and (ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '=='))) or (ansible_distribution == "Rocky" and ansible_distribution_major_version is version('8', '=='))
+      that: (ansible_distribution == "Ubuntu" and (ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '==') or ansible_distribution_version is version('24.04', '=='))) or (ansible_distribution == "Rocky" and ansible_distribution_major_version is version('8', '=='))
       fail_msg: |
-        Managed Lustre is only compatible with Rocky 8, Ubuntu 20.04, and Ubuntu 22.04
+        Managed Lustre is only compatible with Rocky 8, Ubuntu 20.04, Ubuntu 22.04, and Ubuntu 24.04
   - name: Freeze kernel before running playbook
     ansible.builtin.command:
       argv:
