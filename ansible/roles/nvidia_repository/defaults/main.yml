@@ -14,5 +14,8 @@
 # limitations under the License.
 
 # distribution is defined per-distribution in ../vars/*.yml files
-nvidia_repo_url: https://developer.download.nvidia.com/compute/cuda/repos/{{ distribution }}/{{ ansible_architecture }}
+# For Ubuntu on ARM (aarch64), NVIDIA uses 'sbsa' in the repository path.
+# We set a variable to the correct architecture string based on this condition.
+nvidia_repo_architecture: "{{ 'sbsa' if ansible_distribution == 'Ubuntu' and ansible_architecture == 'aarch64' else ansible_architecture }}"
+nvidia_repo_url: "https://developer.download.nvidia.com/compute/cuda/repos/{{ distribution }}/{{ nvidia_repo_architecture }}"
 install_nvidia_repo: true
