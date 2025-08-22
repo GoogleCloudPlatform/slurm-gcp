@@ -15,18 +15,3 @@
 
 dependencies:
 - role: common
-
-- role: google_cloud_ops_agents
-  vars:
-    agent_type: ops-agent
-  when: monitoring_agent == "cloud-ops"
-
-- role: google_cloud_ops_agents
-  vars:
-    agent_type: monitoring
-  when: monitoring_agent == "legacy"
-
-- role: google_cloud_ops_agents
-  vars:
-    agent_type: logging
-  when: monitoring_agent == "legacy"

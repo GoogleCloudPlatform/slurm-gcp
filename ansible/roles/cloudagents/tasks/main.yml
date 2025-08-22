@@ -30,3 +30,27 @@
     src: legacy_agent_py_script_log.conf.j2
     dest: /etc/google-fluentd/config.d/slurm_py_script.conf
   when: monitoring_agent == "legacy"
+
+- name: Install and configure the Google Cloud Ops Agent
+  include_role:
+    name: google_cloud_ops_agents
+    handlers_from: "{{ 'linux' if ansible_os_family != 'Windows' else 'windows' }}.yml"
+  vars:
+    agent_type: ops-agent
+  when: monitoring_agent == "cloud-ops"
+
+- name: Install and configure the legacy Monitoring Agent
+  include_role:
+    name: google_cloud_ops_agents
+    handlers_from: "{{ 'linux' if ansible_os_family != 'Windows' else 'windows' }}.yml"
+  vars:
+    agent_type: monitoring
+  when: monitoring_agent == "legacy"
+
+- name: Install and configure the legacy Logging Agent
+  include_role:
+    name: google_cloud_ops_agents
+    handlers_from: "{{ 'linux' if ansible_os_family != 'Windows' else 'windows' }}.yml"
+  vars:
+    agent_type: logging
+  when: monitoring_agent == "legacy"
