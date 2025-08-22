@@ -55,6 +55,13 @@
     install_pyxis: true
 
   pre_tasks:
+  - name: Install required Ansible collections
+    command: ansible-galaxy collection install -r requirements.yml
+    args:
+      chdir: "{{ playbook_dir }}"
+    run_once: true
+    changed_when: false
+
   - name: Minimum Ansible Version Check
     assert:
       that: ansible_version.full is version_compare({{min_ansible_version}}, '>=')
