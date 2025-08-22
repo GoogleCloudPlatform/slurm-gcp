@@ -13,13 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Add Gcsfuse Repository
-  template:
-    src: gcsfuse.repo.j2
-    dest: /etc/yum.repos.d/gcsfuse.repo
-
-- name: Install Gcsfuse
+- name: Install Gcsfuse build dependencies
   yum:
     name:
-    - gcsfuse
-    state: latest
+    - fuse
+    - git
+    - golang
+    state: present
+
+- name: Clone Gcsfuse repository
+  git:
+    repo: https://github.com/GoogleCloudPlatform/gcsfuse.git
+    dest: /tmp/gcsfuse
+    clone: yes
+    depth: 1
+
+- name: Build Gcsfuse
+  shell:
+    cmd: go build .
+    chdir: /tmp/gcsfuse
+
+- name: Install Gcsfuse binary
+  copy:
+    src: /tmp/gcsfuse/gcsfuse
+    dest: /usr/local/bin/gcsfuse
+    mode: 0755
+    remote_src: yes
