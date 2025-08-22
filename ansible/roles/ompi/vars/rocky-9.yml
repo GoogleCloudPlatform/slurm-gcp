@@ -1,0 +1,6 @@
+---
+# This file is intentionally left empty.
+# The ompi role builds from source and its standard build dependencies,
+# defined in tasks/os/redhat.yml, are compatible with Rocky 9.
+# This file exists to make the support for Rocky 9 explicit and to
+# conform to the variable loading structure used by other roles.

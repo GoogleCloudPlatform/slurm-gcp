@@ -13,19 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Include OS Family Dependent Vars
-  ansible.builtin.include_vars: "{{ lookup('ansible.builtin.first_found', params) }}"
-  vars:
-    params:
-      files:
-      - '{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml'
-      - '{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml'
-      - '{{ ansible_distribution|lower }}.yml'
-      - '{{ ansible_os_family|lower }}-{{ ansible_distribution_version }}.yml'
-      - '{{ ansible_os_family|lower }}-{{ ansible_distribution_major_version }}.yml'
-      - '{{ ansible_os_family|lower }}.yml'
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - files:
+        - "{{ ansible_distribution }}-{{ ansible_distribution_major_version }}.yml"
+        - "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+        - "{{ ansible_distribution }}.yml"
+        - "{{ ansible_os_family }}.yml"
       paths:
-      - 'vars'
+        - "vars"
   when: install_managed_lustre
 
 - name: Include OS Family Dependent Tasks
