@@ -25,9 +25,10 @@
     - '{{ ansible_distribution | lower }}-release'
     state: latest
     update_cache: yes
+  register: kernel_update
 - block:
   - name: Reboot
     reboot:
   - name: Gather facts after reboot
     setup:
-  when: reboot
+  when: reboot and kernel_update.changed

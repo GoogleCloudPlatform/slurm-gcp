@@ -13,15 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- block:
-  - name: Reboot
-    reboot:
-
-  - name: Gather facts after reboot
-    setup:
-
-  when: reboot
-
 - name: Install {{ansible_os_family}} Family Kernel Packages
   yum:
     name:
@@ -34,3 +25,13 @@
     #- kernel-tools-libs-devel
     state: latest
     update_cache: yes
+  register: kernel_update
+
+- block:
+  - name: Reboot
+    reboot:
+
+  - name: Gather facts after reboot
+    setup:
+
+  when: reboot and kernel_update.changed
