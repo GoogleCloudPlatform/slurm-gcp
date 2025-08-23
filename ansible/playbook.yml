@@ -148,7 +148,8 @@
   roles:
   - motd
   - common
-  - kernel
+  - role: kernel
+    when: not install_managed_lustre
   - selinux
   - role: cuda
     vars:

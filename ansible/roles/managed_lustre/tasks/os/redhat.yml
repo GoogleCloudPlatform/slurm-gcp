@@ -15,8 +15,26 @@
 
 - name: Install Managed Lustre Client Repo
   ansible.builtin.yum_repository:
-    name: lustre-client-rocky-8
+    name: "lustre-client-rocky-{{ ansible_distribution_major_version }}"
     description: Lustre Client
     baseurl: '{{ managed_lustre_repo_url }}'
     enabled: true
     gpgcheck: false
+
+- name: Install Kernel from Lustre Repo
+  dnf:
+    name:
+    - kernel
+    - kernel-devel
+    state: latest
+    update_cache: yes
+    disablerepo: "*"
+    enablerepo: "lustre-client-rocky-{{ ansible_distribution_major_version }}"
+  register: kernel_update
+
+- block:
+  - name: Reboot
+    reboot:
+  - name: Gather facts after reboot
+    setup:
+  when: kernel_update.changed
