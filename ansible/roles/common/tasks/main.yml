@@ -66,6 +66,6 @@
 - name: Symlink selinux module into venv
   file:
     src: "{{ system_site_packages.stdout }}/selinux"
-    dest: "{{ ansible_python.site_packages }}/selinux"
+    dest: "{{ (ansible_python.executable | dirname) }}/../lib/python{{ ansible_python.version.major }}.{{ ansible_python.version.minor }}/site-packages/selinux"
     state: link
     force: yes
