@@ -57,22 +57,3 @@
     group: root
     owner: root
     mode: 0660
-
-- name: Find system python site-packages
-  shell: "python3 -c 'import site; print(site.getsitepackages()[0])'"
-  register: system_site_packages
-  changed_when: false
-
-- name: Find venv python site-packages
-  shell: "{{ ansible_python.executable }} -c 'import site; print(site.getsitepackages()[0])'"
-  register: venv_site_packages
-  changed_when: false
-  when: "'ghpc-venv' in ansible_python.executable"
-
-- name: Symlink selinux module into venv
-  file:
-    src: "{{ system_site_packages.stdout }}/selinux"
-    dest: "{{ venv_site_packages.stdout }}/selinux"
-    state: link
-    force: yes
-  when: "'ghpc-venv' in ansible_python.executable"
