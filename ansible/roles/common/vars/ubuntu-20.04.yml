@@ -31,11 +31,13 @@ common_packages:
 - libssl-dev
 - libtool
 - make
+- nfs-client
 - pciutils
 - pdsh
 - pkg-config
 - python3
 - python3-gdbm
+- sudo
 - tmux
 - unzip
 - valgrind

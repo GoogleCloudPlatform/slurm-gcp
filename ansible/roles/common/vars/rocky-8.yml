@@ -43,6 +43,7 @@ common_packages:
 - libtool
 - ltrace
 - make
+- nfs-utils
 - openssl-devel
 - patchutils
 - pciutils
@@ -60,6 +61,7 @@ common_packages:
 - rpm-sign
 - source-highlight
 - strace
+- sudo
 - systemtap
 - tmux
 - unzip
