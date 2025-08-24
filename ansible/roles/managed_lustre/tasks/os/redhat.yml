@@ -1,40 +1,54 @@
 ---
-# Copyright 2025 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 - name: Install Managed Lustre Client Repo
   ansible.builtin.yum_repository:
     name: "lustre-client-rocky-{{ ansible_distribution_major_version }}"
-    description: Lustre Client
+    description: "Lustre Client"
     baseurl: '{{ managed_lustre_repo_url }}'
     enabled: true
     gpgcheck: false
+  become: yes
 
 - name: Install Kernel from Lustre Repo
   dnf:
     name:
     - kernel
     - kernel-devel
-    state: latest
+    state: present
     update_cache: yes
     disablerepo: "*"
     enablerepo: "lustre-client-rocky-{{ ansible_distribution_major_version }}"
   register: kernel_update
+  become: yes
 
+# This block runs only if the kernel was updated.
+# It reboots, gathers facts with the new kernel, and then installs the client.
 - block:
-  - name: Reboot
+  - name: Reboot because kernel was updated
     reboot:
+
+  - name: Wait for system to become reachable after reboot
+    wait_for_connection:
+      connect_timeout: 20
+      sleep: 5
+      delay: 5
+      timeout: 300
+
   - name: Gather facts after reboot
     setup:
+
+  - name: Install Managed Lustre Client after reboot
+    package:
+      name: "{{ managed_lustre_client_pkgs }}"
+      state: present
+      update_cache: yes
   when: kernel_update.changed
+  become: yes
+
+# This task runs only if the kernel was NOT updated.
+- name: Install Managed Lustre Client
+  package:
+    name: "{{ managed_lustre_client_pkgs }}"
+    state: present
+    update_cache: yes
+  when: not kernel_update.changed
+  become: yes

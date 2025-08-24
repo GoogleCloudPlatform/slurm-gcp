@@ -1,46 +1,47 @@
 ---
 - name: Remove Gcsfuse repository file if it exists
-  file:
+  ansible.builtin.file:
     path: /etc/yum.repos.d/gcsfuse.repo
     state: absent
-
-# Copyright (C) SchedMD LLC.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+  become: yes
 
 - name: Install Gcsfuse build dependencies
-  yum:
+  package:
     name:
     - fuse
     - git
     - golang
     state: present
+    update_cache: yes
+  become: yes
 
 - name: Clone Gcsfuse repository
   git:
     repo: https://github.com/GoogleCloudPlatform/gcsfuse.git
     dest: /tmp/gcsfuse
-    clone: yes
-    depth: 1
+    version: master
+    force: yes
+  become: yes
 
-- name: Build Gcsfuse
-  shell:
-    cmd: go build .
+- name: Create GOPATH directory
+  file:
+    path: "/root/go"
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Install Gcsfuse via go install
+  command:
+    cmd: go install .
     chdir: /tmp/gcsfuse
+  become: yes
+  environment:
+    GOPATH: "/root/go"
 
-- name: Install Gcsfuse binary
-  copy:
-    src: /tmp/gcsfuse/gcsfuse
+- name: Symlink Gcsfuse binary to /usr/local/bin
+  file:
+    src: /root/go/bin/gcsfuse
     dest: /usr/local/bin/gcsfuse
-    mode: 0755
-    remote_src: yes
+    state: link
+    force: yes
+  become: yes
