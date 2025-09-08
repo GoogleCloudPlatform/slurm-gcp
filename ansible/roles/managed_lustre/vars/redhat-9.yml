@@ -15,5 +15,5 @@
 
 managed_lustre_repo_url: https://us-yum.pkg.dev/projects/lustre-client-binaries/lustre-client-rocky-9
 managed_lustre_packages:
-- kmod-lustre-client
+- lustre-client-dkms
 - lustre-client

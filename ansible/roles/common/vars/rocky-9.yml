@@ -33,6 +33,7 @@ common_packages:
   - gcc-c++
   - gdb
   - git
+  - kernel-devel
   - glibc-devel
   - graphviz
   - htop
