@@ -4,7 +4,7 @@ Wants=slurmcmd.timer
 
 [Service]
 Type=oneshot
-User={{service_user}}
+User=root
 ExecStart={{service_path}}/slurmsync.py
 
 [Install]
