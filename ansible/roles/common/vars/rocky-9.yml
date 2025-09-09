@@ -13,59 +13,58 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 common_packages:
-  - asciidoc
-  - autoconf
-  - autofs
-  - automake
-  - bash-completion
-  - binutils
-  - bison
-  - byacc
-  - ctags
-  - clang
-  - curl
-  - diffstat
-  - dnf-utils
-  - elfutils-libelf-devel
-  - epel-release
-  - flex
-  - gcc
-  - gcc-c++
-  - gdb
-  - git
-  - kernel-devel
-  - glibc-devel
-  - graphviz
-  - htop
-  - intltool
-  - jna
-  - jq
-  - libtool
-  - ltrace
-  - make
-  - nfs-utils
-  - openssl-devel
-  - patchutils
-  - pciutils
-  - pdsh
-  - perl-Fedora-VSP
-  - perl-Sys-Syslog
-  - perl-generators
-  - pesign
-  - pkgconfig
-  - pkgconf-m4
-  - pkgconf-pkg-config
-  - python3
-  - python3-libselinux # Required for the 'selinux' Ansible module
-  - redhat-rpm-config
-  - rpm-build
-  - rpm-sign
-  - source-highlight
-  - strace
-  - sudo
-  - systemtap
-  - tmux
-  - unzip
-  - valgrind
-  - vim
-
+- asciidoc
+- autoconf
+- autofs
+- automake
+- bash-completion
+- binutils
+- bison
+- byacc
+- ctags
+- clang
+- curl
+- diffstat
+- dnf-utils
+- elfutils-libelf-devel
+- epel-release
+- flex
+- gcc
+- gcc-c++
+- gdb
+- git
+- kernel-devel
+- glibc-devel
+- graphviz
+- htop
+- intltool
+- jna
+- jq
+- libtool
+- ltrace
+- make
+- nfs-utils
+- openssl-devel
+- patchutils
+- pciutils
+- pdsh
+- perl-Fedora-VSP
+- perl-Sys-Syslog
+- perl-generators
+- pesign
+- pkgconfig
+- pkgconf-m4
+- pkgconf-pkg-config
+- python3
+- python3-libselinux # Required for the 'selinux' Ansible module
+- redhat-rpm-config
+- rpm-build
+- rpm-sign
+- source-highlight
+- strace
+- sudo
+- systemtap
+- tmux
+- unzip
+- valgrind
+- vim
