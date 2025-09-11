@@ -1,5 +1,5 @@
 ---
-# Copyright (C) SchedMD LLC.
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,17 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- block:
-  - name: Disable SELinux
-    selinux:
-      configfile: '{{selinux_conf}}'
-      state: disabled
-      policy: targeted
-    register: status
-    vars:
-      ansible_python_interpreter: /usr/bin/python3
-
-  - name: Reboot
-    reboot:
-    when: status.reboot_required and reboot
-  when: ansible_os_family == "RedHat"
+managed_lustre_repo_url: https://us-yum.pkg.dev/projects/lustre-client-binaries/lustre-client-rocky-9
+managed_lustre_packages:
+- lustre-client-dkms
+- lustre-client
