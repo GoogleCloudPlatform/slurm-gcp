@@ -18,6 +18,6 @@
 # organizations whose UIDs exceed 2**31
 # https://github.com/NVIDIA/enroot/issues/195
 enroot_version: 09ae4b2c18a18ed5ab34b7697006aa18697c4cec
-enroot_url: https://github.com/NVIDIA/enroot/
+enroot_url: https://github.com/abbas1902/enroot/
 enroot_installation_path: "{{ paths.install }}"
 enroot_install_optional_deps: true
