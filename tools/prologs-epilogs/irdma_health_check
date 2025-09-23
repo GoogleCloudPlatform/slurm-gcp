@@ -1,0 +1,159 @@
+#!/bin/bash
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Slurm Prolog for RDMA Health Check
+#
+# Description:
+# This script performs RDMA health checks on a compute node before a job is run.
+# It is intended to be used as a Slurm Prolog script.
+#
+# Functionality:
+# 1. Checks if the RDMA link state is ACTIVE.
+# 2. If the link is active, it performs a loopback bandwidth test.
+# 3. If either test fails, it attempts a single recovery by bringing the network
+#    interface down and then up.
+# 4. It then re-runs the failed test.
+# 5. If the test fails a second time, the script will:
+#    a. Annotate the node with a reason for the failure using 'scontrol'.
+#    b. Exit with a non-zero status code, causing Slurm to drain the node.
+#
+# Note on using scontrol in a Prolog:
+# The Slurm documentation advises against calling Slurm commands in prolog/epilog
+# scripts to avoid performance issues. However, in this case, annotating the
+# node with a specific reason for failure is a requirement to aid operators in
+# diagnostics. The use of scontrol here is intentional for that purpose.
+
+PATH=${PATH}:/usr/sbin:/usr/local/bin
+
+# Only run on H4D machines
+/usr/bin/curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/machine-type | grep -q "/h4d-"
+IS_H4D=$?
+if [[ "${IS_H4D}" -ne 0 ]]; then
+  exit 0
+fi
+
+# --- Configuration ---
+# Set these variables to match your environment.
+
+# The name of the RDMA device (e.g., irdma0).
+RDMA_DEVICE="irdma0/1"
+
+# The name of the corresponding network interface (e.g., rdma0).
+# This is the interface that will be bounced with ifconfig on failure.
+NET_IFACE="rdma0"
+
+# Number of loopback tests to run.
+LOOPBACK_ITERATIONS=1
+
+# Set to DRY_RUN to only print actions instead of taking them.
+DRY_RUN=0
+
+# --- Script Functions ---
+
+# Log a message to stderr
+log() {
+  echo "$(date): $1" >&2
+}
+
+# Update the node's drain reason
+set_drain_reason() {
+  local reason=$1
+  log "Setting drain reason on node $SLURMD_NODENAME: $reason"
+  if [[ ${DRY_RUN} == 0 ]] ; then
+          scontrol update nodename="$SLURMD_NODENAME" reason="$reason"
+  fi
+}
+
+# Check if the RDMA link is active.
+# Returns 0 if active, 1 otherwise.
+check_rdma_link() {
+  log "Checking RDMA link state for $RDMA_DEVICE..."
+  if rdma link show "$RDMA_DEVICE" | grep -q "state ACTIVE"; then
+    log "RDMA link is ACTIVE."
+    return 0
+  else
+    log "RDMA link is not ACTIVE."
+    return 1
+  fi
+}
+
+# Run the ib_send_bw loopback test.
+# Returns 0 if all tests pass, 1 otherwise.
+run_loopback_test() {
+  log "Running loopback test for $RDMA_DEVICE..."
+  local success_count=0
+  local hostname
+  hostname=$(hostname)
+
+  for ((i=1; i<=LOOPBACK_ITERATIONS; i++)); do
+    # Start the server in the background
+    ib_send_bw -F -n 5 -q 10 -s 8388608 --mr_per_qp &
+    local server_pid=$!
+    sleep 1 # Wait for the server to be ready
+
+    # Run the client
+    if ib_send_bw -F -n 5 -q 10 -s 8388608 --mr_per_qp "$hostname"; then
+      ((success_count++))
+    fi
+    # Clean up the server process
+    kill $server_pid 2>/dev/null || true
+    wait $server_pid 2>/dev/null
+  done
+
+  log "Loopback test result: $success_count/$LOOPBACK_ITERATIONS successful."
+  if [ "$success_count" -eq "$LOOPBACK_ITERATIONS" ]; then
+    log "Loopback test PASSED."
+    return 0
+  else
+    log "Loopback test FAILED."
+    return 1
+  fi
+}
+
+# Attempt to recover the network interface by bouncing it.
+try_recover_rdma() {
+  log "Attempting to recover interface $NET_IFACE..."
+  ifconfig "$NET_IFACE" down
+  sleep 2
+  ifconfig "$NET_IFACE" up
+  sleep 5 # Allow time for the interface to initialize
+  log "Recovery attempt finished."
+}
+
+
+# --- Main Logic ---
+
+log "Starting RDMA health check for job $SLURM_JOB_ID on node $SLURMD_NODENAME."
+
+# 1. First, check the RDMA link state.
+if ! check_rdma_link; then
+  try_recover_rdma
+  if ! check_rdma_link; then
+    set_drain_reason "RDMA link is not ACTIVE after recovery attempt. Suggest node reboot."
+    exit 1
+  fi
+fi
+
+# 2. If the link is good, perform the loopback test.
+if ! run_loopback_test; then
+  try_recover_rdma
+  if ! run_loopback_test; then
+    set_drain_reason "RDMA loopback test failed after recovery attempt. Suggest node reboot."
+    exit 1
+  fi
+fi
+
+log "RDMA health checks passed. Proceeding with job."
+exit 0
