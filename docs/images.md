@@ -37,9 +37,12 @@ can be created and used instead.
 | cloud-hpc-image-public | hpc-centos-7          | x86_64 |
 | cloud-hpc-image-public | hpc-rocky-linux-8     | x86_64 |
 | debian-cloud           | debian-11             | x86_64 |
+| debian-cloud           | debian-12             | x86_64 |
 | ubuntu-os-cloud        | ubuntu-2004-lts       | x86_64 |
 | ubuntu-os-cloud        | ubuntu-2204-lts       | x86_64 |
 | ubuntu-os-cloud        | ubuntu-2204-lts-arm64 | ARM64  |
+| ubuntu-os-cloud        | ubuntu-2404-lts       | x86_64 |
+| ubuntu-os-cloud        | ubuntu-2404-lts-arm64 | ARM64  |
 
 ### Installed Software for HPC
 
@@ -71,12 +74,14 @@ For the [TPU](./glossary.md#tpu) nodes docker images are also released.
 
 ### Published Image Family
 
-|       Project        | Image Family                        | Arch   | Status         |
-| :------------------: | :---------------------------------- | :----- | :------------- |
-| schedmd-slurm-public | slurm-gcp-6-9-debian-11             | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-9-hpc-rocky-linux-8     | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-9-ubuntu-2004-lts       | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-9-ubuntu-2204-lts-arm64 | ARM64  | Supported      |
+|       Project        | Image Family                              | Arch   | Status         |
+| :------------------: | :---------------------------------------- | :----- | :------------- |
+| schedmd-slurm-public | slurm-gcp-6-11-debian-12                  | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-11-hpc-rocky-linux-8          | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-11-ubuntu-2204-lts-nvidia-570 | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-11-ubuntu-2204-lts-arm64      | ARM64  | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-11-ubuntu-2404-lts-nvidia-570 | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-11-ubuntu-2404-lts-arm64      | ARM64  | Supported      |
 
 ### Published Docker Image Family
 
@@ -148,9 +153,9 @@ Recently published images in project `schedmd-slurm-public` support shielded VMs
 without GPUs or mounting a Lustre filesystem. Both of these features require
 kernel modules, which must be signed to be compatible with SecureBoot.
 
-If you need GPUs, our published image family based on
-`ubuntu-os-cloud/ubuntu-2004-lts` has signed Nvidia drivers installed and
-therefore supports GPUs with SecureBoot and Shielded VMs.
+If you need GPUs, our published image families `slurm-gcp-6-11-ubuntu-2204-lts-nvidia-570`
+and `slurm-gcp-6-11-ubuntu-2404-lts-nvidia-570` has signed Nvidia drivers
+installed and therefore supports GPUs with SecureBoot and Shielded VMs.
 
 If you need Lustre or GPUs on a different OS, it is possible to do this manually
 with a custom image. Doing this requires
