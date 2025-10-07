@@ -13,28 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Handle append GRUB_CMDLINE_LINUX arguments
-  block:
-  - name: Get current GRUB_CMDLINE_LINUX arguments
-    ansible.builtin.shell:
-      cmd: |
-        grep -E "^GRUB_CMDLINE_LINUX=.*" {{ grub_cmdline_file }} |
-        sed -e "s/^GRUB_CMDLINE_LINUX=//" -e "s/^\"//" -e "s/\"$//"
-    register: grub_args
-
-  - name: Set facts
-    ansible.builtin.set_fact:
-      grub_cmdline_args: |
-        {{ (grub_args.stdout.split(' ') + grub_cmdline_args) | unique }}
+- name: Get current GRUB_CMDLINE_LINUX arguments
+  ansible.builtin.shell:
+    cmd: |
+      grep -E "^GRUB_CMDLINE_LINUX=.*" {{ grub_cmdline_file }} |
+      sed -e "s/^GRUB_CMDLINE_LINUX=//" -e "s/^\"//" -e "s/\"$//"
+  register: grub_args
   when:
   - not grub_cmdline_replace
-  - grub_cmdline_args | length > 0
+
+- name: Set facts
+  ansible.builtin.set_fact:
+    grub_cmdline_args_final: |
+      {{ grub_cmdline_args if grub_cmdline_replace else (grub_args.stdout.split(' ') + grub_cmdline_args) | unique }}
+
+- name: Debug grub cmdline
+  ansible.builtin.debug:
+    msg: "grub_cmdline_args_final: {{ grub_cmdline_args_final }}"
 
 - name: Set GRUB_CMDLINE_LINUX arguments
   ansible.builtin.lineinfile:
-    dest: '{{ grub_cmdline_file }}'
-    regexp: ^GRUB_CMDLINE_LINUX=.*$
-    line: GRUB_CMDLINE_LINUX="{{ grub_cmdline_args | join(' ') }}"
+    path: '{{ grub_cmdline_file }}'
+    regexp: '^GRUB_CMDLINE_LINUX='
+    line: GRUB_CMDLINE_LINUX="{{ grub_cmdline_args_final | join(' ') }}"
     state: present
     backup: true
   notify: Update Grub2 ({{ ansible_os_family }} Family)
