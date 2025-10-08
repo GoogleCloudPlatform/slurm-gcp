@@ -35,7 +35,6 @@ can be created and used instead.
 | Project                | Image Family          | Arch   |
 | :--------------------- | :-------------------- | :----- |
 | cloud-hpc-image-public | hpc-rocky-linux-8     | x86_64 |
-| cloud-hpc-image-public | hpc-rocky-linux-9     | x86_64 |
 | debian-cloud           | debian-11             | x86_64 |
 | debian-cloud           | debian-12             | x86_64 |
 | ubuntu-os-cloud        | ubuntu-2004-lts       | x86_64 |
