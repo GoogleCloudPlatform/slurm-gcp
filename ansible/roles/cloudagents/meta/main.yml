@@ -14,8 +14,6 @@
 # limitations under the License.
 
 dependencies:
-- role: common
-
 - role: google_cloud_ops_agents
   vars:
     agent_type: ops-agent
