@@ -10,6 +10,7 @@ google-api-python-client==2.93.0
 google-auth==2.38.0
 google-auth-httplib2==0.2.0
 google-cloud-bigquery==3.29.0
+google-cloud-container==2.59.0
 google-cloud-core==2.4.1
 google-cloud-secret-manager==2.23.0
 google-cloud-storage==2.10.0
@@ -23,6 +24,7 @@ httplib2==0.22.0
 idna==3.7
 ipython>=8.10
 jedi==0.17.2
+kubernetes==34.1.0
 more-executors==2.11.4
 packaging==23.1
 parso==0.7.1
