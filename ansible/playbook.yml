@@ -59,6 +59,7 @@
     install_managed_lustre: false
     slurm_patch_files: []
     install_gcsfuse: true
+    install_gcsfuse_spank: "{{ install_gcsfuse }}"
     install_pmix: true
     install_pyxis: true
     allow_kernel_upgrades: true
@@ -179,6 +180,9 @@
   - role: gcsfuse
     when:
     - install_gcsfuse
+  - role: gcsfuse_spank
+    when:
+    - install_gcsfuse_spank
   - role: cloudagents
   - logrotate
   - python

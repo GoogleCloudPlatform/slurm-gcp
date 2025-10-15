@@ -1,0 +1,33 @@
+---
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- name: Check if gcsfuse_spank is installed
+  stat:
+    path: /usr/local/lib/slurm/gcsfuse_spank.so
+  register: gcsfuse_spank_installed
+
+- block:
+  - name: Build and install gcsfuse_spank
+    make:
+      chdir: "{{ role_path }}/files"
+      target: install
+
+  - name: Configure gcsfuse_spank in plugstack.conf
+    lineinfile:
+      path: /etc/slurm/plugstack.conf
+      regexp: '\s*required\s+/usr/local/lib/slurm/gcsfuse_spank.so\s*'
+      line: 'required /usr/local/lib/slurm/gcsfuse_spank.so'
+      create: yes
+  when: not gcsfuse_spank_installed.stat.exists
