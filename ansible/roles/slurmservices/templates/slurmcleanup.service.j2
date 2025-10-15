@@ -1,0 +1,11 @@
+[Unit]
+Description=Slurm cluster cleanup daemon
+Wants=slurmcleanup.timer
+
+[Service]
+Type=oneshot
+User={{service_user}}
+ExecStart={{service_path}}/cleanup.py
+
+[Install]
+WantedBy=multi-user.target

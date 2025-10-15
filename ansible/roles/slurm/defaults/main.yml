@@ -43,4 +43,5 @@ slurmrestd_user:
 slurmd_override_path: /etc/systemd/system/slurmd.service.d/overrides.conf
 sackd_override_path: /etc/systemd/system/sackd.service.d/override.conf
 slurmcmd_timeout: 30
+slurmcleanup_timeout: 120
 handle_services: true

@@ -1,0 +1,10 @@
+[Unit]
+Description=Slurm cluster cleanup daemon timer
+Requires=slurmcleanup.service
+
+[Timer]
+Unit=slurmcleanup.service
+OnUnitInactiveSec={{slurmcleanup_timeout}}
+
+[Install]
+WantedBy=timers.target

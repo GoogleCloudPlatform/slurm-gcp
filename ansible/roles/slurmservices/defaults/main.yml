@@ -13,15 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: Install Service
-  template:
-    src: slurmcmd.service.j2
-    dest: /usr/lib/systemd/system/slurmcmd.service
-  vars:
-    service_user: '{{slurm_user.user}}'
-    service_path: '{{slurm_paths.scripts}}'
-
-- name: Install Timer
-  template:
-    src: slurmcmd.timer.j2
-    dest: /usr/lib/systemd/system/slurmcmd.timer
+install_slurm_cleanup: false
