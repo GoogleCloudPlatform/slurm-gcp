@@ -59,7 +59,7 @@
     install_managed_lustre: false
     slurm_patch_files: []
     install_gcsfuse: true
-    install_gcsfuse_spank: "{{ install_gcsfuse }}"
+    install_gcsfuse_spank: false
     install_pmix: true
     install_pyxis: true
     allow_kernel_upgrades: true
