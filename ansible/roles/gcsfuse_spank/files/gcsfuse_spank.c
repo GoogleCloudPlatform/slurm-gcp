@@ -41,6 +41,8 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <signal.h>
+#include <errno.h>
 
 /**
  * @brief Checks if a given path is a mountpoint.
@@ -256,6 +258,7 @@ SPANK_PLUGIN(gcsfuse, 1);
 
 // Global array to store the mount points for cleanup.
 static char **mount_points = NULL;
+static pid_t *gcsfuse_pids = NULL;
 static int mount_point_count = 0;
 
 // Forward declaration for the callback.
@@ -324,13 +327,39 @@ int slurm_spank_exit(spank_t sp, int ac, char **av) {
         } else if (pid > 0) {
             waitpid(pid, NULL, 0);
         }
+
+        // Check if unmount was successful, if not, try lazy unmount
+        if (is_mountpoint(mount_points[i])) {
+            slurm_info("gcsfuse-mount: %s still mounted, trying lazy unmount", mount_points[i]);
+            pid_t lpid = fork();
+            if (lpid == 0) {
+                execlp("umount", "umount", "-l", mount_points[i], NULL);
+                slurm_error("gcsfuse-mount: execlp failed for umount -l: %m");
+                exit(1);
+            } else if (lpid > 0) {
+                waitpid(lpid, NULL, 0);
+            }
+        }
         free(mount_points[i]);
     }
     if (mount_points) {
         free(mount_points);
         mount_points = NULL;
-        mount_point_count = 0;
     }
+
+    // slurm_info("gcsfuse-mount: Killing gcsfuse processes");
+    for (int i = 0; i < mount_point_count; i++) {
+        if (gcsfuse_pids[i] > 0) {
+            // slurm_info("gcsfuse-mount: Killing gcsfuse process %d", gcsfuse_pids[i]);
+            kill(gcsfuse_pids[i], SIGKILL);
+            waitpid(gcsfuse_pids[i], NULL, 0); // Reap the killed process
+        }
+    }
+    if (gcsfuse_pids) {
+        free(gcsfuse_pids);
+        gcsfuse_pids = NULL;
+    }
+    mount_point_count = 0;
     // slurm_info("gcsfuse-mount: Ending unmount");
     return 0;
 }
@@ -355,6 +384,7 @@ int slurm_spank_user_init(spank_t sp, int ac, char **av) {
     uid_t uid;
     gid_t gid;
     char mount_env[4096];
+    int return_code = 0; // Start with success
 
     if (spank_get_item(sp, S_JOB_UID, &uid) != 0 || spank_get_item(sp, S_JOB_GID, &gid) != 0) {
         slurm_error("gcsfuse-mount: could not get job UID/GID");
@@ -380,13 +410,47 @@ int slurm_spank_user_init(spank_t sp, int ac, char **av) {
             slurm_error("gcsfuse-mount: invalid argument format: %s", optarg);
             free(arg);
             optarg = strtok_r(NULL, ";", &saveptr);
+            return_code = -1; // Mark as failed
+            continue;
+        }
+
+        if (is_mountpoint(mount_point)) {
+            slurm_error("gcsfuse-mount: Mount point %s is already a mountpoint. Aborting.", mount_point);
+            free(arg);
+            optarg = strtok_r(NULL, ";", &saveptr);
+            return_code = -1; // Mark as failed
             continue;
         }
 
         mount_points = realloc(mount_points, (mount_point_count + 1) * sizeof(char *));
-        mount_points[mount_point_count++] = strdup(mount_point);
+        gcsfuse_pids = realloc(gcsfuse_pids, (mount_point_count + 1) * sizeof(pid_t));
+        if (!mount_points || !gcsfuse_pids) {
+            slurm_error("gcsfuse-mount: realloc failed: %m");
+            free(arg);
+            // Cleanup previously allocated memory
+            for (int i = 0; i < mount_point_count; i++) {
+                free(mount_points[i]);
+            }
+            free(mount_points);
+            free(gcsfuse_pids);
+            mount_points = NULL;
+            gcsfuse_pids = NULL;
+            mount_point_count = 0;
+            return -1;
+        }
+        mount_points[mount_point_count] = strdup(mount_point);
+        gcsfuse_pids[mount_point_count] = -1; // Initialize PID
+        mount_point_count++;
 
-        mkdir(mount_point, 0755);
+        if (mkdir(mount_point, 0755) != 0 && errno != EEXIST) {
+             slurm_error("gcsfuse-mount: failed to create mount point %s: %m", mount_point);
+             free(arg);
+             mount_point_count--; // Decrement count as this mount failed
+             free(mount_points[mount_point_count]);
+             return_code = -1;
+             optarg = strtok_r(NULL, ";", &saveptr);
+             continue;
+        }
 
         pid_t pid = fork();
         if (pid == 0) {
@@ -422,24 +486,36 @@ int slurm_spank_user_init(spank_t sp, int ac, char **av) {
             exit(1);
         } else if (pid < 0) {
             slurm_error("gcsfuse-mount: fork failed: %m");
+            return_code = -1;
+        } else {
+            gcsfuse_pids[mount_point_count - 1] = pid;
         }
         free(arg);
 
         // Wait for the mount to become responsive.
         int found = 0;
-        for (int k = 0; k < 20; k++) { // Wait up to 10 seconds
-            if (is_mountpoint(mount_point)) {
-                found = 1;
-                break;
+        if (pid > 0) {
+            for (int k = 0; k < 20; k++) { // Wait up to 10 seconds
+                if (is_mountpoint(mount_point)) {
+                    found = 1;
+                    break;
+                }
+                usleep(500000); // 500ms
             }
-            usleep(500000); // 500ms
-        }
-        if (!found) {
-            slurm_error("gcsfuse-mount: timed out waiting for mountpoint '%s'", mount_point);
+            if (!found) {
+                slurm_error("gcsfuse-mount: timed out waiting for mountpoint '%s'", mount_point);
+                kill(pid, SIGKILL); // Kill the gcsfuse process if mount failed
+                waitpid(pid, NULL, 0);
+                gcsfuse_pids[mount_point_count - 1] = -1;
+                return_code = -1;
+            }
+        } else { // Fork failed
+             mount_point_count--;
+             free(mount_points[mount_point_count]);
         }
         optarg = strtok_r(NULL, ";", &saveptr);
     }
-    return 0;
+    return return_code;
 }
 
 /**
@@ -464,13 +540,53 @@ static int handle_gcsfuse_mount(int val, const char *optarg, int remote) {
     const char *current_mounts = getenv("GCSFUSE_MOUNTS");
     // slurm_info("gcsfuse-mount: current_mounts: %s Adding: %s", current_mounts, optarg);
 
-    const char *next_mount = resolve_relative_mounts(optarg);
+    char *resolved_optarg = resolve_relative_mounts(optarg);
+    if (!resolved_optarg) {
+        slurm_error("gcsfuse-mount: Failed to resolve paths in %s", optarg);
+        return -1;
+    }
+
+    // Extract mount point from resolved_optarg to check for duplicates
+    char *optarg_copy = strdup(resolved_optarg);
+    char *bucket = strtok(optarg_copy, ":");
+    char *mount_point = strtok(NULL, ":");
+    if (!mount_point) { // Handle case where bucket is not specified
+        mount_point = bucket;
+    }
 
     if (current_mounts && current_mounts[0] != '\0') {
-        asprintf(&new_mounts, "%s;%s", current_mounts, next_mount);
-    } else {
-        asprintf(&new_mounts, "%s", next_mount);
+        char *mounts_copy = strdup(current_mounts);
+        char *saveptr;
+        char *token = strtok_r(mounts_copy, ";", &saveptr);
+        while (token) {
+            char *token_copy = strdup(token);
+            char *p_bucket = strtok(token_copy, ":");
+            char *p_mount_point = strtok(NULL, ":");
+            if (!p_mount_point) { // Handle case where bucket is not specified
+                p_mount_point = p_bucket;
+            }
+
+            if (strcmp(mount_point, p_mount_point) == 0) {
+                slurm_error("gcsfuse-mount: Duplicate mount point specified: %s", mount_point);
+                free(token_copy);
+                free(mounts_copy);
+                free(optarg_copy);
+                free(resolved_optarg);
+                return -1;
+            }
+            free(token_copy);
+            token = strtok_r(NULL, ";", &saveptr);
+        }
+        free(mounts_copy);
     }
+    free(optarg_copy);
+
+    if (current_mounts && current_mounts[0] != '\0') {
+        asprintf(&new_mounts, "%s;%s", current_mounts, resolved_optarg);
+    } else {
+        asprintf(&new_mounts, "%s", resolved_optarg);
+    }
+    free(resolved_optarg);
 
     if (new_mounts == NULL) {
         slurm_error("gcsfuse-mount: asprintf failed");
