@@ -42,6 +42,13 @@ This plugin allows users to easily mount GCS buckets within their Slurm jobs.
 The `--gcsfuse-mount` option can be used multiple times to mount multiple
 buckets.
 
+**Error Handling:** If multiple mounts are specified, the plugin attempts to set up
+each one. If any mount fails (e.g., bucket not found, permission error,
+mount point issue), an error is logged, but the plugin will continue to
+attempt to set up the remaining mounts. The `srun` command will return a non-zero
+exit code if any mount failed, but the job step will still execute with any
+successfully established mounts.
+
 ### Examples
 
 1.  **Mount a bucket and list its contents:**
@@ -68,6 +75,22 @@ buckets.
     ```bash
     srun --gcsfuse-mount=bucket-a:/tmp/a --gcsfuse-mount=bucket-b:./b ls /tmp/a ./b
     ```
+
+## Testing
+
+The `files/test_gcsfuse_spank.sh` script can be used to test the plugin
+functionality. Please note that this script requires three GCS buckets
+(named `your-bucket-a`, `your-bucket-b`, and `your-bucket-c` by default)
+to exist and be accessible by the compute node service account. You may need
+to create these buckets and/or adjust the bucket names in the script.
+
+## Resource Usage
+
+Each gcsfuse mount runs as a separate process. Users should be aware that
+launching a large number of gcsfuse mounts within a single job step will
+consume additional memory and CPU resources on the compute node. The exact
+overhead per mount depends on the gcsfuse version and the workload, but it's
+generally advisable to keep the number of concurrent mounts reasonable.
 
 ## Sequence Diagram
 

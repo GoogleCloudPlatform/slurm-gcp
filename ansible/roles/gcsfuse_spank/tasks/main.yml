@@ -27,7 +27,7 @@
   - name: Configure gcsfuse_spank in plugstack.conf
     lineinfile:
       path: /etc/slurm/plugstack.conf
-      regexp: '\s*required\s+/usr/local/lib/slurm/gcsfuse_spank.so\s*'
-      line: 'required /usr/local/lib/slurm/gcsfuse_spank.so'
+      regexp: '^\s*(required|optional)\s+/usr/local/lib/slurm/gcsfuse_spank.so\s*'
+      line: 'optional /usr/local/lib/slurm/gcsfuse_spank.so'
       create: yes
   when: not gcsfuse_spank_installed.stat.exists

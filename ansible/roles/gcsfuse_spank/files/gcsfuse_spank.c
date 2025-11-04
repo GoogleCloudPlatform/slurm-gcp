@@ -84,7 +84,7 @@ bool is_mountpoint(const char *path) {
     // To check if it's a mountpoint, we compare its device ID with its parent's.
     // We construct the parent path by appending "/..".
     // e.g., for "/home/user", the parent path becomes "/home/user/..".
-    size_t parent_path_len = strlen(path) + 4; // for "/..\0"
+    size_t parent_path_len = strlen(path) + 4; // for "/.. "
     char *parent_path = malloc(parent_path_len);
     if (parent_path == NULL) {
         perror("Failed to allocate memory for parent path");
@@ -118,6 +118,86 @@ bool is_mountpoint(const char *path) {
     return false;
 }
 
+/**
+ * @brief Parses a single mount token.
+ *
+ * Token format: [BUCKET:]MOUNT_POINT[:FLAGS]
+ *
+ * @param token The mount token string.
+ * @param cwd The current working directory for resolving relative paths.
+ * @param bucket_out Pointer to store the allocated bucket name (or NULL).
+ * @param mount_path_out Pointer to store the allocated absolute mount path.
+ * @param mount_options_out Pointer to store the allocated options string (or NULL).
+ * @return 0 on success, -1 on error. Caller must free allocated strings.
+ */
+static int parse_mount_token(const char *token, const char *cwd, char **bucket_out, char **mount_path_out, char **mount_options_out) {
+    *bucket_out = NULL;
+    *mount_path_out = NULL;
+    *mount_options_out = NULL;
+
+    char *my_token = strdup(token);
+    if (!my_token) return -1;
+
+    char *bucket = NULL;
+    char *mount_path = NULL;
+    const char *mount_options = "";
+
+    char *first_colon = strchr(my_token, ':');
+    char *path_part;
+
+    if (first_colon) {
+        char *slash_before_colon = memchr(my_token, '/', first_colon - my_token);
+        if (slash_before_colon == NULL) {
+            bucket = strndup(my_token, first_colon - my_token);
+            path_part = first_colon + 1;
+        } else {
+            path_part = my_token;
+        }
+    } else {
+        path_part = my_token;
+    }
+
+    char *second_colon = strchr(path_part, ':');
+    if (second_colon) {
+        mount_path = strndup(path_part, second_colon - path_part);
+        mount_options = second_colon;
+    } else {
+        mount_path = strdup(path_part);
+    }
+
+    if (!mount_path) {
+        free(bucket);
+        free(my_token);
+        return -1;
+    }
+
+    char *absolute_mount_path = NULL;
+    if (mount_path[0] != '/') {
+        const char *path_ptr = mount_path;
+        if (path_ptr[0] == '.' && path_ptr[1] == '/') {
+            path_ptr += 2;
+        }
+        if (asprintf(&absolute_mount_path, "%s/%s", cwd, path_ptr) < 0) {
+            absolute_mount_path = NULL;
+        }
+    } else {
+        absolute_mount_path = strdup(mount_path);
+    }
+
+    free(mount_path);
+    if (!absolute_mount_path) {
+        free(bucket);
+        free(my_token);
+        return -1;
+    }
+
+    *bucket_out = bucket;
+    *mount_path_out = absolute_mount_path;
+    *mount_options_out = strdup(mount_options);
+
+    free(my_token);
+    return 0;
+}
 
 /**
  * @brief Resolves relative paths in a semicolon-delimited mount string.
@@ -131,9 +211,9 @@ bool is_mountpoint(const char *path) {
  * final resolved string is reassembled.
  *
  * Example:
- * Input: "bucket1:./gcs:\"-o ro\";/abs/path;rel_path"
+ * Input: "bucket1:./gcs:"-o ro";/abs/path;rel_path"
  * CWD: "/home/user"
- * Output: "bucket1:/home/user/gcs:\"-o ro\";/abs/path;/home/user/rel_path"
+ * Output: "bucket1:/home/user/gcs:"-o ro";/abs/path;/home/user/rel_path"
  *
  * @param mounts_str The semicolon-delimited string of mounts.
  * @return A new dynamically allocated string with all paths resolved.
@@ -171,79 +251,45 @@ char* resolve_relative_mounts(const char *mounts_str) {
 
     while (token != NULL) {
         char *bucket = NULL;
-        char *mount_path = NULL;
-        const char *mount_options = ""; // Default to empty string
-
-        char *first_colon = strchr(token, ':');
-        char *path_part;
-
-        if (first_colon) {
-            // Format is bucket:path... or path:options...
-            // Check if the part before the colon contains a '/', if not it's a bucket
-            char *slash_before_colon = memchr(token, '/', first_colon - token);
-            if (slash_before_colon == NULL) {
-                 bucket = strndup(token, first_colon - token);
-                 path_part = first_colon + 1;
-            } else {
-                 path_part = token;
-            }
-        } else {
-            path_part = token;
-        }
-
-        char *second_colon = strchr(path_part, ':');
-        if (second_colon) {
-            mount_path = strndup(path_part, second_colon - path_part);
-            mount_options = second_colon; // Includes the leading ':'
-        } else {
-            mount_path = strdup(path_part);
-        }
-
         char *absolute_mount_path = NULL;
-        if (mount_path && mount_path[0] != '/') {
-            const char *path_ptr = mount_path;
-            if (path_ptr[0] == '.' && path_ptr[1] == '/') {
-                path_ptr += 2;
-            }
-            if (asprintf(&absolute_mount_path, "%s/%s", cwd, path_ptr) < 0) {
-                 absolute_mount_path = NULL;
-            }
-        } else {
-            absolute_mount_path = mount_path ? strdup(mount_path) : strdup("");
-        }
+        char *mount_options = NULL;
 
-        char *final_token_part = NULL;
-        if (bucket) {
-            if (asprintf(&final_token_part, "%s:%s%s", bucket, absolute_mount_path, mount_options) < 0) {
-                final_token_part = NULL;
-            }
-        } else {
-            if (asprintf(&final_token_part, "%s%s", absolute_mount_path, mount_options) < 0) {
-                 final_token_part = NULL;
-            }
-        }
-
-        free(bucket);
-        free(mount_path);
-        free(absolute_mount_path);
-
-        if (final_token_part) {
-            char *new_result;
-            if (result[0] == '\0') {
-                new_result = strdup(final_token_part);
+        if (parse_mount_token(token, cwd, &bucket, &absolute_mount_path, &mount_options) == 0) {
+            char *final_token_part = NULL;
+            if (bucket) {
+                if (asprintf(&final_token_part, "%s:%s%s", bucket, absolute_mount_path, mount_options) < 0) {
+                    final_token_part = NULL;
+                }
             } else {
-                if (asprintf(&new_result, "%s;%s", result, final_token_part) < 0) {
-                     new_result = NULL;
+                if (asprintf(&final_token_part, "%s%s", absolute_mount_path, mount_options) < 0) {
+                     final_token_part = NULL;
                 }
             }
-            free(result);
-            result = new_result;
-            free(final_token_part);
-        }
 
-        if (result == NULL) {
-             perror("Failed to build result string");
-             break;
+            free(bucket);
+            free(absolute_mount_path);
+            free(mount_options);
+
+            if (final_token_part) {
+                char *new_result;
+                if (result[0] == '\0') {
+                    new_result = strdup(final_token_part);
+                } else {
+                    if (asprintf(&new_result, "%s;%s", result, final_token_part) < 0) {
+                         new_result = NULL;
+                    }
+                }
+                free(result);
+                result = new_result;
+                free(final_token_part);
+            }
+
+            if (result == NULL) {
+                 perror("Failed to build result string");
+                 break;
+            }
+        } else {
+            slurm_error("Failed to parse mount token: %s", token);
         }
 
         token = strtok_r(NULL, ";", &saveptr);
@@ -422,23 +468,32 @@ int slurm_spank_user_init(spank_t sp, int ac, char **av) {
             continue;
         }
 
-        mount_points = realloc(mount_points, (mount_point_count + 1) * sizeof(char *));
-        gcsfuse_pids = realloc(gcsfuse_pids, (mount_point_count + 1) * sizeof(pid_t));
-        if (!mount_points || !gcsfuse_pids) {
-            slurm_error("gcsfuse-mount: realloc failed: %m");
+        char **tmp_mount_points = realloc(mount_points, (mount_point_count + 1) * sizeof(char *));
+        if (!tmp_mount_points) {
+            slurm_error("gcsfuse-mount: realloc failed for mount_points: %m");
             free(arg);
-            // Cleanup previously allocated memory
-            for (int i = 0; i < mount_point_count; i++) {
-                free(mount_points[i]);
-            }
-            free(mount_points);
-            free(gcsfuse_pids);
-            mount_points = NULL;
-            gcsfuse_pids = NULL;
-            mount_point_count = 0;
-            return -1;
+            return_code = -1;
+            goto cleanup_user_init;
         }
+        mount_points = tmp_mount_points;
+
+        pid_t *tmp_gcsfuse_pids = realloc(gcsfuse_pids, (mount_point_count + 1) * sizeof(pid_t));
+        if (!tmp_gcsfuse_pids) {
+            slurm_error("gcsfuse-mount: realloc failed for gcsfuse_pids: %m");
+            free(arg);
+            return_code = -1;
+            goto cleanup_user_init;
+        }
+        gcsfuse_pids = tmp_gcsfuse_pids;
+
         mount_points[mount_point_count] = strdup(mount_point);
+        if (!mount_points[mount_point_count]) {
+            slurm_error("gcsfuse-mount: strdup failed for mount_point: %m");
+            free(arg);
+            return_code = -1;
+            optarg = strtok_r(NULL, ";", &saveptr);
+            continue;
+        }
         gcsfuse_pids[mount_point_count] = -1; // Initialize PID
         mount_point_count++;
 
@@ -471,10 +526,15 @@ int slurm_spank_user_init(spank_t sp, int ac, char **av) {
             gcsfuse_argv[j++] = "--dir-mode=755";
 
             if (flags) {
-                char *flag = strtok(flags, " ");
-                while (flag && j < 30) {
+                char *flag_saveptr;
+                char *flag = strtok_r(flags, " ", &flag_saveptr);
+                while (flag && j < 30) { // Reserve space for bucket, mount_point, NULL
                     gcsfuse_argv[j++] = flag;
-                    flag = strtok(NULL, " ");
+                    flag = strtok_r(NULL, " ", &flag_saveptr);
+                }
+                if (flag) {
+                    slurm_error("gcsfuse-mount: Too many flags provided. Maximum ~20 flags allowed.");
+                    exit(1);
                 }
             }
             gcsfuse_argv[j++] = bucket;
@@ -516,6 +576,21 @@ int slurm_spank_user_init(spank_t sp, int ac, char **av) {
         optarg = strtok_r(NULL, ";", &saveptr);
     }
     return return_code;
+
+cleanup_user_init:
+    for (int i = 0; i < mount_point_count; i++) {
+        free(mount_points[i]);
+        if (gcsfuse_pids[i] > 0) {
+            kill(gcsfuse_pids[i], SIGKILL);
+            waitpid(gcsfuse_pids[i], NULL, 0);
+        }
+    }
+    free(mount_points);
+    free(gcsfuse_pids);
+    mount_points = NULL;
+    gcsfuse_pids = NULL;
+    mount_point_count = 0;
+    return -1;
 }
 
 /**

@@ -7,6 +7,13 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:10:00
 
+# NOTE: This test script requires the following GCS buckets to exist
+# and be accessible by the service account used by the Slurm compute nodes:
+# - your-bucket-a
+# - your-bucket-b
+# - your-bucket-c
+# Please create them and update the BUCKET_ variables below if necessary.
+
 # Bucket names
 BUCKET_A="your-bucket-a"
 BUCKET_B="your-bucket-b"
