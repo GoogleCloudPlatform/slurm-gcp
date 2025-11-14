@@ -98,18 +98,35 @@ run_loopback_test() {
   hostname=$(hostname)
 
   for ((i=1; i<=LOOPBACK_ITERATIONS; i++)); do
-    # Start the server in the background
-    ib_send_bw -F -n 5 -q 10 -s 8388608 --mr_per_qp &
-    local server_pid=$!
-    sleep 1 # Wait for the server to be ready
 
-    # Run the client
-    if ib_send_bw -F -n 5 -q 10 -s 8388608 --mr_per_qp "$hostname"; then
-      ((success_count++))
+    # Loop over potential ports
+    for ((port=18500; port<=18600; port++)); do
+
+      # Start the server in the background
+      ib_send_bw -F -n 5 -q 10 -s 8388608 -p $port --mr_per_qp &
+      local server_pid=$!
+      sleep 2 # Wait for the server to be ready
+      ps -p $server_pid
+      if [ $? == 1 ];
+      then
+        continue
+      fi
+
+      # Run the client
+      if ib_send_bw -F -n 5 -q 10 -s 8388608 -p $port --mr_per_qp "$hostname"; then
+        ((success_count++))
+      fi
+      # Clean up the server process
+      kill $server_pid 2>/dev/null || true
+      wait $server_pid 2>/dev/null
+
+      if [ "$success_count" -ge "$LOOPBACK_ITERATIONS" ]; then
+        break
+      fi
+    done
+    if [ "$success_count" -ge "$LOOPBACK_ITERATIONS" ]; then
+      break
     fi
-    # Clean up the server process
-    kill $server_pid 2>/dev/null || true
-    wait $server_pid 2>/dev/null
   done
 
   log "Loopback test result: $success_count/$LOOPBACK_ITERATIONS successful."
