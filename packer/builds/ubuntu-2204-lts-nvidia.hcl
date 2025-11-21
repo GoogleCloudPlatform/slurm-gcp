@@ -24,12 +24,13 @@ zone       = "us-central1-a"
 #########
 
 # NOTE: Your Project ID will be automatically appended
-source_image_project_id = "ubuntu-os-cloud"
+source_image_project_id = "ubuntu-os-accelerator-images"
 
 #source_image        = null
-source_image_family = "ubuntu-2204-lts-arm64"
+source_image_family = "ubuntu-accelerator-2204-amd64-with-nvidia-570"
 
-machine_type = "t2a-standard-16"
+#image_family_name = "ubuntu-2204-lts-nvidia-570"
+image_family_alt = "ubuntu-2204-lts-nvidia-570"
 
 # *NOT* intended for production use
 # skip_create_image = true
