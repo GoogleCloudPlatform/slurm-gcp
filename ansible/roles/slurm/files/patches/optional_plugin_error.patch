@@ -134,4 +134,3 @@ index a739631dc19..887289d9b9b 100644
 +			verbose("spank: %s: %s", path, slurm_strerror(e));
  		return NULL;
  	}
-
