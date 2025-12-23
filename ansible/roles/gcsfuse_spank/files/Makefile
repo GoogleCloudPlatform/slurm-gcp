@@ -1,44 +1,44 @@
-# This prevents conflicts with files of the same name and can improve performance.
-.PHONY: all install clean uninstall
-
-# --- Variables ---
 NAME    := gcsfuse_spank
-SRCS    := gcsfuse_spank.c
-OBJS    := $(SRCS:.c=.o)
+DESTDIR ?= /usr/local
+LIBDIR  ?= $(DESTDIR)/lib/slurm
 
-# Using standard variable names (e.g., CFLAGS, LDFLAGS) is conventional.
-# Using += allows these to be appended to from the command line.
-CFLAGS  += -ggdb -Wall -fPIC
-LDFLAGS += -shared
-LDLIBS  += -lslurm
+FLAGS   := -ggdb -Wall
+SHOPTS  := -shared
+LLIBS   := -lslurm
+OBJS    := gcsfuse_spank.o
 
-INSTALL_DIR := /usr/local/lib/slurm
-
-# --- Targets ---
+# Helper to detect if running tests
+ifdef TEST_BUILD
+CFLAGS += -DTESTING_MODE
+endif
 
 all: $(NAME).so
 
-# The install target should depend on the binary being built.
 install: $(NAME).so
-	@echo "Installing $(NAME).so to $(INSTALL_DIR)..."
-	@mkdir -p --mode=0755 $(INSTALL_DIR)
-	@install -m0755 $(NAME).so $(INSTALL_DIR)/
+	mkdir -p --mode=0755 $(LIBDIR)
+	install -m0755 $(NAME).so $(LIBDIR)
 
-# The linking rule to create the final shared object.
 $(NAME).so: $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	$(CC) $(SHOPTS) -o $(NAME).so $(OBJS) $(LLIBS)
 
-# A pattern rule is a more modern and flexible way to compile .c files to .o files
-# than the old-style .c.o suffix rule.
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+gcsfuse_spank.o: gcsfuse_spank.c
+	$(CC) $(FLAGS) -fPIC -c gcsfuse_spank.c
 
-# Removes all generated files.
+# --- Test Targets ---
+
+test: test_main
+	./test_main
+
+test_main: tests/test_main.c gcsfuse_spank.c
+	$(CC) -ggdb -Wall -DTESTING_MODE -I../slurm -o test_main tests/test_main.c
+
+# --- Lint/Format Targets ---
+
+lint:
+	cppcheck --enable=all --suppress=missingIncludeSystem gcsfuse_spank.c
+
+format:
+	clang-format -i gcsfuse_spank.c tests/test_main.c
+
 clean:
-	@echo "Cleaning up generated files..."
-	@-rm -f *.o *.so
-
-# Provides a way to remove the installed file.
-uninstall:
-	@echo "Uninstalling from $(INSTALL_DIR)..."
-	@-rm -f $(INSTALL_DIR)/$(NAME).so
+	rm -f *.o *.so test_main

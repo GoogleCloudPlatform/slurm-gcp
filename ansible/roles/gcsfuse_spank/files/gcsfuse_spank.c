@@ -20,659 +20,605 @@
  *
  * This plugin allows users to specify GCS buckets to be mounted for the
  * duration of their Slurm job step. It provides a `--gcsfuse-mount` option
- * to `srun`.
+ * to `srun`, `sbatch`, and `salloc`.
  *
- * The plugin operates in two main contexts:
- * 1. Local (srun): It captures the `--gcsfuse-mount` arguments, resolves
- *    any relative paths to absolute paths based on the user's submission
- *    directory, and passes them to the remote end via an environment variable.
- * 2. Remote (slurmd): On the compute node, it reads the environment variable,
- *    forks a `gcsfuse` process for each requested mount, waits for the mount
- *    to become ready, and then allows the user's job to run. At the end of
- *    the job step, it cleans up by unmounting all filesystems.
+ * The plugin operates in three main contexts:
+ * 1. Local/Allocator (srun/sbatch/salloc): Captures `--gcsfuse-mount`, resolves
+ *    paths, and sets `GCSFUSE_MOUNTS` environment variable for the job.
+ * 2. Job Script (prolog/epilog): Runs on the compute node. Prolog mounts the
+ * buckets defined in `GCSFUSE_MOUNTS` (from job env). Epilog unmounts them.
+ * 3. Remote (slurmd/user_init): Runs before each job step. Checks if already
+ * mounted. If not (e.g. srun with new options), mounts them.
  */
 
 #define _GNU_SOURCE
-#include <stdio.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <slurm/spank.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/wait.h>
-#include <stdbool.h>
-#include <signal.h>
-#include <errno.h>
-
-/**
- * @brief Checks if a given path is a mountpoint.
- *
- * This function determines if a path is a mountpoint by comparing the
- * device ID of the path with the device ID of its parent directory.
- * If the device IDs are different, it indicates that the path is the
- * entry point for a different filesystem. The root directory ("/") is
- * handled as a special case and is always considered a mountpoint.
- *
- * Note: This method is POSIX-compliant. However, it may not detect
- * all types of mounts, such as bind mounts on Linux where the device
- * ID might not change. For most common use cases, this approach is
- * reliable.
- *
- * @param path The filesystem path to check.
- * @return `true` if the path is a mountpoint, `false` otherwise.
- */
-bool is_mountpoint(const char *path) {
-    struct stat current_stat;
-
-    // First, get the stat of the provided path.
-    // If it fails, the path likely doesn't exist or is inaccessible.
-    if (stat(path, &current_stat) != 0) {
-        //perror("stat failed for path");
-        return false;
-    }
-
-    // A mountpoint must be a directory.
-    if (!S_ISDIR(current_stat.st_mode)) {
-        return false;
-    }
-
-    // The root directory "/" is always a mountpoint.
-    if (strcmp(path, "/") == 0) {
-        return true;
-    }
-
-    // To check if it's a mountpoint, we compare its device ID with its parent's.
-    // We construct the parent path by appending "/..".
-    // e.g., for "/home/user", the parent path becomes "/home/user/..".
-    size_t parent_path_len = strlen(path) + 4; // for "/.. "
-    char *parent_path = malloc(parent_path_len);
-    if (parent_path == NULL) {
-        perror("Failed to allocate memory for parent path");
-        return false; // Cannot proceed without memory
-    }
-    snprintf(parent_path, parent_path_len, "%s/..", path);
-
-    struct stat parent_stat;
-    // Get the stat of the parent directory.
-    if (stat(parent_path, &parent_stat) != 0) {
-        //perror("stat failed for parent path");
-        free(parent_path);
-        return false;
-    }
-
-    free(parent_path);
-
-    // If the device ID of the path is different from its parent's,
-    // it's a mountpoint.
-    if (current_stat.st_dev != parent_stat.st_dev) {
-        return true;
-    }
-
-    // Additionally, if the inode number is the same, it implies we are at the
-    // root of a filesystem (like in the case of "/"). While the root case is
-    // handled above, this check can also identify it.
-    if (current_stat.st_ino == parent_stat.st_ino) {
-        return true;
-    }
-
-    return false;
-}
-
-/**
- * @brief Parses a single mount token.
- *
- * Token format: [BUCKET:]MOUNT_POINT[:FLAGS]
- *
- * @param token The mount token string.
- * @param cwd The current working directory for resolving relative paths.
- * @param bucket_out Pointer to store the allocated bucket name (or NULL).
- * @param mount_path_out Pointer to store the allocated absolute mount path.
- * @param mount_options_out Pointer to store the allocated options string (or NULL).
- * @return 0 on success, -1 on error. Caller must free allocated strings.
- */
-static int parse_mount_token(const char *token, const char *cwd, char **bucket_out, char **mount_path_out, char **mount_options_out) {
-    *bucket_out = NULL;
-    *mount_path_out = NULL;
-    *mount_options_out = NULL;
-
-    char *my_token = strdup(token);
-    if (!my_token) return -1;
-
-    char *bucket = NULL;
-    char *mount_path = NULL;
-    const char *mount_options = "";
-
-    char *first_colon = strchr(my_token, ':');
-    char *path_part;
-
-    if (first_colon) {
-        char *slash_before_colon = memchr(my_token, '/', first_colon - my_token);
-        if (slash_before_colon == NULL) {
-            bucket = strndup(my_token, first_colon - my_token);
-            path_part = first_colon + 1;
-        } else {
-            path_part = my_token;
-        }
-    } else {
-        path_part = my_token;
-    }
-
-    char *second_colon = strchr(path_part, ':');
-    if (second_colon) {
-        mount_path = strndup(path_part, second_colon - path_part);
-        mount_options = second_colon;
-    } else {
-        mount_path = strdup(path_part);
-    }
-
-    if (!mount_path) {
-        free(bucket);
-        free(my_token);
-        return -1;
-    }
-
-    char *absolute_mount_path = NULL;
-    if (mount_path[0] != '/') {
-        const char *path_ptr = mount_path;
-        if (path_ptr[0] == '.' && path_ptr[1] == '/') {
-            path_ptr += 2;
-        }
-        if (asprintf(&absolute_mount_path, "%s/%s", cwd, path_ptr) < 0) {
-            absolute_mount_path = NULL;
-        }
-    } else {
-        absolute_mount_path = strdup(mount_path);
-    }
-
-    free(mount_path);
-    if (!absolute_mount_path) {
-        free(bucket);
-        free(my_token);
-        return -1;
-    }
-
-    *bucket_out = bucket;
-    *mount_path_out = absolute_mount_path;
-    *mount_options_out = strdup(mount_options);
-
-    free(my_token);
-    return 0;
-}
-
-/**
- * @brief Resolves relative paths in a semicolon-delimited mount string.
- *
- * This function parses a string of mount specifications, separated by
- * semicolons. Each specification can be in the format:
- * [bucket:]path[:"options"]
- *
- * It identifies the 'path' component. If the path is relative (does not
- * start with '/'), it is prepended with the current working directory. The
- * final resolved string is reassembled.
- *
- * Example:
- * Input: "bucket1:./gcs:"-o ro";/abs/path;rel_path"
- * CWD: "/home/user"
- * Output: "bucket1:/home/user/gcs:"-o ro";/abs/path;/home/user/rel_path"
- *
- * @param mounts_str The semicolon-delimited string of mounts.
- * @return A new dynamically allocated string with all paths resolved.
- * The caller is responsible for freeing this memory.
- * Returns NULL on error (e.g., memory allocation failure).
- */
-char* resolve_relative_mounts(const char *mounts_str) {
-    if (mounts_str == NULL || mounts_str[0] == '\0') {
-        return strdup("");
-    }
-
-    char *cwd = getcwd(NULL, 0);
-    if (cwd == NULL) {
-        perror("getcwd failed");
-        return NULL;
-    }
-
-    char *mounts_copy = strdup(mounts_str);
-    if (mounts_copy == NULL) {
-        perror("strdup for mounts_copy failed");
-        free(cwd);
-        return NULL;
-    }
-
-    char *result = strdup("");
-    if (result == NULL) {
-        perror("strdup for result failed");
-        free(cwd);
-        free(mounts_copy);
-        return NULL;
-    }
-
-    char *saveptr;
-    char *token = strtok_r(mounts_copy, ";", &saveptr);
-
-    while (token != NULL) {
-        char *bucket = NULL;
-        char *absolute_mount_path = NULL;
-        char *mount_options = NULL;
-
-        if (parse_mount_token(token, cwd, &bucket, &absolute_mount_path, &mount_options) == 0) {
-            char *final_token_part = NULL;
-            if (bucket) {
-                if (asprintf(&final_token_part, "%s:%s%s", bucket, absolute_mount_path, mount_options) < 0) {
-                    final_token_part = NULL;
-                }
-            } else {
-                if (asprintf(&final_token_part, "%s%s", absolute_mount_path, mount_options) < 0) {
-                     final_token_part = NULL;
-                }
-            }
-
-            free(bucket);
-            free(absolute_mount_path);
-            free(mount_options);
-
-            if (final_token_part) {
-                char *new_result;
-                if (result[0] == '\0') {
-                    new_result = strdup(final_token_part);
-                } else {
-                    if (asprintf(&new_result, "%s;%s", result, final_token_part) < 0) {
-                         new_result = NULL;
-                    }
-                }
-                free(result);
-                result = new_result;
-                free(final_token_part);
-            }
-
-            if (result == NULL) {
-                 perror("Failed to build result string");
-                 break;
-            }
-        } else {
-            slurm_error("Failed to parse mount token: %s", token);
-        }
-
-        token = strtok_r(NULL, ";", &saveptr);
-    }
-
-    free(mounts_copy);
-    free(cwd);
-    return result;
-}
+#include <unistd.h>
 
 SPANK_PLUGIN(gcsfuse, 1);
 
-// Global array to store the mount points for cleanup.
-static char **mount_points = NULL;
-static pid_t *gcsfuse_pids = NULL;
+// Global array to store the mount points for cleanup in user_init/exit context.
+// Note: This is NOT shared with prolog/epilog context.
+static char** mount_points = NULL;
 static int mount_point_count = 0;
 
 // Forward declaration for the callback.
-static int handle_gcsfuse_mount(int val, const char *optarg, int remote);
+static int handle_gcsfuse_mount(int val, const char* optarg, int remote);
 
 // Option definition.
 static struct spank_option gcsfuse_mount_option = {
     "gcsfuse-mount",
     "BUCKET_NAME:MOUNT_POINT[:FLAGS]",
     "Mount a GCS bucket using gcsfuse",
-    1, 0,
-    (spank_opt_cb_f)handle_gcsfuse_mount
-};
+    1,
+    0,
+    (spank_opt_cb_f)handle_gcsfuse_mount};
 
 /**
- * @brief SPANK plugin initialization function.
- *
- * This function is called by Slurm when the plugin is loaded. It runs in
- * both the local (srun) and remote (slurmd) contexts.
- *
- * In the local context, it simply registers the `--gcsfuse-mount` option.
- * In the remote context, it is a no-op, as the mounting logic is handled
- * in `slurm_spank_user_init`.
- *
- * @param sp The SPANK handle.
- * @param ac The argument count.
- * @param av The argument vector.
- * @return 0 on success, -1 on failure.
+ * @brief Checks if a given path is a mountpoint.
  */
-int slurm_spank_init(spank_t sp, int ac, char **av) {
-    if (spank_context() == S_CTX_LOCAL) {
-        return spank_option_register(sp, &gcsfuse_mount_option);
-    }
-    return 0;
+static bool is_mountpoint(const char* path) {
+  struct stat current_stat;
+  if (stat(path, &current_stat) != 0) return false;
+  if (!S_ISDIR(current_stat.st_mode)) return false;
+  if (strcmp(path, "/") == 0) return true;
+
+  size_t parent_path_len = strlen(path) + 4;
+  char* parent_path = malloc(parent_path_len);
+  if (!parent_path) return false;
+  snprintf(parent_path, parent_path_len, "%s/..", path);
+
+  struct stat parent_stat;
+  if (stat(parent_path, &parent_stat) != 0) {
+    free(parent_path);
+    return false;
+  }
+  free(parent_path);
+
+  if (current_stat.st_dev != parent_stat.st_dev) return true;
+  if (current_stat.st_ino == parent_stat.st_ino) return true;
+
+  return false;
 }
 
 /**
- * @brief SPANK plugin exit function.
- *
- * This function is called by Slurm just before the job step finishes. It
- * runs in the remote (slurmd) context.
- *
- * Its primary responsibility is to clean up by unmounting all the gcsfuse
- * filesystems that were mounted for the job step. It iterates through the
- * global `mount_points` array and calls `fusermount -u` for each one.
- *
- * @param sp The SPANK handle.
- * @param ac The argument count.
- * @param av The argument vector.
- * @return 0 on success.
+ * @brief Resolves relative paths in a semicolon-delimited mount string.
  */
-int slurm_spank_exit(spank_t sp, int ac, char **av) {
-    // slurm_info("gcsfuse-mount: Entering slurm_spank_exit. Context: %i", spank_context());
-    if (spank_context() != S_CTX_REMOTE) {
-        return 0;
-    }
-    // slurm_info("gcsfuse-mount: Starting to unmount. Mount point count: %i", mount_point_count);
+static char* resolve_relative_mounts(const char* mounts_str, const char* cwd) {
+  if (mounts_str == NULL || mounts_str[0] == '\0') {
+    return strdup("");
+  }
 
-    for (int i = 0; i < mount_point_count; i++) {
-        pid_t pid = fork();
-        if (pid == 0) {
-            // slurm_info("fusermount: attempting to unmount %s", mount_points[i]);
-            execlp("fusermount", "fusermount", "-u", mount_points[i], NULL);
-            slurm_error("gcsfuse-mount: execlp failed for fusermount: %m");
-            exit(1);
-        } else if (pid > 0) {
-            waitpid(pid, NULL, 0);
-        }
+  // If cwd is not provided, use current working directory
+  char* alloc_cwd = NULL;
+  if (cwd == NULL) {
+    alloc_cwd = getcwd(NULL, 0);
+    if (alloc_cwd == NULL) {
+      perror("getcwd failed");
+      return NULL;
+    }
+    cwd = alloc_cwd;
+  }
 
-        // Check if unmount was successful, if not, try lazy unmount
-        if (is_mountpoint(mount_points[i])) {
-            slurm_info("gcsfuse-mount: %s still mounted, trying lazy unmount", mount_points[i]);
-            pid_t lpid = fork();
-            if (lpid == 0) {
-                execlp("umount", "umount", "-l", mount_points[i], NULL);
-                slurm_error("gcsfuse-mount: execlp failed for umount -l: %m");
-                exit(1);
-            } else if (lpid > 0) {
-                waitpid(lpid, NULL, 0);
-            }
-        }
-        free(mount_points[i]);
-    }
-    if (mount_points) {
-        free(mount_points);
-        mount_points = NULL;
+  char* mounts_copy = strdup(mounts_str);
+  if (!mounts_copy) {
+    if (alloc_cwd) free(alloc_cwd);
+    return NULL;
+  }
+
+  char* result = strdup("");
+  if (!result) {
+    free(mounts_copy);
+    if (alloc_cwd) free(alloc_cwd);
+    return NULL;
+  }
+
+  char* saveptr;
+  char* token = strtok_r(mounts_copy, ";", &saveptr);
+
+  while (token != NULL) {
+    char* bucket = NULL;
+    char* mount_path = NULL;
+    const char* mount_options = "";
+
+    char* first_colon = strchr(token, ':');
+    char* path_part;
+
+    if (first_colon) {
+      const char* slash_before_colon = memchr(token, '/', first_colon - token);
+      if (slash_before_colon == NULL) {
+        bucket = strndup(token, first_colon - token);
+        path_part = first_colon + 1;
+      } else {
+        path_part = token;
+      }
+    } else {
+      path_part = token;
     }
 
-    // slurm_info("gcsfuse-mount: Killing gcsfuse processes");
-    for (int i = 0; i < mount_point_count; i++) {
-        if (gcsfuse_pids[i] > 0) {
-            // slurm_info("gcsfuse-mount: Killing gcsfuse process %d", gcsfuse_pids[i]);
-            kill(gcsfuse_pids[i], SIGKILL);
-            waitpid(gcsfuse_pids[i], NULL, 0); // Reap the killed process
+    char* second_colon = strchr(path_part, ':');
+    if (second_colon) {
+      mount_path = strndup(path_part, second_colon - path_part);
+      mount_options = second_colon;
+    } else {
+      mount_path = strdup(path_part);
+    }
+
+    char* absolute_mount_path = NULL;
+    if (mount_path && mount_path[0] != '/') {
+      const char* path_ptr = mount_path;
+      if (path_ptr[0] == '.' && path_ptr[1] == '/') {
+        path_ptr += 2;
+      }
+      if (asprintf(&absolute_mount_path, "%s/%s", cwd, path_ptr) < 0) {
+        absolute_mount_path = NULL;
+      }
+    } else {
+      absolute_mount_path = mount_path ? strdup(mount_path) : strdup("");
+    }
+
+    char* final_token_part = NULL;
+    if (bucket) {
+      if (asprintf(&final_token_part, "%s:%s%s", bucket, absolute_mount_path,
+                   mount_options) < 0) {
+        final_token_part = NULL;
+      }
+    } else {
+      if (asprintf(&final_token_part, "%s%s", absolute_mount_path,
+                   mount_options) < 0) {
+        final_token_part = NULL;
+      }
+    }
+
+    free(bucket);
+    free(mount_path);
+    free(absolute_mount_path);
+
+    if (final_token_part) {
+      char* new_result;
+      if (result[0] == '\0') {
+        new_result = strdup(final_token_part);
+      } else {
+        if (asprintf(&new_result, "%s;%s", result, final_token_part) < 0) {
+          new_result = NULL;
         }
+      }
+      free(result);
+      result = new_result;
+      free(final_token_part);
     }
-    if (gcsfuse_pids) {
-        free(gcsfuse_pids);
-        gcsfuse_pids = NULL;
+
+    if (result == NULL) {
+      break;
     }
-    mount_point_count = 0;
-    // slurm_info("gcsfuse-mount: Ending unmount");
-    return 0;
+
+    token = strtok_r(NULL, ";", &saveptr);
+  }
+
+  free(mounts_copy);
+  if (alloc_cwd) free(alloc_cwd);
+  return result;
 }
 
 /**
- * @brief SPANK user initialization function.
- *
- * This function is called in the remote (slurmd) context on the compute
- * node just before the user's task is executed.
- *
- * It retrieves the mount arguments from the `GCSFUSE_MOUNTS` environment
- * variable (which was set by the callback in the local context), parses
- * them, and then forks and executes the `gcsfuse` command for each mount.
- * It waits for each mount to become ready before proceeding.
- *
- * @param sp The SPANK handle.
- * @param ac The argument count.
- * @param av The argument vector.
- * @return 0 on success, -1 on failure.
+ * @brief Helper to look up an environment variable in S_JOB_ENV.
  */
-int slurm_spank_user_init(spank_t sp, int ac, char **av) {
-    uid_t uid;
-    gid_t gid;
-    char mount_env[4096];
-    int return_code = 0; // Start with success
+static char* get_job_env_var(spank_t sp, const char* name) {
+  char** env = NULL;
+  if (spank_get_item(sp, S_JOB_ENV, &env) != ESPANK_SUCCESS || !env) {
+    return NULL;
+  }
 
-    if (spank_get_item(sp, S_JOB_UID, &uid) != 0 || spank_get_item(sp, S_JOB_GID, &gid) != 0) {
-        slurm_error("gcsfuse-mount: could not get job UID/GID");
-        return -1;
+  size_t name_len = strlen(name);
+  for (int i = 0; env[i]; i++) {
+    if (strncmp(env[i], name, name_len) == 0 && env[i][name_len] == '=') {
+      return strdup(env[i] + name_len + 1);
     }
+  }
+  return NULL;
+}
 
-    if (spank_getenv(sp, "GCSFUSE_MOUNTS", mount_env, sizeof(mount_env)) != ESPANK_SUCCESS) {
-        return 0; // No mounts requested.
-    }
+/**
+ * @brief Mounts a single bucket.
+ */
+static int mount_gcsfuse(const char* bucket, const char* mount_point,
+                         const char* flags, uid_t uid, gid_t gid) {
+  if (is_mountpoint(mount_point)) {
+    slurm_spank_log("gcsfuse-mount: %s is already a mountpoint, skipping.",
+                    mount_point);
+    return 0;  // Already mounted
+  }
 
-    char *saveptr;
-    char *optarg = strtok_r(mount_env, ";", &saveptr);
-
-    while (optarg) {
-        char *bucket, *mount_point, *flags;
-        char *arg = strdup(optarg);
-
-        bucket = strtok(arg, ":");
-        mount_point = strtok(NULL, ":");
-        flags = strtok(NULL, "");
-
-        if (!bucket || !mount_point) {
-            slurm_error("gcsfuse-mount: invalid argument format: %s", optarg);
-            free(arg);
-            optarg = strtok_r(NULL, ";", &saveptr);
-            return_code = -1; // Mark as failed
-            continue;
-        }
-
-        if (is_mountpoint(mount_point)) {
-            slurm_error("gcsfuse-mount: Mount point %s is already a mountpoint. Aborting.", mount_point);
-            free(arg);
-            optarg = strtok_r(NULL, ";", &saveptr);
-            return_code = -1; // Mark as failed
-            continue;
-        }
-
-        char **tmp_mount_points = realloc(mount_points, (mount_point_count + 1) * sizeof(char *));
-        if (!tmp_mount_points) {
-            slurm_error("gcsfuse-mount: realloc failed for mount_points: %m");
-            free(arg);
-            return_code = -1;
-            goto cleanup_user_init;
-        }
-        mount_points = tmp_mount_points;
-
-        pid_t *tmp_gcsfuse_pids = realloc(gcsfuse_pids, (mount_point_count + 1) * sizeof(pid_t));
-        if (!tmp_gcsfuse_pids) {
-            slurm_error("gcsfuse-mount: realloc failed for gcsfuse_pids: %m");
-            free(arg);
-            return_code = -1;
-            goto cleanup_user_init;
-        }
-        gcsfuse_pids = tmp_gcsfuse_pids;
-
-        mount_points[mount_point_count] = strdup(mount_point);
-        if (!mount_points[mount_point_count]) {
-            slurm_error("gcsfuse-mount: strdup failed for mount_point: %m");
-            free(arg);
-            return_code = -1;
-            optarg = strtok_r(NULL, ";", &saveptr);
-            continue;
-        }
-        gcsfuse_pids[mount_point_count] = -1; // Initialize PID
-        mount_point_count++;
-
-        if (mkdir(mount_point, 0755) != 0 && errno != EEXIST) {
-             slurm_error("gcsfuse-mount: failed to create mount point %s: %m", mount_point);
-             free(arg);
-             mount_point_count--; // Decrement count as this mount failed
-             free(mount_points[mount_point_count]);
-             return_code = -1;
-             optarg = strtok_r(NULL, ";", &saveptr);
-             continue;
-        }
-
-        pid_t pid = fork();
-        if (pid == 0) {
-            char uid_str[20], gid_str[20];
-            sprintf(uid_str, "%d", uid);
-            sprintf(gid_str, "%d", gid);
-
-            char *gcsfuse_argv[32];
-            int j = 0;
-            gcsfuse_argv[j++] = "gcsfuse";
-            gcsfuse_argv[j++] = "-o";
-            gcsfuse_argv[j++] = "allow_other";
-            gcsfuse_argv[j++] = "--uid";
-            gcsfuse_argv[j++] = uid_str;
-            gcsfuse_argv[j++] = "--gid";
-            gcsfuse_argv[j++] = gid_str;
-            gcsfuse_argv[j++] = "--file-mode=644";
-            gcsfuse_argv[j++] = "--dir-mode=755";
-
-            if (flags) {
-                char *flag_saveptr;
-                char *flag = strtok_r(flags, " ", &flag_saveptr);
-                while (flag && j < 30) { // Reserve space for bucket, mount_point, NULL
-                    gcsfuse_argv[j++] = flag;
-                    flag = strtok_r(NULL, " ", &flag_saveptr);
-                }
-                if (flag) {
-                    slurm_error("gcsfuse-mount: Too many flags provided. Maximum ~20 flags allowed.");
-                    exit(1);
-                }
-            }
-            gcsfuse_argv[j++] = bucket;
-            gcsfuse_argv[j++] = mount_point;
-            gcsfuse_argv[j] = NULL;
-
-            execvp("gcsfuse", gcsfuse_argv);
-            slurm_error("gcsfuse-mount: execvp failed for gcsfuse: %m");
-            exit(1);
-        } else if (pid < 0) {
-            slurm_error("gcsfuse-mount: fork failed: %m");
-            return_code = -1;
-        } else {
-            gcsfuse_pids[mount_point_count - 1] = pid;
-        }
-        free(arg);
-
-        // Wait for the mount to become responsive.
-        int found = 0;
-        if (pid > 0) {
-            for (int k = 0; k < 20; k++) { // Wait up to 10 seconds
-                if (is_mountpoint(mount_point)) {
-                    found = 1;
-                    break;
-                }
-                usleep(500000); // 500ms
-            }
-            if (!found) {
-                slurm_error("gcsfuse-mount: timed out waiting for mountpoint '%s'", mount_point);
-                kill(pid, SIGKILL); // Kill the gcsfuse process if mount failed
-                waitpid(pid, NULL, 0);
-                gcsfuse_pids[mount_point_count - 1] = -1;
-                return_code = -1;
-            }
-        } else { // Fork failed
-             mount_point_count--;
-             free(mount_points[mount_point_count]);
-        }
-        optarg = strtok_r(NULL, ";", &saveptr);
-    }
-    return return_code;
-
-cleanup_user_init:
-    for (int i = 0; i < mount_point_count; i++) {
-        free(mount_points[i]);
-        if (gcsfuse_pids[i] > 0) {
-            kill(gcsfuse_pids[i], SIGKILL);
-            waitpid(gcsfuse_pids[i], NULL, 0);
-        }
-    }
-    free(mount_points);
-    free(gcsfuse_pids);
-    mount_points = NULL;
-    gcsfuse_pids = NULL;
-    mount_point_count = 0;
+  // Create directory.
+  // If running as root (prolog), mkdir sets owner to root, so we must chown.
+  // If running as user (user_init), mkdir sets owner to user.
+  if (mkdir(mount_point, 0755) != 0 && errno != EEXIST) {
+    slurm_error("gcsfuse-mount: failed to mkdir %s: %m", mount_point);
     return -1;
+  }
+
+  if (geteuid() == 0) {
+    if (chown(mount_point, uid, gid) != 0) {
+      slurm_error("gcsfuse-mount: failed to chown %s: %m", mount_point);
+      // Proceeding anyway, gcsfuse might still work if allow_other is used?
+      // But usually it needs access.
+    }
+  }
+
+  pid_t pid = fork();
+  if (pid == 0) {
+    // Child process
+
+    // If running as root, switch to user.
+    if (geteuid() == 0) {
+      if (setresgid(gid, gid, -1) != 0) {
+        slurm_error("gcsfuse-mount: setresgid failed: %m");
+        exit(1);
+      }
+      if (setresuid(uid, uid, -1) != 0) {
+        slurm_error("gcsfuse-mount: setresuid failed: %m");
+        exit(1);
+      }
+    }
+
+    char uid_str[20], gid_str[20];
+    sprintf(uid_str, "%d", uid);
+    sprintf(gid_str, "%d", gid);
+
+    char* gcsfuse_argv[64];  // Increased size to prevent overflow
+    int j = 0;
+    gcsfuse_argv[j++] = "gcsfuse";
+    gcsfuse_argv[j++] = "-o";
+    gcsfuse_argv[j++] = "allow_other";
+    gcsfuse_argv[j++] = "--uid";
+    gcsfuse_argv[j++] = uid_str;
+    gcsfuse_argv[j++] = "--gid";
+    gcsfuse_argv[j++] = gid_str;
+    gcsfuse_argv[j++] = "--file-mode=644";
+    gcsfuse_argv[j++] = "--dir-mode=755";
+    // gcsfuse_argv[j++] = "--foreground"; // Not needed if we wait for
+    // mountpoint? Actually gcsfuse forks by default. We want that.
+
+    if (flags) {
+      char* flag_str = strdup(flags);
+      char* flag = strtok(flag_str, " ");
+      while (flag &&
+             j < 60) {  // Limit to 60 to leave room for bucket, mp, NULL
+        gcsfuse_argv[j++] = flag;
+        flag = strtok(NULL, " ");
+      }
+      // free(flag_str); // Leaked in child, doesn't matter
+    }
+    gcsfuse_argv[j++] = (char*)bucket;
+    gcsfuse_argv[j++] = (char*)mount_point;
+    gcsfuse_argv[j] = NULL;
+
+    execvp("gcsfuse", gcsfuse_argv);
+    slurm_error("gcsfuse-mount: execvp failed for gcsfuse: %m");
+    exit(1);
+  } else if (pid < 0) {
+    slurm_error("gcsfuse-mount: fork failed: %m");
+    return -1;
+  }
+
+  // Wait for the mount to become responsive.
+  int found = 0;
+  for (int k = 0; k < 20; k++) {  // Wait up to 10 seconds
+    if (is_mountpoint(mount_point)) {
+      found = 1;
+      break;
+    }
+    usleep(500000);  // 500ms
+  }
+  if (!found) {
+    slurm_error("gcsfuse-mount: timed out waiting for mountpoint '%s'",
+                mount_point);
+    // Maybe try to kill the gcsfuse process if we knew its PID?
+    // But gcsfuse forks, so 'pid' above is the parent of the daemon.
+    return -1;
+  }
+  return 0;
+}
+
+/**
+ * @brief Unmounts a bucket.
+ */
+static int unmount_gcsfuse(const char* mount_point) {
+  pid_t pid = fork();
+  if (pid == 0) {
+    execlp("fusermount", "fusermount", "-u", mount_point, NULL);
+    slurm_error("gcsfuse-mount: execlp failed for fusermount: %m");
+    exit(1);
+  } else if (pid > 0) {
+    int status;
+    waitpid(pid, &status, 0);
+    if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+      slurm_error("gcsfuse-mount: fusermount exited with error for %s",
+                  mount_point);
+      return -1;
+    }
+  }
+  return 0;
+}
+
+/**
+ * @brief Parse mounts string and perform action (mount/unmount).
+ * mode: 0=mount, 1=unmount
+ */
+static void process_mounts(const char* mount_env, uid_t uid, gid_t gid,
+                           int mode) {
+  if (!mount_env) return;
+
+  char* saveptr;
+  char* env_copy = strdup(mount_env);
+  char* optarg = strtok_r(env_copy, ";", &saveptr);
+
+  while (optarg) {
+    char *bucket = NULL, *mount_point = NULL, *flags = NULL;
+    char* arg = strdup(optarg);
+
+    bucket = strtok(arg, ":");
+    mount_point = strtok(NULL, ":");
+    flags = strtok(NULL, "");
+
+    if (bucket && mount_point) {
+      if (mode == 0) {
+        if (mount_gcsfuse(bucket, mount_point, flags, uid, gid) == 0) {
+          // If called from user_init, we might want to track this.
+          // But here we are generic.
+        }
+      } else {
+        unmount_gcsfuse(mount_point);
+      }
+    }
+    free(arg);
+    optarg = strtok_r(NULL, ";", &saveptr);
+  }
+  free(env_copy);
+}
+
+/**
+ * @brief Check for mount conflicts.
+ *
+ * Checks if any mount point in `new_mounts` uses the same mount point as
+ * an entry in `current_mounts` but with a different bucket.
+ *
+ * @return 0 if no conflict, -1 if conflict found.
+ */
+static int check_mount_conflicts(const char* current_mounts,
+                                 const char* new_mounts) {
+  if (!current_mounts || !new_mounts) return 0;
+
+  char* new_copy = strdup(new_mounts);
+  char* saveptr_new;
+  char* new_token = strtok_r(new_copy, ";", &saveptr_new);
+
+  while (new_token) {
+    char *new_bucket = NULL, *new_path = NULL;
+    char* new_arg = strdup(new_token);
+
+    new_bucket = strtok(new_arg, ":");
+    new_path = strtok(NULL, ":");
+
+    if (new_bucket && new_path) {
+      char* cur_copy = strdup(current_mounts);
+      char* saveptr_cur;
+      char* cur_token = strtok_r(cur_copy, ";", &saveptr_cur);
+
+      while (cur_token) {
+        char *cur_bucket = NULL, *cur_path = NULL;
+        char* cur_arg = strdup(cur_token);
+
+        cur_bucket = strtok(cur_arg, ":");
+        cur_path = strtok(NULL, ":");
+
+        if (cur_bucket && cur_path) {
+          if (strcmp(new_path, cur_path) == 0) {
+            if (strcmp(new_bucket, cur_bucket) != 0) {
+              slurm_error(
+                  "gcsfuse-mount: Conflict! Mountpoint '%s' is already "
+                  "assigned to bucket '%s'. Cannot mount bucket '%s'.",
+                  new_path, cur_bucket, new_bucket);
+              free(cur_arg);
+              free(cur_copy);
+              free(new_arg);
+              free(new_copy);
+              return -1;
+            }
+          }
+        }
+        free(cur_arg);
+        cur_token = strtok_r(NULL, ";", &saveptr_cur);
+      }
+      free(cur_copy);
+    }
+    free(new_arg);
+    new_token = strtok_r(NULL, ";", &saveptr_new);
+  }
+  free(new_copy);
+  return 0;
+}
+
+/**
+ * @brief SPANK plugin initialization.
+ */
+int slurm_spank_init(spank_t sp, int ac, char** av) {
+  // Register option in LOCAL (srun) and ALLOCATOR (sbatch/salloc) contexts.
+  if (spank_context() == S_CTX_LOCAL || spank_context() == S_CTX_ALLOCATOR) {
+    return spank_option_register(sp, &gcsfuse_mount_option);
+  }
+  return 0;
 }
 
 /**
  * @brief SPANK callback for the --gcsfuse-mount option.
- *
- * This function is called in the local (srun) context whenever the
- * `--gcsfuse-mount` option is used.
- *
- * It takes the option's argument, resolves any relative paths within it,
- * and appends the resolved string to the `GCSFUSE_MOUNTS` environment
- * variable. This variable is then propagated to the job step on the
- * compute node. Multiple uses of the option will append to the variable,
- * separated by semicolons.
- *
- * @param val The value of the option (not used).
- * @param optarg The argument provided to the option.
- * @param remote Flag indicating if the context is remote (0 for local).
- * @return 0 on success, -1 on failure.
  */
-static int handle_gcsfuse_mount(int val, const char *optarg, int remote) {
-    char *new_mounts;
-    const char *current_mounts = getenv("GCSFUSE_MOUNTS");
-    // slurm_info("gcsfuse-mount: current_mounts: %s Adding: %s", current_mounts, optarg);
+static int handle_gcsfuse_mount(int val, const char* optarg, int remote) {
+  char* new_mounts;
+  const char* current_mounts = getenv("GCSFUSE_MOUNTS");
+  const char* next_mount = resolve_relative_mounts(optarg, NULL);  // Use cwd
 
-    char *resolved_optarg = resolve_relative_mounts(optarg);
-    if (!resolved_optarg) {
-        slurm_error("gcsfuse-mount: Failed to resolve paths in %s", optarg);
-        return -1;
-    }
+  if (next_mount == NULL) {
+    slurm_error("gcsfuse-mount: Failed to resolve mount arguments");
+    return -1;
+  }
 
-    // Extract mount point from resolved_optarg to check for duplicates
-    char *optarg_copy = strdup(resolved_optarg);
-    char *bucket = strtok(optarg_copy, ":");
-    char *mount_point = strtok(NULL, ":");
-    if (!mount_point) { // Handle case where bucket is not specified
-        mount_point = bucket;
-    }
+  if (check_mount_conflicts(current_mounts, next_mount) != 0) {
+    free((void*)next_mount);  // cast to void* to suppress const warning if any,
+                              // though it's allocated
+    return -1;
+  }
 
-    if (current_mounts && current_mounts[0] != '\0') {
-        char *mounts_copy = strdup(current_mounts);
-        char *saveptr;
-        char *token = strtok_r(mounts_copy, ";", &saveptr);
-        while (token) {
-            char *token_copy = strdup(token);
-            char *p_bucket = strtok(token_copy, ":");
-            char *p_mount_point = strtok(NULL, ":");
-            if (!p_mount_point) { // Handle case where bucket is not specified
-                p_mount_point = p_bucket;
-            }
+  if (current_mounts && current_mounts[0] != '\0') {
+    asprintf(&new_mounts, "%s;%s", current_mounts, next_mount);
+  } else {
+    asprintf(&new_mounts, "%s", next_mount);
+  }
 
-            if (strcmp(mount_point, p_mount_point) == 0) {
-                slurm_error("gcsfuse-mount: Duplicate mount point specified: %s", mount_point);
-                free(token_copy);
-                free(mounts_copy);
-                free(optarg_copy);
-                free(resolved_optarg);
-                return -1;
-            }
-            free(token_copy);
-            token = strtok_r(NULL, ";", &saveptr);
-        }
-        free(mounts_copy);
-    }
-    free(optarg_copy);
+  if (new_mounts == NULL) {
+    slurm_error("gcsfuse-mount: asprintf failed");
+    free((void*)next_mount);
+    return -1;
+  }
 
-    if (current_mounts && current_mounts[0] != '\0') {
-        asprintf(&new_mounts, "%s;%s", current_mounts, resolved_optarg);
-    } else {
-        asprintf(&new_mounts, "%s", resolved_optarg);
-    }
-    free(resolved_optarg);
+  // Set the environment variable.
+  // In sbatch/salloc (allocator), this modifies the job environment.
+  // In srun (local), this modifies the step environment.
+  setenv("GCSFUSE_MOUNTS", new_mounts, 1);
+  free(new_mounts);
+  free((void*)next_mount);
 
-    if (new_mounts == NULL) {
-        slurm_error("gcsfuse-mount: asprintf failed");
-        return -1;
-    }
+  return 0;
+}
 
-    // Set the environment variable in the current srun process.
-    // Slurm will propagate this to the job step's environment.
-    setenv("GCSFUSE_MOUNTS", new_mounts, 1);
-    // slurm_info("gcsfuse-mount: new_mounts: %s", new_mounts);
-    free(new_mounts);
+/**
+ * @brief Job Prolog: Mount buckets on the node.
+ */
+int slurm_spank_job_prolog(spank_t sp, int ac, char** av) {
+  uid_t uid;
+  gid_t gid;
 
+  if (spank_get_item(sp, S_JOB_UID, &uid) != ESPANK_SUCCESS ||
+      spank_get_item(sp, S_JOB_GID, &gid) != ESPANK_SUCCESS) {
     return 0;
+  }
+
+  // Get mounts from job environment
+  char* mount_env = get_job_env_var(sp, "GCSFUSE_MOUNTS");
+  if (mount_env) {
+    // slurm_spank_log("gcsfuse-mount: prolog mounting: %s", mount_env);
+    process_mounts(mount_env, uid, gid, 0);  // Mount
+    free(mount_env);
+  }
+  return 0;
+}
+
+/**
+ * @brief Job Epilog: Unmount buckets on the node.
+ */
+int slurm_spank_job_epilog(spank_t sp, int ac, char** av) {
+  // We don't need UID/GID to unmount (root can do it).
+  // But we need the list of mounts.
+  char* mount_env = get_job_env_var(sp, "GCSFUSE_MOUNTS");
+  if (mount_env) {
+    // slurm_spank_log("gcsfuse-mount: epilog unmounting: %s", mount_env);
+    process_mounts(mount_env, 0, 0, 1);  // Unmount
+    free(mount_env);
+  }
+  return 0;
+}
+
+/**
+ * @brief User Init: Mount buckets for the step (if not already mounted).
+ */
+int slurm_spank_user_init(spank_t sp, int ac, char** av) {
+  uid_t uid;
+  gid_t gid;
+  char mount_env_buf[4096];
+
+  if (spank_get_item(sp, S_JOB_UID, &uid) != 0 ||
+      spank_get_item(sp, S_JOB_GID, &gid) != 0) {
+    return -1;
+  }
+
+  // Use spank_getenv for remote context
+  if (spank_getenv(sp, "GCSFUSE_MOUNTS", mount_env_buf,
+                   sizeof(mount_env_buf)) != ESPANK_SUCCESS) {
+    return 0;
+  }
+
+  const char* mount_env = mount_env_buf;
+  char* env_copy = strdup(mount_env);
+  char* saveptr;
+  char* optarg = strtok_r(env_copy, ";", &saveptr);
+
+  while (optarg) {
+    char *bucket = NULL, *mount_point = NULL, *flags = NULL;
+    char* arg = strdup(optarg);
+
+    bucket = strtok(arg, ":");
+    mount_point = strtok(NULL, ":");
+    flags = strtok(NULL, "");
+
+    if (bucket && mount_point) {
+      // Check if already mounted (e.g. by prolog)
+      if (!is_mountpoint(mount_point)) {
+        slurm_info("gcsfuse-mount: user_init mounting %s to %s", bucket,
+                   mount_point);
+        if (mount_gcsfuse(bucket, mount_point, flags, uid, gid) == 0) {
+          // Track this mount point for cleanup in exit
+          char** temp_points =
+              realloc(mount_points, (mount_point_count + 1) * sizeof(char*));
+          if (temp_points) {
+            mount_points = temp_points;
+            mount_points[mount_point_count++] = strdup(mount_point);
+          } else {
+            slurm_error("gcsfuse-mount: realloc failed for mount_points");
+            // If realloc fails, we can't track it, so we won't unmount it?
+            // Serious error. But mounting succeeded.
+          }
+        }
+      } else {
+        // slurm_info("gcsfuse-mount: user_init skipping %s (already mounted)",
+        // mount_point);
+      }
+    }
+    free(arg);
+    optarg = strtok_r(NULL, ";", &saveptr);
+  }
+  free(env_copy);
+  return 0;
+}
+
+/**
+ * @brief User Exit: Unmount buckets mounted by this step.
+ */
+int slurm_spank_exit(spank_t sp, int ac, char** av) {
+  if (spank_context() != S_CTX_REMOTE) {
+    return 0;
+  }
+
+  slurm_info("gcsfuse-mount: exit called. Cleaning up %d mounts.",
+             mount_point_count);
+
+  for (int i = 0; i < mount_point_count; i++) {
+    slurm_info("gcsfuse-mount: unmounting %s", mount_points[i]);
+    unmount_gcsfuse(mount_points[i]);
+    free(mount_points[i]);
+  }
+  if (mount_points) {
+    free(mount_points);
+    mount_points = NULL;
+    mount_point_count = 0;
+  }
+  return 0;
 }
