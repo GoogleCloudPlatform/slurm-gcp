@@ -25,8 +25,8 @@ echo "--- Starting gcsfuse SPANK Plugin Tests ---"
 echo "Initializing buckets for Test 1..."
 echo ID_A > ID_A.txt
 echo ID_B > ID_B.txt
-gsutil cp ID_A.txt gs://${BUCKET_A}/
-gsutil cp ID_B.txt gs://${BUCKET_B}/
+gcloud storage cp ID_A.txt gs://${BUCKET_A}/
+gcloud storage cp ID_B.txt gs://${BUCKET_B}/
 rm ID_A.txt ID_B.txt
 echo "Bucket initialization complete."
 
