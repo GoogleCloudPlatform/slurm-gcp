@@ -26,4 +26,4 @@ then
 	exit 1
 fi
 
-gsutil cp $MIGRATE_SRC $MIGRATE_DEST
+gcloud storage cp $MIGRATE_SRC $MIGRATE_DEST
