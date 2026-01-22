@@ -30,5 +30,3 @@ enroot_runtime_dependencies:
 
 enroot_optional_runtime_dependencies:
 - fuse-overlayfs
-- pigz
-- squashfuse
