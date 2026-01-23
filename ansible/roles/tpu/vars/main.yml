@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#To see the .whl files, this can be done: gsutil ls -r gs://cloud-tpu-tpuvm-artifacts/tensorflow/**
+#To see the .whl files, this can be done: gcloud storage ls --recursive gs://cloud-tpu-tpuvm-artifacts/tensorflow/**
 
 tf_versions_to_tpu_mapping:
   2.15.0: 1.9.0
