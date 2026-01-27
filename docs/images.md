@@ -75,23 +75,23 @@ For the [TPU](./glossary.md#tpu) nodes docker images are also released.
 
 |       Project        | Image Family                              | Arch   | Status         |
 | :------------------: | :---------------------------------------- | :----- | :------------- |
-| schedmd-slurm-public | slurm-gcp-6-11-debian-12                  | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-11-hpc-rocky-linux-8          | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-11-ubuntu-2204-lts-nvidia-570 | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-11-ubuntu-2204-lts-arm64      | ARM64  | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-11-ubuntu-2404-lts-nvidia-570 | x86_64 | Supported      |
-| schedmd-slurm-public | slurm-gcp-6-11-ubuntu-2404-lts-arm64      | ARM64  | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-12-debian-12                  | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-12-hpc-rocky-linux-8          | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-12-ubuntu-2204-lts-nvidia-570 | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-12-ubuntu-2204-lts-arm64      | ARM64  | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-12-ubuntu-2404-lts-nvidia-570 | x86_64 | Supported      |
+| schedmd-slurm-public | slurm-gcp-6-12-ubuntu-2404-lts-arm64      | ARM64  | Supported      |
 
 ### Published Docker Image Family
 
 |       Project        | Image Family                | Status    |
 | :------------------: | :-------------------------- | :-------- |
-| schedmd-slurm-public | tpu:slurm-gcp-6-9-tf-2.12.1 | Supported |
-| schedmd-slurm-public | tpu:slurm-gcp-6-9-tf-2.13.0 | Supported |
-| schedmd-slurm-public | tpu:slurm-gcp-6-9-tf-2.13.1 | Supported |
-| schedmd-slurm-public | tpu:slurm-gcp-6-9-tf-2.14.0 | Supported |
-| schedmd-slurm-public | tpu:slurm-gcp-6-9-tf-2.14.1 | Supported |
-| schedmd-slurm-public | tpu:slurm-gcp-6-9-tf-2.15.0 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-12-tf-2.12.1 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-12-tf-2.13.0 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-12-tf-2.13.1 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-12-tf-2.14.0 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-12-tf-2.14.1 | Supported |
+| schedmd-slurm-public | tpu:slurm-gcp-6-12-tf-2.15.0 | Supported |
 
 ## Custom Image
 
@@ -131,6 +131,7 @@ combination, if desired.
   applied after Slurm installation is complete. For example, the following
   configuration will run a playbook without any dependencies on extra Ansible
   Galaxy roles:
+
   ```hcl
   extra_ansible_provisioners = [
     {
@@ -141,6 +142,7 @@ combination, if desired.
     },
   ]
   ```
+
 - The Slurm image can be built on top of an existing image. Configure the
   pkrvars file with `source_image` or `source_image_family` pointing to your
   image. This is intended for more complex configurations because of workflow or
@@ -152,8 +154,8 @@ Recently published images in project `schedmd-slurm-public` support shielded VMs
 without GPUs or mounting a Lustre filesystem. Both of these features require
 kernel modules, which must be signed to be compatible with SecureBoot.
 
-If you need GPUs, our published image families `slurm-gcp-6-11-ubuntu-2204-lts-nvidia-570`
-and `slurm-gcp-6-11-ubuntu-2404-lts-nvidia-570` has signed Nvidia drivers
+If you need GPUs, our published image families `slurm-gcp-6-12-ubuntu-2204-lts-nvidia-570`
+and `slurm-gcp-6-12-ubuntu-2404-lts-nvidia-570` has signed Nvidia drivers
 installed and therefore supports GPUs with SecureBoot and Shielded VMs.
 
 If you need Lustre or GPUs on a different OS, it is possible to do this manually
