@@ -1,44 +1,78 @@
-NAME    := gcsfuse_spank
-DESTDIR ?= /usr/local
-LIBDIR  ?= $(DESTDIR)/lib/slurm
+# --- Configuration ---
+NAME        := gcsfuse_spank
+PREFIX      ?= /usr/local
+LIBDIR      ?= $(PREFIX)/lib/slurm
+SLURM_PATH  ?= /usr/include # Default path, change if slurm.h is elsewhere
 
-FLAGS   := -ggdb -Wall
-SHOPTS  := -shared
-LLIBS   := -lslurm
-OBJS    := gcsfuse_spank.o
+# Compiler and Linker Settings
+CC          ?= gcc
+CFLAGS      := -ggdb -Wall -Wextra -std=gnu99 -fPIC
+CPPFLAGS    := -I$(SLURM_PATH)
+LDFLAGS     := -shared
 
-# Helper to detect if running tests
-ifdef TEST_BUILD
-CFLAGS += -DTESTING_MODE
+# Source and Objects
+SRCS        := gcsfuse_spank.c
+OBJS        := $(SRCS:.c=.o)
+
+# --- AddressSanitizer (ASan) Support ---
+# Usage: make SANITIZE=1
+ifdef SANITIZE
+    CFLAGS  += -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer
+    LDFLAGS += -fsanitize=address -fsanitize=undefined
 endif
+
+# --- Test Build Support ---
+ifdef TEST_BUILD
+    CFLAGS += -DTESTING_MODE
+endif
+
+# --- Targets ---
+
+.PHONY: all install clean lint format analyze help
 
 all: $(NAME).so
 
-install: $(NAME).so
-	mkdir -p --mode=0755 $(LIBDIR)
-	install -m0755 $(NAME).so $(LIBDIR)
-
+# Link the shared object
 $(NAME).so: $(OBJS)
-	$(CC) $(SHOPTS) -o $(NAME).so $(OBJS) $(LLIBS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-gcsfuse_spank.o: gcsfuse_spank.c
-	$(CC) $(FLAGS) -fPIC -c gcsfuse_spank.c
+# Compile source files
+%.o: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-# --- Test Targets ---
+install: $(NAME).so
+	install -d -m 755 $(LIBDIR)
+	install -m 755 $(NAME).so $(LIBDIR)
 
-test: test_main
-	./test_main
+# --- Analysis & Code Quality ---
 
-test_main: tests/test_main.c gcsfuse_spank.c
-	$(CC) -ggdb -Wall -DTESTING_MODE -I../slurm -o test_main tests/test_main.c
+# 1. Clang Static Analyzer (scan-build)
+# Requires 'clang-tools' or 'clang' package
+analyze: clean
+	@echo "Running Clang Static Analyzer..."
+	scan-build -o analysis_report --status-bugs \
+		$(MAKE) CC=clang $(NAME).so
 
-# --- Lint/Format Targets ---
-
+# 2. Cppcheck
 lint:
-	cppcheck --enable=all --suppress=missingIncludeSystem gcsfuse_spank.c
+	cppcheck --enable=all --suppress=missingIncludeSystem --error-exitcode=1 $(SRCS)
 
+# 3. Formatting
 format:
-	clang-format -i gcsfuse_spank.c tests/test_main.c
+	clang-format -i $(SRCS)
 
 clean:
-	rm -f *.o *.so test_main
+	rm -f $(OBJS) $(NAME).so
+	rm -rf analysis_report
+
+help:
+	@echo "Targets:"
+	@echo "  all        : Build the plugin"
+	@echo "  install    : Install to $(LIBDIR)"
+	@echo "  analyze    : Run Clang static analyzer (scan-build)"
+	@echo "  lint       : Run cppcheck"
+	@echo "  format     : Run clang-format"
+	@echo "  clean      : Remove build artifacts"
+	@echo ""
+	@echo "Options:"
+	@echo "  SANITIZE=1 : Enable AddressSanitizer (ASan) for runtime leak checks"
