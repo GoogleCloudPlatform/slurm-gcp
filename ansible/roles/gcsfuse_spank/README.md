@@ -73,6 +73,11 @@ multiple `--gscfuse-mount` flags.
 If the bucket name is omitted, the plugin defaults to **"All Buckets"** mode.
 Any `FLAGS` will be passed directly to the `gcsfuse` command.
 
+By default, this will use Application Default Credentials (ADC) for GCP
+authentication. This typically defaults to the Service Account attached to the
+VM. However, if a user has run gcloud auth application-default login on the
+node, gcsfuse will use their specific user credentials to mount the buckets.
+
 ### Examples
 
 **1. Mount a specific bucket**
