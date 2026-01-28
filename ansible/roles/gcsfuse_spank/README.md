@@ -89,14 +89,15 @@ srun --gcsfuse-mount=:/home/user/gcs my_app.sh
 
 **3. Pass custom gcsfuse flags**
 ```bash
-srun --gcsfuse-mount=my-bucket:/mnt/gcs:"--implicit-dirs --only-dir logs" my_app.sh
+srun --gcsfuse-mount=my-bucket:./gcs:"--implicit-dirs --only-dir logs" my_app.sh
+srun --gcsfuse-mount=my-bucket:./checkpoints:"--implicit-dirs --profile=aiml-checkpointing" my_app.sh
 ```
 
 **4. Specify multiple mounts**
 ```bash
 # Both syntaxes are equivalent. sbatch/salloc/srun are all valid.
-sbatch --gcsfuse-mount="bucket1:/mnt/b1;bucket2:/mnt/b2" my_job.slurm
-sbatch --gcsfuse-mount=bucket1:/mnt/b1 --gcsfuse-mount=bucket2:/mnt/b2 my_job.slurm
+sbatch --gcsfuse-mount="bucket1:./b1;bucket2:./b2" my_job.slurm
+sbatch --gcsfuse-mount=bucket1:./b1 --gcsfuse-mount=bucket2:./b2 my_job.slurm
 ```
 
 ## Design and Implementation

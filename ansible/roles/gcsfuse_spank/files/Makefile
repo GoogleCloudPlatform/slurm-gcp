@@ -28,9 +28,15 @@ endif
 
 # --- Targets ---
 
-.PHONY: all install clean lint format analyze help
+.PHONY: all install clean lint format analyze help test
 
 all: $(NAME).so
+
+test: test_main
+	./test_main
+
+test_main: tests/test_main.c gcsfuse_spank.c
+	$(CC) $(CFLAGS) -DTESTING_MODE -I$(SLURM_PATH) -o test_main tests/test_main.c
 
 # Link the shared object
 $(NAME).so: $(OBJS)
