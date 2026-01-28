@@ -61,14 +61,17 @@ static void free_mount_spec(mount_spec_t* spec) {
 
 /**
  * @brief Parses a mount string into a struct.
- * Logic:
- * 1. "bucket:mount"       -> bucket="bucket", mount="mount"
- * 2. ":mount"             -> bucket="" (All Buckets), mount="mount"
- * 3. "/path/to/dir:flags" -> bucket=NULL (All Buckets), mount="/path/to/dir"
- * 4. "mount"              -> bucket=NULL (All Buckets), mount="mount"
- * 5. "bucket:mount:flags" -> bucket="bucket", mount="mount", flags="flags"
+ *
+ * Heuristics for token parsing (colon-delimited):
+ * 1. If the first part contains a '/', it's treated as a local path (All
+ * Buckets mode).
+ * 2. If the first part is empty (e.g. ":mount"), it's Explicit All Buckets
+ * mode.
+ * 3. Otherwise, the first part is the GCS bucket name.
  */
 static int parse_mount_spec(const char* token, mount_spec_t* spec) {
+  if (!token) return -1;
+
   spec->bucket = NULL;
   spec->mount_point = NULL;
   spec->flags = NULL;
@@ -118,7 +121,15 @@ static int parse_mount_spec(const char* token, mount_spec_t* spec) {
     spec->mount_point = strdup(my_token);
   }
 
+  bool has_slash = (strchr(my_token, '/') != NULL);
   free(my_token);
+
+  if (!spec->mount_point || (first_colon && !spec->flags && has_slash)) {
+    // Basic check for strdup failures on required parts
+    free_mount_spec(spec);
+    return -1;
+  }
+
   return 0;
 }
 
@@ -135,6 +146,10 @@ static struct spank_option gcsfuse_mount_option = {
 static bool is_mountpoint_logic(const char* path) {
   struct stat current_stat;
   if (stat(path, &current_stat) != 0) {
+    /*
+     * If transport endpoint is not connected, it's likely a hung FUSE mount.
+     * We treat this as a mountpoint so we can attempt to unmount/remount it.
+     */
     if (errno == ENOTCONN) return true;
     return false;
   }
@@ -142,6 +157,10 @@ static bool is_mountpoint_logic(const char* path) {
   if (!S_ISDIR(current_stat.st_mode)) return false;
   if (strcmp(path, "/") == 0) return true;
 
+  /*
+   * Standard mountpoint detection: check if the device ID (st_dev) or
+   * inode number (st_ino) of the directory differs from its parent.
+   */
   size_t parent_path_len = strlen(path) + 4;
   char* parent_path = malloc(parent_path_len);
   if (!parent_path) return false;
@@ -228,7 +247,18 @@ static char* resolve_relative_mounts(const char* mounts_str, const char* cwd) {
   }
 
   char* mounts_copy = strdup(mounts_str);
+  if (!mounts_copy) {
+    if (alloc_cwd) free(alloc_cwd);
+    return NULL;
+  }
+
   char* result = strdup("");
+  if (!result) {
+    free(mounts_copy);
+    if (alloc_cwd) free(alloc_cwd);
+    return NULL;
+  }
+
   char* saveptr;
   char* token = strtok_r(mounts_copy, ";", &saveptr);
 
@@ -260,15 +290,17 @@ static char* resolve_relative_mounts(const char* mounts_str, const char* cwd) {
       flags_with_colon = strdup("");
     }
 
-    if (spec.bucket) {
-      if (asprintf(&final_token_part, "%s:%s%s", spec.bucket,
-                   absolute_mount_path, flags_with_colon) < 0) {
-        final_token_part = NULL;
-      }
-    } else {
-      if (asprintf(&final_token_part, "%s%s", absolute_mount_path,
-                   flags_with_colon) < 0) {
-        final_token_part = NULL;
+    if (absolute_mount_path && flags_with_colon) {
+      if (spec.bucket) {
+        if (asprintf(&final_token_part, "%s:%s%s", spec.bucket,
+                     absolute_mount_path, flags_with_colon) < 0) {
+          final_token_part = NULL;
+        }
+      } else {
+        if (asprintf(&final_token_part, "%s%s", absolute_mount_path,
+                     flags_with_colon) < 0) {
+          final_token_part = NULL;
+        }
       }
     }
 
@@ -288,6 +320,7 @@ static char* resolve_relative_mounts(const char* mounts_str, const char* cwd) {
       result = new_result;
       free(final_token_part);
     }
+
     if (result == NULL) break;
     token = strtok_r(NULL, ";", &saveptr);
   }
@@ -336,7 +369,13 @@ static pid_t mount_gcsfuse(const char* bucket, const char* mount_point,
   if (pid == 0) {
     // >>> CHILD PROCESS START <<<
 
-    // A. Drop Privileges
+    /*
+     * A. Drop Privileges
+     * We drop to the job user's UID/GID before calling gcsfuse. This ensures:
+     * 1. gcsfuse runs with the user's permissions.
+     * 2. Any user-provided flags (like --key-file) cannot be used to access
+     *    privileged system files that the user themselves cannot read.
+     */
     if (geteuid() == 0) {
       if (setresgid(gid, gid, -1) != 0) {
         slurm_error("gcsfuse-mount: setresgid failed: %m");
@@ -387,7 +426,13 @@ static pid_t mount_gcsfuse(const char* bucket, const char* mount_point,
       exit(1);
     }
 
-    // D. Setup Logging
+    /*
+     * D. Setup Logging
+     * We use a nested fork to run the 'logger' command. The main child's
+     * stdout/stderr are piped to logger's stdin. This ensures gcsfuse output
+     * is captured in syslog/journald with a recognizable tag, making it
+     * much easier to debug mount failures on remote nodes.
+     */
     int log_pipe[2];
     if (pipe(log_pipe) == -1) exit(1);
 
@@ -436,10 +481,14 @@ static pid_t mount_gcsfuse(const char* bucket, const char* mount_point,
 
     if (flags) {
       char* flag_str = strdup(flags);
-      char* flag = strtok(flag_str, " ");
-      while (flag && j < 60) {
-        gcsfuse_argv[j++] = flag;
-        flag = strtok(NULL, " ");
+      if (flag_str) {
+        char* flag = strtok(flag_str, " ");
+        while (flag && j < 60) {
+          gcsfuse_argv[j++] = flag;
+          flag = strtok(NULL, " ");
+        }
+        // No need to free(flag_str) before execv, but good practice if execv
+        // fails
       }
     }
 
@@ -507,6 +556,10 @@ static pid_t mount_gcsfuse(const char* bucket, const char* mount_point,
 static int unmount_gcsfuse(const char* mount_point) {
   if (!is_mountpoint_logic(mount_point)) return 0;
 
+  /*
+   * We first attempt a standard user-space unmount using fusermount.
+   * This is the cleanest way to shut down a FUSE filesystem.
+   */
   pid_t pid = fork();
   if (pid == 0) {
     execlp("fusermount", "fusermount", "-u", mount_point, NULL);
@@ -515,7 +568,12 @@ static int unmount_gcsfuse(const char* mount_point) {
     waitpid(pid, NULL, 0);
   }
 
-  // Lazy unmount fallback
+  /*
+   * Lazy unmount fallback.
+   * If the mount is still busy or hung, we attempt a lazy unmount. Note that
+   * this may require elevated privileges depending on system configuration,
+   * but it's our last-resort effort to clean up the mountpoint.
+   */
   if (is_mountpoint_logic(mount_point)) {
     slurm_info("gcsfuse-mount: lazy unmount %s", mount_point);
     pid_t lpid = fork();
@@ -558,11 +616,12 @@ static int unmount_gcsfuse(const char* mount_point) {
 // 	  if (!is_mountpoint_logic(spec.mount_point)) {
 // 		  // rmdir is safe: it only removes if empty.
 // 		  // If user left files, it fails (errno=ENOTEMPTY or EBUSY) and
-// we ignore it. 		  if (rmdir(spec.mount_point) == 0) { 			  slurm_info("gcsfuse-mount:
-// removed empty mountpoint %s", spec.mount_point); 		  } else {
+// we ignore it. 		  if (rmdir(spec.mount_point) == 0) {
+// slurm_info("gcsfuse-mount: removed empty mountpoint %s", spec.mount_point);
+// } else {
 // 			  // Debug only, failing to remove is fine (user might
-// want to keep it) 			  slurm_info("gcsfuse-mount: could not remove %s: %m",
-// spec.mount_point);
+// want to keep it) 			  slurm_info("gcsfuse-mount: could not
+// remove %s: %m", spec.mount_point);
 // 		  }
 // 	  } else {
 // 		  slurm_info("gcsfuse-mount: %s is still mount point",
@@ -660,13 +719,25 @@ static int handle_gcsfuse_mount(int val, const char* optarg, int remote) {
   }
 
   if (current_mounts && current_mounts[0] != '\0') {
-    asprintf(&new_mounts, "%s;%s", current_mounts, next_mount);
+    if (asprintf(&new_mounts, "%s;%s", current_mounts, next_mount) < 0)
+      new_mounts = NULL;
   } else {
-    asprintf(&new_mounts, "%s", next_mount);
+    if (asprintf(&new_mounts, "%s", next_mount) < 0) new_mounts = NULL;
   }
 
-  setenv("GCSFUSE_MOUNTS", new_mounts, 1);
-  free(new_mounts);
+  if (new_mounts) {
+    setenv("GCSFUSE_MOUNTS", new_mounts, 1);
+    free(new_mounts);
+  } else {
+    /*
+     * If memory allocation for the environment variable fails, we abort the
+     * mount request to prevent inconsistent job state.
+     */
+    slurm_error(
+        "gcsfuse-mount: memory allocation failed in handle_gcsfuse_mount");
+    free((void*)next_mount);
+    return -1;
+  }
   free((void*)next_mount);
   return 0;
 }
@@ -699,6 +770,13 @@ int slurm_spank_user_init(spank_t sp, int ac, char** av) {
           pid_t pid = mount_gcsfuse(spec.bucket, spec.mount_point, spec.flags,
                                     uid, gid);
           if (pid > 0) {
+            /*
+             * Track both the mount point path and the PID of the gcsfuse
+             * daemon. Tracking the PID is necessary because gcsfuse is started
+             * in the foreground but managed by this plugin; we need to
+             * explicitly terminate it during cleanup to prevent leaked
+             * processes.
+             */
             char** next_points =
                 realloc(mount_points, (mount_point_count + 1) * sizeof(char*));
             if (!next_points) {
