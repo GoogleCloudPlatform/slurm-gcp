@@ -330,19 +330,6 @@ static char* resolve_relative_mounts(const char* mounts_str, const char* cwd) {
   return result;
 }
 
-// static char *get_job_env_var(spank_t sp, const char *name) {
-//   char **env = NULL;
-//   if (spank_get_item(sp, S_JOB_ENV, &env) != ESPANK_SUCCESS || !env)
-//     return NULL;
-//   size_t name_len = strlen(name);
-//   for (int i = 0; env[i]; i++) {
-//     if (strncmp(env[i], name, name_len) == 0 && env[i][name_len] == '=') {
-//       return strdup(env[i] + name_len + 1);
-//     }
-//   }
-//   return NULL;
-// }
-
 static pid_t mount_gcsfuse(const char* bucket, const char* mount_point,
                            const char* flags, uid_t uid, gid_t gid) {
   const char* effective_bucket_arg = NULL;
@@ -586,58 +573,6 @@ static int unmount_gcsfuse(const char* mount_point) {
 
   return 0;
 }
-
-// static int process_mounts(const char *mount_env, uid_t uid, gid_t gid,
-//                           int mode) {
-//   slurm_error("gcsfuse-mount: Inside process_mounts. %s %d %d %d", mount_env,
-//   uid, gid, mode); if (!mount_env)
-//     return 0;
-//   int rc = 0;
-//   char *saveptr;
-//   char *env_copy = strdup(mount_env);
-//   char *optarg = strtok_r(env_copy, ";", &saveptr);
-//
-//   while (optarg) {
-//     mount_spec_t spec;
-//     if (parse_mount_spec(optarg, &spec) == 0) {
-//       if (spec.mount_point) {
-//         if (mode == 0) {
-//           if (mount_gcsfuse(spec.bucket, spec.mount_point, spec.flags, uid,
-//                             gid) < 0) {
-//             rc = -1;
-//           }
-//         } else {
-//           unmount_gcsfuse(spec.mount_point);
-//
-//           slurm_info("attempting to clean up %s.", spec.mount_point);
-//
-// 	  // --- CLEANUP: Attempt to remove directory ---
-// 	  // Only remove if it is no longer a mountpoint.
-// 	  if (!is_mountpoint_logic(spec.mount_point)) {
-// 		  // rmdir is safe: it only removes if empty.
-// 		  // If user left files, it fails (errno=ENOTEMPTY or EBUSY) and
-// we ignore it. 		  if (rmdir(spec.mount_point) == 0) {
-// slurm_info("gcsfuse-mount: removed empty mountpoint %s", spec.mount_point);
-// } else {
-// 			  // Debug only, failing to remove is fine (user might
-// want to keep it) 			  slurm_info("gcsfuse-mount: could not
-// remove %s: %m", spec.mount_point);
-// 		  }
-// 	  } else {
-// 		  slurm_info("gcsfuse-mount: %s is still mount point",
-// spec.mount_point);
-// 	  }
-// 	}
-//       }
-//       free_mount_spec(&spec);
-//     }
-//     if (rc != 0)
-//       break;
-//     optarg = strtok_r(NULL, ";", &saveptr);
-//   }
-//   free(env_copy);
-//   return rc;
-// }
 
 static int check_mount_conflicts(const char* current_mounts,
                                  const char* new_mounts) {
