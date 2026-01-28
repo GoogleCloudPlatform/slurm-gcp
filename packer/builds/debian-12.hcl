@@ -24,12 +24,10 @@ zone       = "us-central1-a"
 #########
 
 # NOTE: Your Project ID will be automatically appended
-source_image_project_id = "ubuntu-os-cloud"
+source_image_project_id = "debian-cloud"
 
 #source_image        = null
-source_image_family = "ubuntu-2204-lts-arm64"
-
-machine_type = "t2a-standard-16"
+source_image_family = "debian-12"
 
 # *NOT* intended for production use
 # skip_create_image = true
@@ -38,5 +36,6 @@ machine_type = "t2a-standard-16"
 # PROVISION #
 #############
 
+install_lustre = false
 # slurm_version = null
 monitoring_agent = "cloud-ops"
