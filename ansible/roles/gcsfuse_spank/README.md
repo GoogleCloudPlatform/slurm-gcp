@@ -1,85 +1,139 @@
-# Slurm SPANK plugin for GCSFuse
+# Slurm GCSFuse SPANK Plugin
 
-This project provides a Slurm SPANK plugin that allows users to manage
-gcsfuse mounts through srun commands.
+A Slurm SPANK (Slurm Plug-in Architecture for Node Keyset) plugin that enables
+users to mount Google Cloud Storage (GCS) buckets as local filesystems using
+`gcsfuse` for the duration of a Slurm job or job step.
 
-## Interface
+## Features
 
-The desired interface is:
-`--gcsfuse-mount=BUCKET_NAME:MOUNT_POINT[:FLAGS]`
+- **Consolidated Job Interface**: Manage mounts using the `--gcsfuse-mount` flag
+  with `srun`, `sbatch`, and `salloc`.
+- **Flexible Mounting Modes**: Supports mounting specific buckets or "All
+  Buckets" mode.
+- **Privilege Separation**: Forks and drops privileges to the job user before
+  executing `gcsfuse`, ensuring security and correct file ownership.
+- **Robust Lifecycle Management**:
+    - Automatic polling for mount availability.
+    - Captures `gcsfuse` logs in `syslog`/`journald` via `logger`.
+    - Explicit PID tracking to ensure daemon termination.
+    - Fallback to lazy unmount (`umount -l`) for hung or busy mountpoints.
+- **Conflict Prevention**: Detects and prevents conflicting mount requests
+  (e.g., mounting different buckets to the same path).
 
-This will start gcsfuse on all nodes at the beginning of the step, and will
-unmount the bucket at the end.
+## Installation
 
-## Design
+### Prerequisites
+- Slurm development headers (`slurm/spank.h`).
+- `gcsfuse` installed on all compute nodes at `/usr/bin/gcsfuse`.
+- `fusermount` (provided by the `fuse` or `fuse3` package).
 
-The plugin uses the Slurm SPANK plugin infrastructure to mount GCS buckets
-at the beginning of a job or job step and unmount them at the end.
+### Building
+Build the shared object using the provided `Makefile`. You may need to specify the path to your Slurm headers.
 
-The plugin operates in several contexts:
+```bash
+# Basic build
+make SLURM_PATH=/path/to/slurm/include
 
-1.  **Local/Allocator (srun/sbatch/salloc) context:** When the user provides the
-    `--gcsfuse-mount` option, the `handle_gcsfuse_mount` callback function
-    is invoked. This function resolves any relative paths in the mount
-    point and then appends the mount specification to the `GCSFUSE_MOUNTS`
-    environment variable. For `sbatch` and `salloc`, this variable is
-    stored in the job's environment.
+# Build with AddressSanitizer for debugging
+make SANITIZE=1
 
-2.  **Job Script (prolog/epilog) context:** On the compute node, the
-    `slurm_spank_job_prolog` function is called at job start. It reads
-    `GCSFUSE_MOUNTS` from the job environment and mounts the buckets.  The
-    `slurm_spank_job_epilog` function is called at job end to unmount them. This
-    ensures buckets are available for the entire duration of an `sbatch` or
-    `salloc` session.
+# Run static analysis
+make analyze
+```
 
-3.  **Remote (slurmd) context:** On the compute node, before each job step,
-    `slurm_spank_user_init` is called. It checks the `GCSFUSE_MOUNTS`
-    environment variable. If a mount point is not already active (e.g., it
-    wasn't mounted by the prolog or it's a new mount requested specifically for
-    this `srun`), it performs the mount.
+### Deployment
+The plugin **must be installed on all nodes** of the Slurm cluster (controllers,
+login nodes, and compute nodes) to function correctly across different job
+contexts.
 
-4.  **Conflict Detection:** The plugin includes logic to prevent mounting
-    different buckets to the same mount point. If such a conflict is detected
-    (e.g., an `srun` attempt to override a job-level mount with a different
-    bucket), the command will fail with an error message.
+You can use the provided install target to deploy the plugin:
 
-At the end of a job step, `slurm_spank_exit` unmounts any filesystems
-specifically mounted for that step.
+```bash
+# Install to default location (/usr/local/lib/slurm)
+sudo make install
 
-## Functionality
+# Install to a specific Slurm library directory
+sudo make install LIBDIR=/usr/lib64/slurm
+```
 
-This plugin allows users to easily mount GCS buckets within their Slurm jobs.
-The `--gcsfuse-mount` option can be used multiple times to mount multiple
-buckets. It is supported by `srun`, `sbatch`, and `salloc`.
+After installation, add the plugin to your `plugstack.conf` file:
+```text
+optional /usr/lib64/slurm/gcsfuse_spank.so
+```
+
+## Usage
+
+The plugin provides a single command-line option: `--gcsfuse-mount`. Multiple
+mounts can be specified by separating them with semicolons or by supplying
+multiple `--gscfuse-mount` flags.
+
+### Syntax
+`--gcsfuse-mount=[BUCKET:]MOUNT_POINT[:FLAGS]`
+
+If the bucket name is omitted, the plugin defaults to **"All Buckets"** mode.
+Any `FLAGS` will be passed directly to the `gcsfuse` command.
 
 ### Examples
 
-1.  **Submit a batch job with a GCS mount:**
-    ```bash
-    sbatch --gcsfuse-mount=my-bucket:/tmp/my_bucket my_script.sh
-    ```
+**1. Mount a specific bucket**
+```bash
+srun --gcsfuse-mount=my-data-bucket:/home/user/data my_app.sh
+```
 
-2.  **Mount a bucket and list its contents with srun:**
-    ```bash
-    srun --gcsfuse-mount=my-bucket:/tmp/my_bucket ls /tmp/my_bucket
-    ```
+**2. Mount all accessible buckets (Dynamic mode)**
+```bash
+# Both syntaxes are equivalent
+srun --gcsfuse-mount=/home/user/gcs my_app.sh
+srun --gcsfuse-mount=:/home/user/gcs my_app.sh
+```
 
-2.  **Mount a bucket with gcsfuse flags (e.g., read-only and implicit directories):**
-    ```bash
-    srun --gcsfuse-mount=my-bucket:/tmp/my_bucket:"-o ro --implicit-dirs" ls /tmp/my_bucket
-    ```
+**3. Pass custom gcsfuse flags**
+```bash
+srun --gcsfuse-mount=my-bucket:/mnt/gcs:"--implicit-dirs --only-dir logs" my_app.sh
+```
 
-3.  **Mount a specific directory within a bucket:**
-    ```bash
-    srun --gcsfuse-mount=my-bucket:/tmp/my_dir:"--only-dir my_folder" ls /tmp/my_dir
-    ```
+**4. Specify multiple mounts**
+```bash
+# Both syntaxes are equivalent. sbatch/salloc/srun are all valid.
+sbatch --gcsfuse-mount="bucket1:/mnt/b1;bucket2:/mnt/b2" my_job.slurm
+sbatch --gcsfuse-mount=bucket1:/mnt/b1 --gcsfuse-mount=bucket2:/mnt/b2 my_job.slurm
+```
 
-4.  **Mount a bucket to a relative path:**
-    ```bash
-    srun --gcsfuse-mount=my-bucket:./my_bucket ls ./my_bucket
-    ```
+## Design and Implementation
 
-5.  **Mount multiple buckets simultaneously:**
-    ```bash
-    srun --gcsfuse-mount=bucket-a:/tmp/a --gcsfuse-mount=bucket-b:./b ls /tmp/a ./b
-    ```
+### Context Handling
+- **Local/Allocator Context (`srun`, `sbatch`, `salloc`)**: The plugin captures
+  the user's mount requests, resolves any relative paths to absolute paths, and
+  stores the configuration in the `GCSFUSE_MOUNTS` environment variable.
+- **Remote Context (`slurmd`)**: Before the job step starts, the plugin parses
+  `GCSFUSE_MOUNTS`, performs security validations, and invokes `gcsfuse`.
+
+### Security Model
+The plugin follows a "Least Privilege" model:
+1. It verifies that the job user owns the target `MOUNT_POINT` and that it is an
+   empty directory.
+2. It forks a child process and uses `setresuid`/`setresgid` to drop all root
+   privileges.
+3. Only after dropping privileges does it `exec` the `gcsfuse` binary. This
+   ensures that a user cannot use `gcsfuse` flags (like `--key-file`) to read
+   files they do not already have permission to access on the host.
+
+### Observability
+Debugging FUSE mounts on remote compute nodes can be difficult. To solve this,
+the plugin pipes all `gcsfuse` output to the system logger (`logger -t
+gcsfuse_mount`). Admins and users can check `journalctl` or `/var/log/syslog` on
+the compute node to see the exact reason for a mount failure.
+
+### Cleanup
+During the `exit` phase of a Slurm step:
+1. It attempts a standard `fusermount -u`.
+2. It sends `SIGKILL` to the tracked PID of the `gcsfuse` daemon.
+3. If the mountpoint is still active (e.g., a hung network), it attempts a lazy
+   unmount (`umount -l`).
+
+## Development
+
+The project includes several targets for maintaining code quality:
+- `make lint`: Runs `cppcheck` with exhaustive branch analysis.
+- `make format`: Formats code according to the `clang-format` project style.
+- `make analyze`: Runs the Clang Static Analyzer (`scan-build`).
