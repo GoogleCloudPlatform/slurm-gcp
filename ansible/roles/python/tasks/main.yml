@@ -44,7 +44,7 @@
 
 - name: Create virtualenv for tool
   ansible.builtin.pip:
-    name: pip==25.0
+    name: pip==25.3
     virtualenv: "/slurm/python/venv"
     virtualenv_command: /slurm/python/bin/python3.13 -m venv --copies
 
