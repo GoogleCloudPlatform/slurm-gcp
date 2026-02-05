@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python_packages:
-- python3
-- python3-pip
-- python3-setuptools
-- python3-virtualenv
-python38_installed: false
+cgroup_packages:
+- dbus-devel
+- systemd-devel
+
+cgroup_grub_cmdline_linux: []

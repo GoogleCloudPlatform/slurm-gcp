@@ -32,6 +32,3 @@ enroot_runtime_dependencies:
 
 enroot_optional_runtime_dependencies:
 - fuse-overlayfs
-- libnvidia-container-tools
-- pigz
-- squashfuse
