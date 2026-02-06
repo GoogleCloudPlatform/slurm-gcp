@@ -14,8 +14,8 @@
 # limitations under the License.
 
 slurm_git_url: https://github.com/SchedMD/slurm.git
-slurm_tar_baseurl: https://github.com/SchedMD/slurm/releases/download/slurm-{{ slurm_version | replace('.', '-') }}-1
 slurm_version: 25.05.2
+slurm_tar_baseurl: https://github.com/SchedMD/slurm/releases/download/slurm-{{ slurm_version | replace('.', '-') }}-1
 slurm_patch_files: []
 
 slurm_paths:
