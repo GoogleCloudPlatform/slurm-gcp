@@ -13,12 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-dependencies:
-- role: common
-- role: selinux
-- role: mariadb
-- role: munge
-- role: cgroups
-  vars:
-    change_grub: false
-- role: libjwt
+dependencies: []

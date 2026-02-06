@@ -13,9 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-dependencies:
-- role: common
-- role: lmod
-- role: slurm
-  vars:
-    handle_services: false
+dependencies: []
