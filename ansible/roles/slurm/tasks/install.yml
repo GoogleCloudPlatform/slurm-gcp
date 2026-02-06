@@ -19,6 +19,9 @@
     get_url:
       url: '{{slurm_tar_baseurl}}/slurm-{{slurm_version}}.tar.bz2'
       dest: '{{paths.src}}'
+      timeout: "{{ slurm_download_timeout | default(60) }}"
+      retries: "{{ slurm_download_retries | default(5) }}"
+      delay: "{{ slurm_download_delay | default(5) }}"
     register: slurm_archive
 
   - name: Inflate Tarball
