@@ -24,7 +24,7 @@ httplib2==0.22.0
 idna==3.7
 ipython>=8.10
 jedi==0.17.2
-kubernetes==34.1.0
+kubernetes==35.0.0
 more-executors==2.11.4
 packaging==23.1
 parso==0.7.1
