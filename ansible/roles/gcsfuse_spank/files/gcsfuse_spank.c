@@ -39,6 +39,7 @@
 #define GCSFUSE_BIN "/usr/bin/gcsfuse"
 #define MOUNT_WAIT_RETRIES 60
 #define MOUNT_WAIT_SLEEP_US 500000
+#define GCSFUSE_DEFAULT_FLAGS "--implicit-dirs"
 
 SPANK_PLUGIN(gcsfuse_mount, 1);
 
@@ -71,7 +72,7 @@ static void free_mount_spec(mount_spec_t* spec) {
  * 3. Otherwise, the first part is the GCS bucket name.
  */
 static int parse_mount_spec(const char* token, mount_spec_t* spec) {
-  if (!token) return -1;
+  if (!token || !spec) return -1;
 
   spec->bucket = NULL;
   spec->mount_point = NULL;
@@ -81,6 +82,7 @@ static int parse_mount_spec(const char* token, mount_spec_t* spec) {
   if (!my_token) return -1;
 
   char* first_colon = strchr(my_token, ':');
+  char* temp_flags = NULL;
 
   if (first_colon) {
     *first_colon = '\0';
@@ -89,30 +91,27 @@ static int parse_mount_spec(const char* token, mount_spec_t* spec) {
 
     if (strchr(part1, '/') != NULL) {
       // Case A: "/path/to/mount:flags"
-      // Part 1 is a path. Bucket is NULL (All Buckets).
       spec->mount_point = strdup(part1);
-      spec->flags = strdup(part2);
+      temp_flags = strdup(part2);
     } else if (part1[0] == '\0') {
       // Case B: ":mount"
       spec->bucket = strdup("");
-
       char* second_colon = strchr(part2, ':');
       if (second_colon) {
         *second_colon = '\0';
         spec->mount_point = strdup(part2);
-        spec->flags = strdup(second_colon + 1);
+        temp_flags = strdup(second_colon + 1);
       } else {
         spec->mount_point = strdup(part2);
       }
     } else {
       // Case C: "bucket:mount"
       spec->bucket = strdup(part1);
-
       char* second_colon = strchr(part2, ':');
       if (second_colon) {
         *second_colon = '\0';
         spec->mount_point = strdup(part2);
-        spec->flags = strdup(second_colon + 1);
+        temp_flags = strdup(second_colon + 1);
       } else {
         spec->mount_point = strdup(part2);
       }
@@ -122,11 +121,15 @@ static int parse_mount_spec(const char* token, mount_spec_t* spec) {
     spec->mount_point = strdup(my_token);
   }
 
-  bool has_slash = (strchr(my_token, '/') != NULL);
+  if (temp_flags) {
+    spec->flags = temp_flags;
+  } else {
+    spec->flags = strdup(GCSFUSE_DEFAULT_FLAGS);
+  }
+
   free(my_token);
 
-  if (!spec->mount_point || (first_colon && !spec->flags && has_slash)) {
-    // Basic check for strdup failures on required parts
+  if (!spec->mount_point || !spec->flags) {
     free_mount_spec(spec);
     return -1;
   }
@@ -139,7 +142,9 @@ static int handle_gcsfuse_mount(int val, const char* optarg, int remote);
 static struct spank_option gcsfuse_mount_option = {
     "gcsfuse-mount",
     "BUCKET_NAME:MOUNT_POINT[:FLAGS]",
-    "Mount a GCS bucket using gcsfuse",
+    "Mount a GCS bucket using gcsfuse. If unspecified, default flags of "
+	    GCSFUSE_DEFAULT_FLAGS
+	    " will be used. Specify \"\" as FLAGS to remove default flags.",
     1,
     0,
     (spank_opt_cb_f)handle_gcsfuse_mount};
@@ -505,13 +510,15 @@ static pid_t mount_gcsfuse(const char* bucket, const char* mount_point,
       gcsfuse_argv[j++] = "--log-format";
       gcsfuse_argv[j++] = "json";
 
+      char *flag_str = NULL;
       if (flags) {
-        char* flag_str = strdup(flags);
+        flag_str = strdup(flags);
         if (flag_str) {
-          char* flag = strtok(flag_str, " ");
+          char *saveptr_flags;
+          char* flag = strtok_r(flag_str, " ", &saveptr_flags);
           while (flag && j < 60) {
             gcsfuse_argv[j++] = flag;
-            flag = strtok(NULL, " ");
+            flag = strtok_r(NULL, " ", &saveptr_flags);
           }
         }
       }
@@ -527,9 +534,9 @@ static pid_t mount_gcsfuse(const char* bucket, const char* mount_point,
       char debug_buffer[8192] = {0};
       int offset = 0;
       for (int k = 0; gcsfuse_argv[k] != NULL; k++) {
-        int written =
-            snprintf(debug_buffer + offset, sizeof(debug_buffer) - offset,
-                     "%s ", gcsfuse_argv[k]);
+        int written = snprintf(debug_buffer + offset,
+                               sizeof(debug_buffer) - offset, "%s ",
+                               gcsfuse_argv[k]);
         if (written > 0 && offset + written < (int)sizeof(debug_buffer)) {
           offset += written;
         } else {
@@ -541,6 +548,9 @@ static pid_t mount_gcsfuse(const char* bucket, const char* mount_point,
 
       execv(GCSFUSE_BIN, gcsfuse_argv);
       slurm_error("gcsfuse-mount: execv failed: %m");
+      if (flag_str) {
+        free(flag_str);
+      }
       exit(1);
     } else if (grandchild > 0) {
       // Child 1 exits immediately
@@ -824,8 +834,8 @@ int slurm_spank_task_init(spank_t sp, int ac, char** av) {
   (void)ac;
   (void)av;
 
-  // If mounts failed during init (in the parent/slurmstepd), abort the task
-  // here (in the child) so that srun reports a failure and exits non-zero.
+  // If mounts failed during init (in the parent/slurmstepd), abort the task here
+  // (in the child) so that srun reports a failure and exits non-zero.
   if (g_mount_failure) {
     fprintf(stderr,
             "gcsfuse-mount: Job aborted due to mount failure. Check slurmd "
@@ -845,7 +855,7 @@ int slurm_spank_exit(spank_t sp, int ac, char** av) {
     unmount_gcsfuse(mount_points[i]);
     if (gcsfuse_pids[i] > 0) {
       kill(gcsfuse_pids[i], SIGKILL);
-      waitpid(gcsfuse_pids[i], NULL, 0);
+      // No need to waitpid because it will always fail with ECHILD
     }
     free(mount_points[i]);
   }
