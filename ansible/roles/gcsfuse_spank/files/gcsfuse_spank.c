@@ -39,6 +39,7 @@
 #define GCSFUSE_BIN "/usr/bin/gcsfuse"
 #define MOUNT_WAIT_RETRIES 60
 #define MOUNT_WAIT_SLEEP_US 500000
+#define GCSFUSE_DEFAULT_FLAGS "--implicit-dirs"
 
 SPANK_PLUGIN(gcsfuse_mount, 1);
 
@@ -52,6 +53,7 @@ typedef struct {
 static char** mount_points = NULL;
 static pid_t* gcsfuse_pids = NULL;
 static int mount_point_count = 0;
+static int g_mount_failure = 0;
 
 static void free_mount_spec(mount_spec_t* spec) {
   if (spec->bucket) free(spec->bucket);
@@ -70,7 +72,7 @@ static void free_mount_spec(mount_spec_t* spec) {
  * 3. Otherwise, the first part is the GCS bucket name.
  */
 static int parse_mount_spec(const char* token, mount_spec_t* spec) {
-  if (!token) return -1;
+  if (!token || !spec) return -1;
 
   spec->bucket = NULL;
   spec->mount_point = NULL;
@@ -80,6 +82,7 @@ static int parse_mount_spec(const char* token, mount_spec_t* spec) {
   if (!my_token) return -1;
 
   char* first_colon = strchr(my_token, ':');
+  char* temp_flags = NULL;
 
   if (first_colon) {
     *first_colon = '\0';
@@ -88,30 +91,27 @@ static int parse_mount_spec(const char* token, mount_spec_t* spec) {
 
     if (strchr(part1, '/') != NULL) {
       // Case A: "/path/to/mount:flags"
-      // Part 1 is a path. Bucket is NULL (All Buckets).
       spec->mount_point = strdup(part1);
-      spec->flags = strdup(part2);
+      temp_flags = strdup(part2);
     } else if (part1[0] == '\0') {
       // Case B: ":mount"
       spec->bucket = strdup("");
-
       char* second_colon = strchr(part2, ':');
       if (second_colon) {
         *second_colon = '\0';
         spec->mount_point = strdup(part2);
-        spec->flags = strdup(second_colon + 1);
+        temp_flags = strdup(second_colon + 1);
       } else {
         spec->mount_point = strdup(part2);
       }
     } else {
       // Case C: "bucket:mount"
       spec->bucket = strdup(part1);
-
       char* second_colon = strchr(part2, ':');
       if (second_colon) {
         *second_colon = '\0';
         spec->mount_point = strdup(part2);
-        spec->flags = strdup(second_colon + 1);
+        temp_flags = strdup(second_colon + 1);
       } else {
         spec->mount_point = strdup(part2);
       }
@@ -121,11 +121,15 @@ static int parse_mount_spec(const char* token, mount_spec_t* spec) {
     spec->mount_point = strdup(my_token);
   }
 
-  bool has_slash = (strchr(my_token, '/') != NULL);
+  if (temp_flags) {
+    spec->flags = temp_flags;
+  } else {
+    spec->flags = strdup(GCSFUSE_DEFAULT_FLAGS);
+  }
+
   free(my_token);
 
-  if (!spec->mount_point || (first_colon && !spec->flags && has_slash)) {
-    // Basic check for strdup failures on required parts
+  if (!spec->mount_point || !spec->flags) {
     free_mount_spec(spec);
     return -1;
   }
@@ -138,7 +142,9 @@ static int handle_gcsfuse_mount(int val, const char* optarg, int remote);
 static struct spank_option gcsfuse_mount_option = {
     "gcsfuse-mount",
     "BUCKET_NAME:MOUNT_POINT[:FLAGS]",
-    "Mount a GCS bucket using gcsfuse",
+    "Mount a GCS bucket using gcsfuse. If unspecified, default flags of "
+	    GCSFUSE_DEFAULT_FLAGS
+	    " will be used. Specify \"\" as FLAGS to remove default flags.",
     1,
     0,
     (spank_opt_cb_f)handle_gcsfuse_mount};
@@ -151,6 +157,15 @@ static bool is_mountpoint_logic(const char* path) {
      * We treat this as a mountpoint so we can attempt to unmount/remount it.
      */
     if (errno == ENOTCONN) return true;
+
+    /*
+     * If stat fails with EACCES (Permission Denied), it is likely a FUSE mount
+     * owned by another user without 'allow_other'. Root would normally bypass
+     * permissions on standard filesystems, but FUSE is strict. We treat this
+     * as a mountpoint so we can attempt to unmount it during cleanup.
+     */
+    if (errno == EACCES) return true;
+
     return false;
   }
 
@@ -199,13 +214,6 @@ static bool is_mountpoint_as_user(const char* path, uid_t uid, gid_t gid) {
     if (is_mountpoint_logic(path)) {
       _exit(0);
     }
-
-    openlog("gcsfuse-spank-check", LOG_PID, LOG_USER);
-    syslog(LOG_ERR,
-           "Check failed for %s: Directory exists but is not a mountpoint.",
-           path);
-    closelog();
-
     _exit(1);
   } else if (pid > 0) {
     int status;
@@ -330,6 +338,23 @@ static char* resolve_relative_mounts(const char* mounts_str, const char* cwd) {
   return result;
 }
 
+static void move_self_to_root_cgroup() {
+  const char* cgroup_procs_path = "/sys/fs/cgroup/cgroup.procs";
+  int fd = open(cgroup_procs_path, O_WRONLY);
+  if (fd < 0) {
+    slurm_spank_log("gcsfuse-mount: Warning: could not open %s: %m",
+                    cgroup_procs_path);
+    return;
+  }
+  char pid_str[16];
+  snprintf(pid_str, sizeof(pid_str), "%d", getpid());
+  if (write(fd, pid_str, strlen(pid_str)) < 0) {
+    slurm_spank_log(
+        "gcsfuse-mount: Warning: failed to move self to root cgroup: %m");
+  }
+  close(fd);
+}
+
 static pid_t mount_gcsfuse(const char* bucket, const char* mount_point,
                            const char* flags, uid_t uid, gid_t gid) {
   const char* effective_bucket_arg = NULL;
@@ -350,194 +375,240 @@ static pid_t mount_gcsfuse(const char* bucket, const char* mount_point,
     return 0;
   }
 
-  // --- 3. Fork and Mount ---
+  // --- 3. Double Fork and Mount ---
+  int pid_pipe[2];
+  if (pipe(pid_pipe) == -1) {
+    slurm_error("gcsfuse-mount: pipe failed: %m");
+    return -1;
+  }
+
   pid_t pid = fork();
 
   if (pid == 0) {
-    // >>> CHILD PROCESS START <<<
+    // >>> CHILD 1 PROCESS START <<<
+    // We are the intermediate child.
 
-    /*
-     * A. Drop Privileges
-     * We drop to the job user's UID/GID before calling gcsfuse. This ensures:
-     * 1. gcsfuse runs with the user's permissions.
-     * 2. Any user-provided flags (like --key-file) cannot be used to access
-     *    privileged system files that the user themselves cannot read.
-     */
-    if (geteuid() == 0) {
-      if (setresgid(gid, gid, -1) != 0) {
-        slurm_error("gcsfuse-mount: setresgid failed: %m");
-        exit(1);
-      }
-      if (setresuid(uid, uid, -1) != 0) {
-        slurm_error("gcsfuse-mount: setresuid failed: %m");
-        exit(1);
-      }
-    }
+    pid_t grandchild = fork();
+    if (grandchild == 0) {
+      // >>> CHILD 2 (GRANDCHILD) PROCESS START <<<
+      // Close read end of pipe
+      close(pid_pipe[0]);
 
-    // B. Setup Environment
-    struct passwd* pw = getpwuid(uid);
-    if (pw) setenv("HOME", pw->pw_dir, 1);
+      // Move self to root cgroup to avoid hanging job cleanup
+      move_self_to_root_cgroup();
 
-    // C. Validate/Create Mount Point
-    struct stat st;
-    if (lstat(mount_point, &st) == 0) {
-      if (!S_ISDIR(st.st_mode)) {
-        slurm_error("gcsfuse-mount: Error: %s exists but is not a directory.",
-                    mount_point);
-        exit(1);
+      // Write PID to pipe
+      pid_t my_pid = getpid();
+      if (write(pid_pipe[1], &my_pid, sizeof(my_pid)) != sizeof(my_pid)) {
+        // Best effort
       }
-      if (st.st_uid != uid) {
-        slurm_error(
-            "gcsfuse-mount: Security Error: You do not own the mount point %s.",
-            mount_point);
-        exit(1);
-      }
-      if (!is_directory_empty(mount_point)) {
-        slurm_error("gcsfuse-mount: Error: Mount point %s is not empty.",
-                    mount_point);
-        exit(1);
-      }
-      if (access(mount_point, W_OK) != 0) {
-        slurm_error("gcsfuse-mount: Permission denied. Cannot write to %s.",
-                    mount_point);
-        exit(1);
-      }
-    } else if (errno == ENOENT) {
-      if (mkdir(mount_point, 0755) != 0) {
-        slurm_error("gcsfuse-mount: failed to mkdir %s: %m", mount_point);
-        exit(1);
-      }
-    } else {
-      slurm_error("gcsfuse-mount: lstat failed on %s. Error: %d", mount_point,
-                  errno);
-      exit(1);
-    }
+      close(pid_pipe[1]);
 
-    /*
-     * D. Setup Logging
-     * We use a nested fork to run the 'logger' command. The main child's
-     * stdout/stderr are piped to logger's stdin. This ensures gcsfuse output
-     * is captured in syslog/journald with a recognizable tag, making it
-     * much easier to debug mount failures on remote nodes.
-     */
-    int log_pipe[2];
-    if (pipe(log_pipe) == -1) exit(1);
+      /*
+       * A. Drop Privileges
+       * We drop to the job user's UID/GID before calling gcsfuse. This ensures:
+       * 1. gcsfuse runs with the user's permissions.
+       * 2. Any user-provided flags (like --key-file) cannot be used to access
+       *    privileged system files that the user themselves cannot read.
+       */
+      if (geteuid() == 0) {
+        if (setresgid(gid, gid, -1) != 0) {
+          slurm_error("gcsfuse-mount: setresgid failed: %m");
+          exit(1);
+        }
+        if (setresuid(uid, uid, -1) != 0) {
+          slurm_error("gcsfuse-mount: setresuid failed: %m");
+          exit(1);
+        }
+      }
 
-    pid_t logger_pid = fork();
-    if (logger_pid == 0) {
-      close(log_pipe[1]);
-      dup2(log_pipe[0], STDIN_FILENO);
+      // B. Setup Environment
+      struct passwd* pw = getpwuid(uid);
+      if (pw) setenv("HOME", pw->pw_dir, 1);
+
+      // C. Validate/Create Mount Point
+      struct stat st;
+      if (lstat(mount_point, &st) == 0) {
+        if (!S_ISDIR(st.st_mode)) {
+          slurm_error("gcsfuse-mount: Error: %s exists but is not a directory.",
+                      mount_point);
+          exit(1);
+        }
+        if (st.st_uid != uid) {
+          slurm_error(
+              "gcsfuse-mount: Security Error: You do not own the mount point "
+              "%s.",
+              mount_point);
+          exit(1);
+        }
+        if (!is_directory_empty(mount_point)) {
+          slurm_error("gcsfuse-mount: Error: Mount point %s is not empty.",
+                      mount_point);
+          exit(1);
+        }
+        if (access(mount_point, W_OK) != 0) {
+          slurm_error("gcsfuse-mount: Permission denied. Cannot write to %s.",
+                      mount_point);
+          exit(1);
+        }
+      } else if (errno == ENOENT) {
+        if (mkdir(mount_point, 0755) != 0) {
+          slurm_error("gcsfuse-mount: failed to mkdir %s: %m", mount_point);
+          exit(1);
+        }
+      } else {
+        slurm_error("gcsfuse-mount: lstat failed on %s. Error: %d", mount_point,
+                    errno);
+        exit(1);
+      }
+
+      /*
+       * D. Setup Logging
+       * We use a nested fork to run the 'logger' command.
+       */
+      int log_pipe[2];
+      if (pipe(log_pipe) == -1) exit(1);
+
+      pid_t logger_pid = fork();
+      if (logger_pid == 0) {
+        close(log_pipe[1]);
+        dup2(log_pipe[0], STDIN_FILENO);
+        close(log_pipe[0]);
+        int devnull = open("/dev/null", O_WRONLY);
+        if (devnull != -1) {
+          dup2(devnull, STDOUT_FILENO);
+          dup2(devnull, STDERR_FILENO);
+          close(devnull);
+        }
+        execlp("logger", "logger", "-t", "gcsfuse_mount", "-p", "user.info",
+               NULL);
+        _exit(127);
+      }
+
       close(log_pipe[0]);
-      int devnull = open("/dev/null", O_WRONLY);
+      dup2(log_pipe[1], STDOUT_FILENO);
+      dup2(log_pipe[1], STDERR_FILENO);
+      close(log_pipe[1]);
+      int devnull = open("/dev/null", O_RDONLY);
       if (devnull != -1) {
-        dup2(devnull, STDOUT_FILENO);
-        dup2(devnull, STDERR_FILENO);
+        dup2(devnull, STDIN_FILENO);
         close(devnull);
       }
-      execlp("logger", "logger", "-t", "gcsfuse_mount", "-p", "user.info",
-             NULL);
-      _exit(127);
-    }
 
-    close(log_pipe[0]);
-    dup2(log_pipe[1], STDOUT_FILENO);
-    dup2(log_pipe[1], STDERR_FILENO);
-    close(log_pipe[1]);
-    int devnull = open("/dev/null", O_RDONLY);
-    if (devnull != -1) {
-      dup2(devnull, STDIN_FILENO);
-      close(devnull);
-    }
+      char uid_str[20], gid_str[20];
+      sprintf(uid_str, "%u", uid);
+      sprintf(gid_str, "%u", gid);
 
-    char uid_str[20], gid_str[20];
-    sprintf(uid_str, "%u", uid);
-    sprintf(gid_str, "%u", gid);
+      char* gcsfuse_argv[64];
+      int j = 0;
+      gcsfuse_argv[j++] = GCSFUSE_BIN;
+      gcsfuse_argv[j++] = "--foreground";
+      gcsfuse_argv[j++] = "--uid";
+      gcsfuse_argv[j++] = uid_str;
+      gcsfuse_argv[j++] = "--gid";
+      gcsfuse_argv[j++] = gid_str;
+      gcsfuse_argv[j++] = "--log-format";
+      gcsfuse_argv[j++] = "json";
 
-    char* gcsfuse_argv[64];
-    int j = 0;
-    gcsfuse_argv[j++] = GCSFUSE_BIN;
-    gcsfuse_argv[j++] = "--foreground";
-    gcsfuse_argv[j++] = "-o";
-    gcsfuse_argv[j++] = "allow_other";
-    gcsfuse_argv[j++] = "--uid";
-    gcsfuse_argv[j++] = uid_str;
-    gcsfuse_argv[j++] = "--gid";
-    gcsfuse_argv[j++] = gid_str;
-    gcsfuse_argv[j++] = "--log-format";
-    gcsfuse_argv[j++] = "json";
-
-    if (flags) {
-      char* flag_str = strdup(flags);
-      if (flag_str) {
-        char* flag = strtok(flag_str, " ");
-        while (flag && j < 60) {
-          gcsfuse_argv[j++] = flag;
-          flag = strtok(NULL, " ");
+      char *flag_str = NULL;
+      if (flags) {
+        flag_str = strdup(flags);
+        if (flag_str) {
+          char *saveptr_flags;
+          char* flag = strtok_r(flag_str, " ", &saveptr_flags);
+          while (flag && j < 60) {
+            gcsfuse_argv[j++] = flag;
+            flag = strtok_r(NULL, " ", &saveptr_flags);
+          }
         }
-        // No need to free(flag_str) before execv, but good practice if execv
-        // fails
       }
+
+      if (effective_bucket_arg) {
+        gcsfuse_argv[j++] = (char*)effective_bucket_arg;
+      }
+
+      gcsfuse_argv[j++] = (char*)mount_point;
+      gcsfuse_argv[j] = NULL;
+
+      /* --- DEBUG: Print the full command --- */
+      char debug_buffer[8192] = {0};
+      int offset = 0;
+      for (int k = 0; gcsfuse_argv[k] != NULL; k++) {
+        int written = snprintf(debug_buffer + offset,
+                               sizeof(debug_buffer) - offset, "%s ",
+                               gcsfuse_argv[k]);
+        if (written > 0 && offset + written < (int)sizeof(debug_buffer)) {
+          offset += written;
+        } else {
+          break;
+        }
+      }
+      dprintf(STDERR_FILENO, "DEBUG: Executing: %s\n", debug_buffer);
+      /* ------------------------------------- */
+
+      execv(GCSFUSE_BIN, gcsfuse_argv);
+      slurm_error("gcsfuse-mount: execv failed: %m");
+      if (flag_str) {
+        free(flag_str);
+      }
+      exit(1);
+    } else if (grandchild > 0) {
+      // Child 1 exits immediately
+      _exit(0);
+    } else {
+      slurm_error("gcsfuse-mount: double fork failed: %m");
+      _exit(1);
     }
+  } else if (pid > 0) {
+    // Parent
+    close(pid_pipe[1]);
 
-    if (effective_bucket_arg) {
-      gcsfuse_argv[j++] = (char*)effective_bucket_arg;
+    // Read grandchild PID
+    pid_t grandchild_pid = -1;
+    if (read(pid_pipe[0], &grandchild_pid, sizeof(grandchild_pid)) !=
+        sizeof(grandchild_pid)) {
+      slurm_error("gcsfuse-mount: failed to read grandchild PID");
     }
+    close(pid_pipe[0]);
 
-    gcsfuse_argv[j++] = (char*)mount_point;
-    gcsfuse_argv[j] = NULL;
+    // Wait for Child 1
+    waitpid(pid, NULL, 0);
 
-    /* --- DEBUG: Print the full command --- */
-    char debug_buffer[8192] = {0};
-    int offset = 0;
-    for (int k = 0; gcsfuse_argv[k] != NULL; k++) {
-      int written =
-          snprintf(debug_buffer + offset, sizeof(debug_buffer) - offset, "%s ",
-                   gcsfuse_argv[k]);
-      if (written > 0 && offset + written < (int)sizeof(debug_buffer)) {
-        offset += written;
-      } else {
+    // If we didn't get a valid PID, we can't track it
+    if (grandchild_pid <= 0) return -1;
+
+    // Wait for Mount
+    int found = 0;
+    for (int k = 0; k < MOUNT_WAIT_RETRIES; k++) {
+      if (is_mountpoint_as_user(mount_point, uid, gid)) {
+        found = 1;
         break;
       }
-    }
-    dprintf(STDERR_FILENO, "DEBUG: Executing: %s\n", debug_buffer);
-    /* ------------------------------------- */
 
-    execv(GCSFUSE_BIN, gcsfuse_argv);
-    slurm_error("gcsfuse-mount: execv failed: %m");
-    exit(1);
-
-    // >>> CHILD PROCESS END <<<
-  } else if (pid < 0) {
-    slurm_error("gcsfuse-mount: fork failed: %m");
-    return -1;
-  }
-
-  // --- 4. Parent Waits for Mount ---
-  int found = 0;
-  for (int k = 0; k < MOUNT_WAIT_RETRIES; k++) {
-    if (is_mountpoint_as_user(mount_point, uid, gid)) {
-      found = 1;
-      break;
+      // Check if grandchild is still alive using kill(0)
+      if (kill(grandchild_pid, 0) != 0) {
+        slurm_error(
+            "gcsfuse-mount: mount process exited early (check "
+            "permissions or syslog)");
+        return -1;
+      }
+      usleep(MOUNT_WAIT_SLEEP_US);
     }
 
-    int status;
-    if (waitpid(pid, &status, WNOHANG) != 0) {
-      slurm_error(
-          "gcsfuse-mount: mount process exited early (check "
-          "permissions or syslog)");
+    if (!found) {
+      slurm_error("gcsfuse-mount: timed out waiting for %s", mount_point);
+      kill(grandchild_pid, SIGKILL);
+      // Can't wait for grandchild (not our child)
       return -1;
     }
-    usleep(MOUNT_WAIT_SLEEP_US);
-  }
 
-  if (!found) {
-    slurm_error("gcsfuse-mount: timed out waiting for %s", mount_point);
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
+    return grandchild_pid;
+  } else {
+    slurm_error("gcsfuse-mount: fork failed: %m");
+    close(pid_pipe[0]);
+    close(pid_pipe[1]);
     return -1;
   }
-
-  return pid;
 }
 
 static int unmount_gcsfuse(const char* mount_point) {
@@ -677,12 +748,14 @@ static int handle_gcsfuse_mount(int val, const char* optarg, int remote) {
   return 0;
 }
 
-int slurm_spank_user_init(spank_t sp, int ac, char** av) {
+int slurm_spank_init_post_opt(spank_t sp, int ac, char** av) {
   (void)ac;
   (void)av;
   uid_t uid;
   gid_t gid;
   char mount_env_buf[4096];
+
+  if (spank_context() != S_CTX_REMOTE) return 0;
 
   if (spank_get_item(sp, S_JOB_UID, &uid) != 0 ||
       spank_get_item(sp, S_JOB_GID, &gid) != 0)
@@ -742,7 +815,35 @@ int slurm_spank_user_init(spank_t sp, int ac, char** av) {
     optarg = strtok_r(NULL, ";", &saveptr);
   }
   free(env_copy);
-  return rc;
+
+  // If we failed, mark it so we can abort tasks in slurm_spank_task_init
+  if (rc != 0) {
+    g_mount_failure = 1;
+  }
+  /*
+   * We return 0 (success) even if a mount failed. This ensures that Slurm
+   * proceeds to launch the task, allowing slurm_spank_task_init to execute.
+   * In slurm_spank_task_init, we check g_mount_failure and abort the task
+   * with a user-visible error message if necessary.
+   */
+  return 0;
+}
+
+int slurm_spank_task_init(spank_t sp, int ac, char** av) {
+  (void)sp;
+  (void)ac;
+  (void)av;
+
+  // If mounts failed during init (in the parent/slurmstepd), abort the task here
+  // (in the child) so that srun reports a failure and exits non-zero.
+  if (g_mount_failure) {
+    fprintf(stderr,
+            "gcsfuse-mount: Job aborted due to mount failure. Check slurmd "
+            "logs for details.\n");
+    // Exit with failure status to signal srun/slurm that task failed to start
+    exit(1);
+  }
+  return 0;
 }
 
 int slurm_spank_exit(spank_t sp, int ac, char** av) {
@@ -754,7 +855,7 @@ int slurm_spank_exit(spank_t sp, int ac, char** av) {
     unmount_gcsfuse(mount_points[i]);
     if (gcsfuse_pids[i] > 0) {
       kill(gcsfuse_pids[i], SIGKILL);
-      waitpid(gcsfuse_pids[i], NULL, 0);
+      // No need to waitpid because it will always fail with ECHILD
     }
     free(mount_points[i]);
   }
