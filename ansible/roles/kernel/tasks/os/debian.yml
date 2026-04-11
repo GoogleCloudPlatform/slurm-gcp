@@ -42,54 +42,40 @@
 - name: Install running kernel headers
   ansible.builtin.apt:
     name: "linux-headers-{{ ansible_kernel }}"
-  ignore_errors: yes
-  when: 
-    - not tpu_docker_image
-    - ansible_kernel != "6.1.0-43-cloud-amd64" # Skip if we are using the manual workaround
-
-- name: Download specific kernel headers and common dependency
-  ansible.builtin.get_url:
-    url: "{{ item.url }}"
-    dest: "{{ item.dest }}"
-    checksum: "sha1:{{ item.checksum }}"
-  loop:
-    - { 
-        url: "https://snapshot.debian.org/archive/debian/20260219T203930Z/pool/main/l/linux/linux-headers-6.1.0-43-common_6.1.162-1_all.deb", 
-        dest: "/tmp/linux-headers-6.1.0-43-common.deb",
-        checksum: "566a4d70d4be67cda86f36fb8a10efe2fcce9138"
-      }
-    - { 
-        url: "https://snapshot.debian.org/archive/debian/20260219T203930Z/pool/main/l/linux/linux-headers-6.1.0-43-cloud-amd64_6.1.162-1_amd64.deb", 
-        dest: "/tmp/linux-headers-6.1.0-43-cloud-amd64.deb",
-        checksum: "07d78100f45443669eebac0875b068b1bb506e5f"
-      }
   when:
-    - ansible_distribution == "Debian"
-    - ansible_kernel == "6.1.0-43-cloud-amd64"
-    - not tpu_docker_image
+  - not tpu_docker_image
+  - ansible_kernel != "6.1.0-43-cloud-amd64" # Skip if we are using the manual workaround
 
-- name: Install downloaded kernel headers
-  ansible.builtin.apt:
-    deb: "{{ item.dest }}"
-  loop:
-    - { dest: "/tmp/linux-headers-6.1.0-43-common.deb" }
-    - { dest: "/tmp/linux-headers-6.1.0-43-cloud-amd64.deb" }
-  when:
-    - ansible_distribution == "Debian"
-    - ansible_kernel == "6.1.0-43-cloud-amd64"
-    - not tpu_docker_image
-
-- name: Clean up downloaded debs
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-  - "/tmp/linux-headers-6.1.0-43-common.deb"
-  - "/tmp/linux-headers-6.1.0-43-cloud-amd64.deb"
+- name: Workaround for missing Debian 12 kernel headers (6.1.0-43)
   when:
   - ansible_distribution == "Debian"
   - ansible_kernel == "6.1.0-43-cloud-amd64"
   - not tpu_docker_image
+  block:
+  - name: Download specific kernel headers and common dependency
+    ansible.builtin.get_url:
+      url: "{{ item.url }}"
+      dest: "{{ item.dest }}"
+      checksum: "sha1:{{ item.checksum }}"
+      mode: '0644' # Added explicit mode
+    loop:
+    - {url: "https://snapshot.debian.org/archive/debian/20260219T203930Z/pool/main/l/linux/linux-headers-6.1.0-43-common_6.1.162-1_all.deb", dest: "/tmp/linux-headers-6.1.0-43-common.deb", checksum: "566a4d70d4be67cda86f36fb8a10efe2fcce9138"}
+    - {url: "https://snapshot.debian.org/archive/debian/20260219T203930Z/pool/main/l/linux/linux-headers-6.1.0-43-cloud-amd64_6.1.162-1_amd64.deb", dest: "/tmp/linux-headers-6.1.0-43-cloud-amd64.deb", checksum: "07d78100f45443669eebac0875b068b1bb506e5f",}
+
+  - name: Install downloaded kernel headers
+    ansible.builtin.apt:
+      deb: "{{ item }}"
+    loop:
+    - "/tmp/linux-headers-6.1.0-43-common.deb"
+    - "/tmp/linux-headers-6.1.0-43-cloud-amd64.deb"
+
+  - name: Clean up downloaded debs
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+    - "/tmp/linux-headers-6.1.0-43-common.deb"
+    - "/tmp/linux-headers-6.1.0-43-cloud-amd64.deb"
 
 - name: Install generic kernel headers
   ansible.builtin.apt:
