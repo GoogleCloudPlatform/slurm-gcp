@@ -1,0 +1,136 @@
+From ce082fd87f685bf99bfd9276a97ee9ec2b6acd1c Mon Sep 17 00:00:00 2001
+From: Brian Gregory <brian.gregory@schedmd.com>
+Date: Wed, 19 Nov 2025 15:58:52 -0500
+Subject: [PATCH 1/2] Change signature of plugin_load_from_file to pass if
+ plugin is required
+
+If the plugin is marked as not required, then log a verbose message instead
+of an error if dlopen() fails. This is in preparation for the following
+commit.
+
+Ticket: 24155
+---
+ src/common/plugin.c   | 16 +++++++++++-----
+ src/common/plugin.h   |  4 +++-
+ src/common/plugrack.c |  2 +-
+ src/common/spank.c    |  2 +-
+ 4 files changed, 16 insertions(+), 8 deletions(-)
+
+diff --git a/src/common/plugin.c b/src/common/plugin.c
+index e2d74e01b18..872603c079d 100644
+--- a/src/common/plugin.c
++++ b/src/common/plugin.c
+@@ -132,7 +132,8 @@ extern int plugin_peek(const char *fq_path, char *plugin_type,
+ 	return rc;
+ }
+
+-extern int plugin_load_from_file(plugin_handle_t *p, const char *fq_path)
++extern int plugin_load_from_file(plugin_handle_t *p, const char *fq_path,
++				 bool required)
+ {
+ 	int rc;
+ 	plugin_handle_t plug;
+@@ -153,8 +154,12 @@ extern int plugin_load_from_file(plugin_handle_t *p, const char *fq_path)
+ 	(void) dlerror();
+ 	plug = dlopen(fq_path, RTLD_LAZY);
+ 	if (plug == NULL) {
+-		error("plugin_load_from_file: dlopen(%s): %s",
+-		      fq_path, dlerror());
++		if (required)
++			error("plugin_load_from_file: dlopen(%s): %s",
++			      fq_path, dlerror());
++		else
++			verbose("plugin_load_from_file: dlopen(%s): %s",
++				fq_path, dlerror());
+ 		return ESLURM_PLUGIN_DLOPEN_FAILED;
+ 	}
+
+@@ -229,8 +234,9 @@ plugin_load_and_link(const char *type_name, int n_syms,
+ 			xfree(file_name);
+ 			err = ESLURM_PLUGIN_NOTFOUND;
+ 		} else {
+-			if ((err = plugin_load_from_file(&plug, file_name))
+-			   == SLURM_SUCCESS) {
++			if ((err = plugin_load_from_file(&plug, file_name,
++							 true)) ==
++			    SLURM_SUCCESS) {
+ 				if (plugin_get_syms(plug, n_syms,
+ 						    names, ptrs) >= n_syms) {
+ 					debug3("Success.");
+diff --git a/src/common/plugin.h b/src/common/plugin.h
+index c7363c3cb4b..dcc9048a61f 100644
+--- a/src/common/plugin.h
++++ b/src/common/plugin.h
+@@ -40,6 +40,7 @@
+ #define __GENERIC_PLUGIN_H__
+
+ #include <inttypes.h>
++#include <stdbool.h>
+ #include <sys/types.h>
+ #include <dirent.h>
+
+@@ -102,7 +103,8 @@ extern int plugin_peek(const char *fq_path, char *plugin_type,
+  *
+  * RET SLURM_SUCCESS or error
+  */
+-extern int plugin_load_from_file(plugin_handle_t *pph, const char *fq_path);
++extern int plugin_load_from_file(plugin_handle_t *pph, const char *fq_path,
++				 bool required);
+
+ /*
+  * load plugin and link hooks.
+diff --git a/src/common/plugrack.c b/src/common/plugrack.c
+index df3baa074a5..b2916f7e77a 100644
+--- a/src/common/plugrack.c
++++ b/src/common/plugrack.c
+@@ -345,7 +345,7 @@ plugin_handle_t plugrack_use_by_type(plugrack_t *rack, const char *full_type)
+
+ 		/* See if plugin is loaded. */
+ 		if (e->plug == PLUGIN_INVALID_HANDLE  &&
+-		    (err = plugin_load_from_file(&e->plug, e->fq_path)))
++		    (err = plugin_load_from_file(&e->plug, e->fq_path, true)))
+ 			error("%s: %s", e->fq_path, slurm_strerror(err));
+
+ 		/* If load was successful, increment the reference count. */
+diff --git a/src/common/spank.c b/src/common/spank.c
+index 398ceb52095..a739631dc19 100644
+--- a/src/common/spank.c
++++ b/src/common/spank.c
+@@ -337,7 +337,7 @@ static struct spank_plugin *_spank_plugin_create(struct spank_stack *stack,
+ 	int e;
+ 	struct spank_plugin_operations ops;
+
+-	if ((e = plugin_load_from_file(&p, path)) != SLURM_SUCCESS) {
++	if ((e = plugin_load_from_file(&p, path, true)) != SLURM_SUCCESS) {
+ 		error("spank: %s: %s", path, slurm_strerror(e));
+ 		return NULL;
+ 	}
+
+From 4e4894b90b7bcb093ec371a2ed15e293b2f659e0 Mon Sep 17 00:00:00 2001
+From: Brian Gregory <brian.gregory@schedmd.com>
+Date: Wed, 19 Nov 2025 15:19:47 -0500
+Subject: [PATCH 2/2] Do not output error for missing optional spank plugin
+
+Changelog: Remove error output for missing optional spank plugin.
+Ticket: 24155
+---
+ src/common/spank.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/src/common/spank.c b/src/common/spank.c
+index a739631dc19..887289d9b9b 100644
+--- a/src/common/spank.c
++++ b/src/common/spank.c
+@@ -337,8 +337,11 @@ static struct spank_plugin *_spank_plugin_create(struct spank_stack *stack,
+ 	int e;
+ 	struct spank_plugin_operations ops;
+
+-	if ((e = plugin_load_from_file(&p, path, true)) != SLURM_SUCCESS) {
+-		error("spank: %s: %s", path, slurm_strerror(e));
++	if ((e = plugin_load_from_file(&p, path, required)) != SLURM_SUCCESS) {
++		if (required)
++			error("spank: %s: %s", path, slurm_strerror(e));
++		else
++			verbose("spank: %s: %s", path, slurm_strerror(e));
+ 		return NULL;
+ 	}
