@@ -39,3 +39,4 @@ machine_type = "t2a-standard-16"
 #############
 
 # slurm_version = null
+monitoring_agent = "cloud-ops"
