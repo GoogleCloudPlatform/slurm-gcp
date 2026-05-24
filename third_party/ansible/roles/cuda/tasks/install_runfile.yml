@@ -46,7 +46,9 @@
 - name: Check NVIDIA kernel module
   find:
     path: /lib/modules/{{ cuda_driver_kernel_version }}
-    patterns: nvidia.ko.xz
+    patterns:
+    - nvidia.ko
+    - nvidia.ko.xz
     recurse: true
   register: cuda_driver_kernel_module_find
 
