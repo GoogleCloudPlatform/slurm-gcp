@@ -57,6 +57,17 @@
     cmd: make install > /dev/null
     chdir: '{{lmod_paths.src}}'
 
+- name: Disable conflicting default module/scl profile scripts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+  - /etc/profile.d/modules.sh
+  - /etc/profile.d/modules.csh
+  - /etc/profile.d/scl-init.sh
+  - /etc/profile.d/scl.sh
+  when: ansible_os_family == 'RedHat'
+
 - name: Symbolic Link
   file:
     src: '{{item.src}}'
