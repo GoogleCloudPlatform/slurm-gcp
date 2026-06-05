@@ -1,0 +1,1403 @@
+# Slurm patch for TPU support (tpu-2605.patch)
+# Copyright (C) 2026 Google LLC
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (see COPYING.GPLv2); if not, write to the
+# Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+# Boston, MA 02110-1301 USA
+diff --git a/configure.ac b/configure.ac
+index 519cbc0091..3d6fa93605 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -471,6 +471,7 @@ AC_CONFIG_FILES([Makefile
+ 		 src/plugins/cli_filter/lua/Makefile
+ 		 src/plugins/cli_filter/syslog/Makefile
+ 		 src/plugins/cli_filter/user_defaults/Makefile
++		 src/plugins/cli_filter/tpu/Makefile
+ 		 src/plugins/compress/Makefile
+ 		 src/plugins/compress/none/Makefile
+ 		 src/plugins/compress/lz4/Makefile
+@@ -497,6 +498,7 @@ AC_CONFIG_FILES([Makefile
+ 		 src/plugins/gres/mps/Makefile
+ 		 src/plugins/gres/nic/Makefile
+ 		 src/plugins/gres/shard/Makefile
++		 src/plugins/gres/tpu/Makefile
+ 		 src/plugins/hash/Makefile
+ 		 src/plugins/hash/common_xkcp/Makefile
+ 		 src/plugins/hash/k12/Makefile
+@@ -516,6 +518,7 @@ AC_CONFIG_FILES([Makefile
+ 		 src/plugins/job_submit/pbs/Makefile
+ 		 src/plugins/job_submit/require_timelimit/Makefile
+ 		 src/plugins/job_submit/throttle/Makefile
++		 src/plugins/job_submit/tpu/Makefile
+ 		 src/plugins/jobacct_gather/Makefile
+ 		 src/plugins/jobacct_gather/cgroup/Makefile
+ 		 src/plugins/jobacct_gather/common/Makefile
+diff --git a/etc/Makefile.am b/etc/Makefile.am
+index 26517d2631..6db90fa6cb 100644
+--- a/etc/Makefile.am
++++ b/etc/Makefile.am
+@@ -4,6 +4,8 @@ ETC_FILES = init.d.slurmdbd init.d.slurm \
+
+ CLEANFILES = $(ETC_FILES)
+
++sysconf_DATA = tpu.conf.example
++
+ edit = sed \
+         -e 's|@bindir[@]|$(bindir)|g' \
+         -e 's|@includedir[@]|$(includedir)|g' \
+diff --git a/etc/tpu.conf.example b/etc/tpu.conf.example
+new file mode 100644
+index 0000000000..5d6a1384a6
+--- /dev/null
++++ b/etc/tpu.conf.example
+@@ -0,0 +1,13 @@
++# Example tpu.conf
++# Supported parameters:
++# TPUType: Identifier string (e.g., v5e, v5p, v6e, 7x)
++# ChipsPerNode: Number of chips per node (default: 4)
++# Dimensions: 2 or 3
++# NodesPerSubBlock: Number of nodes per sub-block
++# NodesPerBlock: Number of nodes per full block
++# PciDeviceId: PCI Device ID for auto-detection (Required)
++
++TPUType=v5e ChipsPerNode=4 Dimensions=2 NodesPerSubBlock=64 NodesPerBlock=64 PciDeviceId=0x0063
++TPUType=v5p ChipsPerNode=4 Dimensions=3 NodesPerSubBlock=16 NodesPerBlock=2240 PciDeviceId=0x0062
++TPUType=v6e ChipsPerNode=4 Dimensions=2 NodesPerSubBlock=64 NodesPerBlock=64 PciDeviceId=0x006f
++TPUType=7x ChipsPerNode=4 Dimensions=3 NodesPerSubBlock=16 NodesPerBlock=2304 PciDeviceId=0x0076
+diff --git a/slurm/slurm.h b/slurm/slurm.h
+index 2e87869f3f..dec929eef7 100644
+--- a/slurm/slurm.h
++++ b/slurm/slurm.h
+@@ -1869,6 +1869,7 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
+ 	char *x11_magic_cookie;	/* automatically stolen from submit node */
+ 	char *x11_target;	/* target hostname, or unix socket if port == 0 */
+ 	uint16_t x11_target_port; /* target tcp port, 6000 + the display number */
++	char *accelerator_topology; /* --accelerator-topology option */
+ } job_desc_msg_t;
+
+ typedef struct job_info {
+@@ -1923,6 +1924,7 @@ typedef struct job_info {
+ 	uint16_t exclusive; /* JOB_EXCLUSIVE_* (NONE/NODE/USER/MCS/TOPO) */
+ 	uint32_t exit_code;	/* exit code for job (status from wait call) */
+ 	char *extra;		/* Arbitrary string */
++	char *accelerator_topology; /* --accelerator-topology option */
+ 	char *failed_node;	/* if set, node that caused job to fail */
+ 	char *features;		/* comma separated list of required features */
+ 	char *fed_origin_str;	/* Origin cluster's name */
+diff --git a/src/api/Makefile.am b/src/api/Makefile.am
+index b153a19bdd..6bef8c2c86 100644
+--- a/src/api/Makefile.am
++++ b/src/api/Makefile.am
+@@ -145,6 +145,7 @@ convenience_libs = \
+
+ libslurm_la_SOURCES =
+ libslurm_la_LIBADD = $(convenience_libs)
++libslurm_la_DEPENDENCIES = version.map $(convenience_libs)
+ libslurm_la_LDFLAGS        = \
+         $(LIB_LDFLAGS) \
+         -version-info $(current):$(rev):$(age) \
+@@ -152,6 +153,7 @@ libslurm_la_LDFLAGS        = \
+
+ libslurmfull_la_SOURCES =
+ libslurmfull_la_LIBADD = $(convenience_libs)
++libslurmfull_la_DEPENDENCIES = full_version.map $(convenience_libs)
+ libslurmfull_la_LDFLAGS        = \
+         $(LIB_LDFLAGS) \
+ 	-avoid-version \
+@@ -159,6 +161,7 @@ libslurmfull_la_LDFLAGS        = \
+
+ libslurm_pmi_la_SOURCES =
+ libslurm_pmi_la_LIBADD = $(convenience_libs)
++libslurm_pmi_la_DEPENDENCIES = version.map $(convenience_libs)
+ libslurm_pmi_la_LDFLAGS        = \
+         $(LIB_LDFLAGS) \
+ 	-avoid-version \
+@@ -180,7 +183,7 @@ force:
+ $(libslurm_o_LDADD) $(convenience_libs) $(slurmapi_add) : force
+ 	@cd `dirname $@` && $(MAKE) `basename $@`
+
+-$(VERSION_SCRIPT) :
++version.map :
+ 	(echo "{ global:";   \
+ 	 echo "   islurm_*;"; \
+ 	 echo "   sack_*;"; \
+@@ -191,10 +194,10 @@ $(VERSION_SCRIPT) :
+ 	 echo "   active_node_record_count;"; \
+ 	 echo "   node_record_table_ptr;"; \
+ 	 echo "  local: *;"; \
+-	 echo "};") > $(VERSION_SCRIPT)
++	 echo "};") > version.map
+
+-$(FULL_VERSION_SCRIPT) :
+-	(echo "{ global: *; };") > $(FULL_VERSION_SCRIPT)
++full_version.map :
++	(echo "{ global: *; };") > full_version.map
+
+ CLEANFILES = \
+ 	$(VERSION_SCRIPT) $(FULL_VERSION_SCRIPT)
+diff --git a/src/common/assoc_mgr.c b/src/common/assoc_mgr.c
+index 638edd0a41..5aa91d0d12 100644
+--- a/src/common/assoc_mgr.c
++++ b/src/common/assoc_mgr.c
+@@ -7206,6 +7206,7 @@ extern bool assoc_mgr_valid_tres_cnt(char *tres, bool gres_tres_enforce)
+ 		xfree(name);
+
+ 		if (pos == -1) {
++			error("assoc_mgr_valid_tres_cnt: Invalid (%s:%s:%s:%"PRIu64")", tres_type, name, type ? type : "", cnt);
+ 			rc = SLURM_ERROR;
+ 			break;
+ 		}
+diff --git a/src/common/fetch_config.c b/src/common/fetch_config.c
+index c90eea1ffa..d3e5597a32 100644
+--- a/src/common/fetch_config.c
++++ b/src/common/fetch_config.c
+@@ -71,6 +71,7 @@ static char *slurmd_config_files[] = {
+ 	"slurm.conf",
+ 	"topology.conf",
+ 	"topology.yaml",
++	"tpu.conf",
+ 	NULL,
+ };
+
+@@ -82,6 +83,7 @@ static char *client_config_files[] = {
+ 	"slurm.conf",
+ 	"topology.conf",
+ 	"topology.yaml",
++	"tpu.conf",
+ 	NULL,
+ };
+
+diff --git a/src/common/job_record.c b/src/common/job_record.c
+index 3d77ce418c..6383003f80 100644
+--- a/src/common/job_record.c
++++ b/src/common/job_record.c
+@@ -259,6 +259,7 @@ extern void job_record_delete(void *job_entry)
+ 	xfree(job_ptr->cpus_per_tres);
+ 	xfree(job_ptr->exclusive);
+ 	xfree(job_ptr->extra);
++	xfree(job_ptr->accelerator_topology);
+ 	FREE_NULL_EXTRA_CONSTRAINTS(job_ptr->extra_constraints);
+ 	xfree(job_ptr->failed_node);
+ 	job_record_free_fed_details(&job_ptr->fed_details);
+@@ -2359,6 +2360,7 @@ extern void job_record_pack_common(job_record_t *dump_job_ptr,
+
+ 		pack32(dump_job_ptr->exit_code, buffer);
+ 		packstr(dump_job_ptr->extra, buffer);
++		packstr(dump_job_ptr->accelerator_topology, buffer);
+
+ 		packstr(dump_job_ptr->failed_node, buffer);
+ 		_dump_job_fed_details(dump_job_ptr->fed_details, for_state,
+@@ -2734,6 +2736,7 @@ extern int job_record_unpack_common(job_record_t *job_ptr,
+
+ 		safe_unpack32(&job_ptr->exit_code, buffer);
+ 		safe_unpackstr(&job_ptr->extra, buffer);
++		safe_unpackstr(&job_ptr->accelerator_topology, buffer);
+
+ 		safe_unpackstr(&job_ptr->failed_node, buffer);
+ 		if (_load_job_fed_details(&job_ptr->fed_details, buffer,
+diff --git a/src/common/job_record.h b/src/common/job_record.h
+index b6118617b7..9bf9cc81be 100644
+--- a/src/common/job_record.h
++++ b/src/common/job_record.h
+@@ -332,6 +332,7 @@ struct job_record {
+ 	uint32_t exit_code;		/* exit code for job (status from
+ 					 * wait call) */
+ 	char *extra;			/* Arbitrary string */
++	char *accelerator_topology;	/* Requested accelerator topology */
+ 	elem_t *extra_constraints;	/* Head of tree built from constraints
+ 					 * defined in "extra". Not state saved.
+ 					 */
+diff --git a/src/common/slurm_opt.c b/src/common/slurm_opt.c
+index 23e35b3a73..9b8e883041 100644
+--- a/src/common/slurm_opt.c
++++ b/src/common/slurm_opt.c
+@@ -1706,6 +1706,17 @@ static slurm_cli_opt_t slurm_opt_gpus_per_task = {
+ 	.reset_each_pass = true,
+ };
+
++COMMON_STRING_OPTION(accelerator_topology);
++static slurm_cli_opt_t slurm_opt_accelerator_topology = {
++	.name = "accelerator-topology",
++	.has_arg = required_argument,
++	.val = LONG_OPT_ACCELERATOR_TOPOLOGY,
++	.set_func = arg_set_accelerator_topology,
++	.get_func = arg_get_accelerator_topology,
++	.reset_func = arg_reset_accelerator_topology,
++	.reset_each_pass = true,
++};
++
+ static int arg_set_tree_width(slurm_opt_t *opt, const char *arg)
+ {
+ 	if (!opt->srun_opt)
+@@ -4373,6 +4384,7 @@ static slurm_cli_opt_t slurm_opt_x11 = {
+ static const slurm_cli_opt_t *common_options[] = {
+ 	&slurm_opt__unknown_,
+ 	&slurm_opt_accel_bind,
++	&slurm_opt_accelerator_topology,
+ 	&slurm_opt_account,
+ 	&slurm_opt_acctg_freq,
+ 	&slurm_opt_alloc_nodelist,
+@@ -6135,6 +6147,7 @@ extern job_desc_msg_t *slurm_opt_create_job_desc(slurm_opt_t *opt_local,
+ 		  opt_local->gpus_per_socket);
+
+ 	job_desc->tres_per_task = xstrdup(opt_local->tres_per_task);
++	job_desc->accelerator_topology = xstrdup(opt_local->accelerator_topology);
+ 	job_desc->user_id = opt_local->uid;
+
+ 	/* wait_all_nodes not filled in here */
+diff --git a/src/common/slurm_opt.h b/src/common/slurm_opt.h
+index 235c7106ad..49fd3d6af5 100644
+--- a/src/common/slurm_opt.h
++++ b/src/common/slurm_opt.h
+@@ -71,6 +71,7 @@ typedef enum {BELL_NEVER, BELL_AFTER_DELAY, BELL_ALWAYS} bell_flag_t;
+ enum {
+ 	LONG_OPT_ENUM_START = 0x100,
+ 	LONG_OPT_ACCEL_BIND,
++	LONG_OPT_ACCELERATOR_TOPOLOGY,
+ 	LONG_OPT_ACCTG_FREQ,
+ 	LONG_OPT_ALLOC_NODELIST,
+ 	LONG_OPT_ARGV,
+@@ -386,6 +387,7 @@ typedef struct {
+ 	char *gpus_per_node;		/* --gpus_per_node		*/
+ 	char *gpus_per_socket;		/* --gpus_per_socket		*/
+ 	char *gpus_per_task;		/* --gpus_per_task		*/
++	char *accelerator_topology;		/* --accelerator-topology			*/
+
+ 	int pn_min_cpus;		/* --mincpus			*/
+ 	uint64_t mem_per_cpu;		/* --mem-per-cpu		*/
+diff --git a/src/common/slurm_protocol_defs.c b/src/common/slurm_protocol_defs.c
+index 35b6819b83..b683847627 100644
+--- a/src/common/slurm_protocol_defs.c
++++ b/src/common/slurm_protocol_defs.c
+@@ -1732,6 +1732,7 @@ extern void slurm_free_job_desc_msg(job_desc_msg_t *msg)
+ 		xfree(msg->work_dir);
+ 		xfree(msg->x11_magic_cookie);
+ 		xfree(msg->x11_target);
++		xfree(msg->accelerator_topology);
+ 		xfree(msg);
+ 	}
+ }
+diff --git a/src/common/slurm_protocol_pack.c b/src/common/slurm_protocol_pack.c
+index 0293c7d509..25d7e823bf 100644
+--- a/src/common/slurm_protocol_pack.c
++++ b/src/common/slurm_protocol_pack.c
+@@ -3843,6 +3843,7 @@ _unpack_job_info_members(job_info_t * job, buf_t *buffer,
+
+ 		safe_unpack32(&job->exit_code, buffer);
+ 		safe_unpackstr(&job->extra, buffer);
++		safe_unpackstr(&job->accelerator_topology, buffer);
+
+ 		safe_unpackstr(&job->failed_node, buffer);
+ 		/* job_record_pack_fed_details */
+@@ -7352,6 +7353,7 @@ static void _pack_job_desc_msg(const slurm_msg_t *smsg, buf_t *buffer)
+ 		pack32(msg->min_nodes, buffer);
+ 		pack32(msg->max_nodes, buffer);
+ 		packstr(msg->job_size_str, buffer);
++		packstr(msg->accelerator_topology, buffer);
+ 		pack16(msg->boards_per_node, buffer);
+ 		pack16(msg->sockets_per_board, buffer);
+ 		pack16(msg->sockets_per_node, buffer);
+@@ -7936,6 +7938,7 @@ static int _unpack_job_desc_msg(slurm_msg_t *smsg, buf_t *buffer)
+ 		safe_unpack32(&msg->min_nodes, buffer);
+ 		safe_unpack32(&msg->max_nodes, buffer);
+ 		safe_unpackstr(&msg->job_size_str, buffer);
++		safe_unpackstr(&msg->accelerator_topology, buffer);
+ 		safe_unpack16(&msg->boards_per_node, buffer);
+ 		safe_unpack16(&msg->sockets_per_board, buffer);
+ 		safe_unpack16(&msg->sockets_per_node, buffer);
+diff --git a/src/interfaces/gres.c b/src/interfaces/gres.c
+index b5348ed9bc..c50ae402c0 100644
+--- a/src/interfaces/gres.c
++++ b/src/interfaces/gres.c
+@@ -1351,6 +1351,9 @@ static char *_get_autodetect_flags_str(void)
+ 			xstrfmtcat(flags, "%soff", flags ? "," : "");
+ 	}
+
++	if (autodetect_flags & GRES_AUTODETECT_TPU)
++		xstrfmtcat(flags, "%stpu", flags ? "," : "");
++
+ 	return flags;
+ }
+
+@@ -1371,6 +1374,8 @@ static uint32_t _handle_autodetect_flags(char *str)
+ 		flags |= GRES_AUTODETECT_GPU_NRT;
+ 	else if (xstrcasestr(str, "nvidia"))
+ 		flags |= GRES_AUTODETECT_GPU_NVIDIA;
++	else if (xstrcasestr(str, "tpu"))
++		flags |= GRES_AUTODETECT_TPU;
+ 	else if (!xstrcasecmp(str, "off"))
+ 		flags |= GRES_AUTODETECT_GPU_OFF;
+ 	else
+@@ -1493,6 +1498,7 @@ extern void gres_get_autodetected_gpus(node_config_load_t node_conf,
+ 		GRES_AUTODETECT_GPU_RSMI,
+ 		GRES_AUTODETECT_GPU_ONEAPI,
+ 		GRES_AUTODETECT_GPU_NRT,
++		GRES_AUTODETECT_TPU,
+ 		GRES_AUTODETECT_UNSET /* For loop is done */
+ 	};
+
+diff --git a/src/interfaces/gres.h b/src/interfaces/gres.h
+index e36ab498ed..ae225b130b 100644
+--- a/src/interfaces/gres.h
++++ b/src/interfaces/gres.h
+@@ -168,6 +168,8 @@ typedef struct {
+ #define GRES_AUTODETECT_GPU_FLAGS 0x000000ff /* reserve first 8 bits for gpu
+ 					      * flags */
+
++#define GRES_AUTODETECT_TPU       0x00000100 /* Non-GPU (TPU) autodetect flag */
++
+ typedef enum {
+ 	GRES_STATE_SRC_STATE_PTR,
+ 	GRES_STATE_SRC_CONTEXT_PTR,
+diff --git a/src/plugins/cli_filter/Makefile.am b/src/plugins/cli_filter/Makefile.am
+index 839003142f..0019f238d5 100644
+--- a/src/plugins/cli_filter/Makefile.am
++++ b/src/plugins/cli_filter/Makefile.am
+@@ -1,6 +1,6 @@
+ # Makefile for cli_filter plugins
+
+-SUBDIRS = common syslog user_defaults
++SUBDIRS = common syslog user_defaults tpu
+
+ if HAVE_LUA
+ SUBDIRS += lua
+diff --git a/src/plugins/cli_filter/tpu/Makefile.am b/src/plugins/cli_filter/tpu/Makefile.am
+new file mode 100644
+index 0000000000..2d98963b92
+--- /dev/null
++++ b/src/plugins/cli_filter/tpu/Makefile.am
+@@ -0,0 +1,13 @@
++# Makefile for cli_filter/tpu plugin
++
++AUTOMAKE_OPTIONS = foreign
++
++PLUGIN_FLAGS = -module -avoid-version --export-dynamic
++
++AM_CPPFLAGS = -I$(top_srcdir) -I$(top_builddir)
++
++pkglib_LTLIBRARIES = cli_filter_tpu.la
++
++cli_filter_tpu_la_SOURCES = cli_filter_tpu.c
++cli_filter_tpu_la_LDFLAGS = $(SO_LDFLAGS) $(PLUGIN_FLAGS)
++cli_filter_tpu_la_LIBADD = ../common/libcli_filter_common.la
+diff --git a/src/plugins/cli_filter/tpu/cli_filter_tpu.c b/src/plugins/cli_filter/tpu/cli_filter_tpu.c
+new file mode 100644
+index 0000000000..42c7075443
+--- /dev/null
++++ b/src/plugins/cli_filter/tpu/cli_filter_tpu.c
+@@ -0,0 +1,219 @@
++#include <inttypes.h>
++#include <stdio.h>
++#include <string.h>
++#include <sys/types.h>
++#include <unistd.h>
++
++#include "slurm/slurm_errno.h"
++#include "src/common/log.h"
++#include "src/common/xmalloc.h"
++#include "src/common/xstring.h"
++#include "src/common/slurm_opt.h"
++#include "src/common/list.h"
++#include "src/common/parse_config.h"
++#include "src/common/read_config.h"
++#include "src/interfaces/cli_filter.h"
++
++const char plugin_name[] = "TPU CLI filter plugin";
++const char plugin_type[] = "cli_filter/tpu";
++const uint32_t plugin_version = SLURM_VERSION_NUMBER;
++
++typedef struct {
++	char *type;
++	uint32_t chips_per_node;
++	uint16_t dimensions;
++	uint32_t nodes_per_sub_block;
++	uint32_t nodes_per_block;
++	char *pci_device_id;
++} tpu_config_t;
++
++static list_t *tpu_config_list = NULL;
++
++static void _tpu_config_destroy(void *x)
++{
++	tpu_config_t *conf = (tpu_config_t *)x;
++	xfree(conf->type);
++	xfree(conf->pci_device_id);
++	xfree(conf);
++}
++
++static int _load_tpu_conf(void)
++{
++	s_p_options_t tpu_options[] = {
++		{"TPUType", S_P_STRING},
++		{"ChipsPerNode", S_P_UINT32},
++		{"Dimensions", S_P_UINT16},
++		{"NodesPerSubBlock", S_P_UINT32},
++		{"NodesPerBlock", S_P_UINT32},
++		{"PciDeviceId", S_P_STRING},
++		{NULL}
++	};
++
++	s_p_options_t options[] = {
++		{"TPUType", S_P_LINE, NULL, NULL, tpu_options},
++		{NULL}
++	};
++
++	s_p_hashtbl_t *tbl = s_p_hashtbl_create(options);
++	char *conf_path = get_extra_conf_path("tpu.conf");
++
++	if (s_p_parse_file(tbl, NULL, conf_path, 0, NULL) == SLURM_ERROR) {
++		error("cli_filter/tpu: Failed to parse %s", conf_path);
++		xfree(conf_path);
++		s_p_hashtbl_destroy(tbl);
++		return SLURM_ERROR;
++	}
++	xfree(conf_path);
++
++	tpu_config_list = list_create(_tpu_config_destroy);
++
++	s_p_hashtbl_t **tpu_tbls;
++	int count = 0;
++	if (s_p_get_line(&tpu_tbls, &count, "TPUType", tbl)) {
++		for (int i = 0; i < count; i++) {
++			tpu_config_t *conf = xmalloc(sizeof(tpu_config_t));
++			s_p_get_string(&conf->type, "TPUType", tpu_tbls[i]);
++			s_p_get_uint32(&conf->chips_per_node, "ChipsPerNode", tpu_tbls[i]);
++			s_p_get_uint16(&conf->dimensions, "Dimensions", tpu_tbls[i]);
++			s_p_get_uint32(&conf->nodes_per_sub_block, "NodesPerSubBlock", tpu_tbls[i]);
++			s_p_get_uint32(&conf->nodes_per_block, "NodesPerBlock", tpu_tbls[i]);
++			s_p_get_string(&conf->pci_device_id, "PciDeviceId", tpu_tbls[i]);
++
++			list_append(tpu_config_list, conf);
++			debug("cli_filter/tpu: Loaded config for %s", conf->type);
++		}
++	}
++
++	s_p_hashtbl_destroy(tbl);
++	return SLURM_SUCCESS;
++}
++
++static int _process_accelerator_topology(slurm_opt_t *opt)
++{
++	if (!opt->accelerator_topology) {
++		if (opt->gres && strstr(opt->gres, "tpu")) {
++			info("Warning: TPU GRES detected but --accelerator-topology unspecified.");
++			info("Implications: NodesPerBlock limit will not be enforced, and hardware topology may not be optimized.");
++		}
++		return SLURM_SUCCESS;
++	}
++
++	if (!tpu_config_list) {
++		if (_load_tpu_conf() != SLURM_SUCCESS) {
++			error("cli_filter/tpu: Failed to load TPU configuration.");
++			return SLURM_ERROR;
++		}
++	}
++
++	char *tpu_str = xstrdup(opt->accelerator_topology);
++	char *colon = strchr(tpu_str, ':');
++
++	if (!colon) {
++		error("cli_filter/tpu: Invalid accelerator-topology format (%s). Expected [TYPE]:[TOPOLOGY]", opt->accelerator_topology);
++		xfree(tpu_str);
++		return SLURM_ERROR;
++	}
++
++	*colon = '\0';
++	char *tpu_type = tpu_str;
++	char *tpu_topology = colon + 1;
++
++	debug("cli_filter/tpu: Processing accelerator topology request %s:%s", tpu_type, tpu_topology);
++
++	tpu_config_t *conf = NULL;
++	list_itr_t *iter = list_iterator_create(tpu_config_list);
++	while ((conf = list_next(iter))) {
++		if (xstrcmp(conf->type, tpu_type) == 0)
++			break;
++	}
++	list_iterator_destroy(iter);
++
++	if (!conf) {
++		error("cli_filter/tpu: Unknown TPU type %s", tpu_type);
++		xfree(tpu_str);
++		return SLURM_ERROR;
++	}
++
++	int x = 0, y = 0, z = 0;
++	uint32_t num_nodes = 0;
++	uint32_t num_chips = 0;
++
++	if (conf->dimensions == 2) {
++		if (sscanf(tpu_topology, "%dx%d", &x, &y) == 2 ||
++		    sscanf(tpu_topology, "%d_%d", &x, &y) == 2) {
++			num_chips = x * y;
++			num_nodes = num_chips / conf->chips_per_node;
++
++		} else {
++			error("cli_filter/tpu: Invalid topology format %s for 2D TPU", tpu_topology);
++			xfree(tpu_str);
++			return SLURM_ERROR;
++		}
++	} else if (conf->dimensions == 3) {
++		if (sscanf(tpu_topology, "%dx%dx%d", &x, &y, &z) == 3 ||
++		    sscanf(tpu_topology, "%d_%d_%d", &x, &y, &z) == 3) {
++			num_chips = x * y * z;
++			num_nodes = num_chips / conf->chips_per_node;
++
++		} else {
++			error("cli_filter/tpu: Invalid topology format %s for 3D TPU", tpu_topology);
++			xfree(tpu_str);
++			return SLURM_ERROR;
++		}
++	} else {
++		error("cli_filter/tpu: Unsupported dimensions %u for %s", conf->dimensions, tpu_type);
++		xfree(tpu_str);
++		return SLURM_ERROR;
++	}
++
++	if (num_nodes > 0) {
++		bool nodes_set = slurm_option_set_by_cli(opt, 'N') || slurm_option_set_by_env(opt, 'N');
++		if (!nodes_set) {
++			opt->min_nodes = num_nodes;
++			opt->max_nodes = num_nodes;
++			debug("cli_filter/tpu: Set nodes to %u based on topology", num_nodes);
++		} else if (opt->min_nodes != num_nodes) {
++			error("cli_filter/tpu: Requested node count (%d) does not match topology shape %s (requires %u nodes)",
++			      opt->min_nodes, tpu_topology, num_nodes);
++			xfree(tpu_str);
++			return SLURM_ERROR;
++		}
++	}
++
++	if (num_nodes > conf->nodes_per_block) {
++		error("cli_filter/tpu: Requested nodes %u exceeds NodesPerBlock limit %u for %s",
++		      num_nodes, conf->nodes_per_block, tpu_type);
++		xfree(tpu_str);
++		return SLURM_ERROR;
++	}
++
++	xfree(tpu_str);
++	return SLURM_SUCCESS;
++}
++
++extern int init(void)
++{
++	debug("%s: %s loaded", __func__, plugin_name);
++	return SLURM_SUCCESS;
++}
++
++extern void fini(void)
++{
++	debug("%s: unloading %s", __func__, plugin_name);
++	FREE_NULL_LIST(tpu_config_list);
++}
++
++extern int cli_filter_p_setup_defaults(slurm_opt_t *opt, bool early)
++{
++	return SLURM_SUCCESS;
++}
++
++extern int cli_filter_p_pre_submit(slurm_opt_t *opt, int offset)
++{
++	return _process_accelerator_topology(opt);
++}
++
++extern void cli_filter_p_post_submit(int offset, uint32_t jobid, uint32_t stepid)
++{
++	/* No op */
++}
+diff --git a/src/plugins/gres/Makefile.am b/src/plugins/gres/Makefile.am
+index db1e6e33f0..9c217c1704 100644
+--- a/src/plugins/gres/Makefile.am
++++ b/src/plugins/gres/Makefile.am
+@@ -1,3 +1,3 @@
+ # Makefile for gres plugins
+
+-SUBDIRS = common gpu nic mps shard
++SUBDIRS = common gpu nic mps shard tpu
+diff --git a/src/plugins/gres/tpu/Makefile.am b/src/plugins/gres/tpu/Makefile.am
+new file mode 100644
+index 0000000000..1bcc60d1a6
+--- /dev/null
++++ b/src/plugins/gres/tpu/Makefile.am
+@@ -0,0 +1,18 @@
++# Makefile for gres/tpu plugin
++
++AUTOMAKE_OPTIONS = foreign
++
++PLUGIN_FLAGS = -module -avoid-version --export-dynamic
++
++AM_CPPFLAGS = -DSLURM_PLUGIN_DEBUG -I$(top_srcdir)
++
++pkglib_LTLIBRARIES = gres_tpu.la
++
++# GRES TPU plugin.
++gres_tpu_la_SOURCES = gres_tpu.c
++gres_tpu_la_LDFLAGS = $(PLUGIN_FLAGS)
++gres_tpu_la_LIBADD = ../common/libgres_common.la
++
++force:
++$(gres_tpu_la_LIBADD) : force
++	@cd `dirname $@` && $(MAKE) `basename $@`
+diff --git a/src/plugins/gres/tpu/gres_tpu.c b/src/plugins/gres/tpu/gres_tpu.c
+new file mode 100644
+index 0000000000..f213fe629a
+--- /dev/null
++++ b/src/plugins/gres/tpu/gres_tpu.c
+@@ -0,0 +1,351 @@
++#include <ctype.h>
++#include <inttypes.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/types.h>
++#include <unistd.h>
++
++#include "slurm/slurm.h"
++#include "slurm/slurm_errno.h"
++
++#include "src/common/slurm_xlator.h"
++#include "src/common/bitstring.h"
++#include "src/common/env.h"
++#include "src/interfaces/gres.h"
++#include "src/common/list.h"
++#include "src/common/xstring.h"
++#include "src/common/parse_config.h"
++#include "src/common/read_config.h"
++
++#include "../common/gres_common.h"
++
++/* Required Slurm plugin symbols: */
++const char plugin_name[] = "Gres TPU plugin";
++const char plugin_type[] = "gres/tpu";
++const uint32_t plugin_version = SLURM_VERSION_NUMBER;
++
++static list_t *gres_devices = NULL;
++
++typedef struct {
++	char *type;
++	uint32_t chips_per_node;
++	uint16_t dimensions;
++	uint32_t nodes_per_sub_block;
++	uint32_t nodes_per_block;
++	char *pci_device_id;
++} tpu_config_t;
++
++static list_t *tpu_config_list = NULL;
++
++static void _tpu_config_destroy(void *x)
++{
++	tpu_config_t *conf = (tpu_config_t *)x;
++	xfree(conf->type);
++	xfree(conf->pci_device_id);
++	xfree(conf);
++}
++
++static int _load_tpu_conf(void)
++{
++	s_p_options_t tpu_options[] = {
++		{"TPUType", S_P_STRING},
++		{"ChipsPerNode", S_P_UINT32},
++		{"Dimensions", S_P_UINT16},
++		{"NodesPerSubBlock", S_P_UINT32},
++		{"NodesPerBlock", S_P_UINT32},
++		{"PciDeviceId", S_P_STRING},
++		{NULL}
++	};
++
++	s_p_options_t options[] = {
++		{"TPUType", S_P_LINE, NULL, NULL, tpu_options},
++		{NULL}
++	};
++
++	s_p_hashtbl_t *tbl = s_p_hashtbl_create(options);
++	char *conf_path = get_extra_conf_path("tpu.conf");
++
++	if (s_p_parse_file(tbl, NULL, conf_path, 0, NULL) == SLURM_ERROR) {
++		error("gres/tpu: Failed to parse %s", conf_path);
++		xfree(conf_path);
++		s_p_hashtbl_destroy(tbl);
++		return SLURM_ERROR;
++	}
++	xfree(conf_path);
++
++	tpu_config_list = list_create(_tpu_config_destroy);
++
++	s_p_hashtbl_t **tpu_tbls;
++	int count = 0;
++	if (s_p_get_line(&tpu_tbls, &count, "TPUType", tbl)) {
++		for (int i = 0; i < count; i++) {
++			tpu_config_t *conf = xmalloc(sizeof(tpu_config_t));
++			s_p_get_string(&conf->type, "TPUType", tpu_tbls[i]);
++			s_p_get_uint32(&conf->chips_per_node, "ChipsPerNode", tpu_tbls[i]);
++			s_p_get_uint16(&conf->dimensions, "Dimensions", tpu_tbls[i]);
++			s_p_get_uint32(&conf->nodes_per_sub_block, "NodesPerSubBlock", tpu_tbls[i]);
++			s_p_get_uint32(&conf->nodes_per_block, "NodesPerBlock", tpu_tbls[i]);
++			s_p_get_string(&conf->pci_device_id, "PciDeviceId", tpu_tbls[i]);
++
++			list_append(tpu_config_list, conf);
++			debug("gres/tpu: Loaded config for %s", conf->type);
++		}
++	}
++
++	s_p_hashtbl_destroy(tbl);
++	return SLURM_SUCCESS;
++}
++
++static void _set_env(common_gres_env_t *gres_env)
++{
++	char *slurm_env_var = NULL;
++
++	if (gres_env->is_job)
++			slurm_env_var = "SLURM_JOB_TPUS";
++	else
++			slurm_env_var = "SLURM_STEP_TPUS";
++
++	gres_env->prefix = "tpu_";
++	gres_env->use_dev_num = true;
++
++	common_gres_set_env(gres_env);
++
++	if (gres_env->global_list) {
++		env_array_overwrite(gres_env->env_ptr, slurm_env_var,
++				    gres_env->global_list);
++		xfree(gres_env->global_list);
++	} else {
++		unsetenvp(*gres_env->env_ptr, slurm_env_var);
++	}
++}
++
++#include <dirent.h>
++#include <fcntl.h>
++
++static int _read_file(const char *filename, char *buffer, size_t max_len)
++{
++	int fd = open(filename, O_RDONLY);
++	if (fd < 0)
++		return -1;
++	ssize_t len = read(fd, buffer, max_len - 1);
++	close(fd);
++	if (len > 0 && buffer[len - 1] == '\n') {
++		len--;
++	}
++	if (len >= 0)
++		buffer[len] = '\0';
++	return len;
++}
++
++static const char *_tpu_device_id_to_name(const char *device_id_hex)
++{
++	if (!tpu_config_list)
++		return "unknown";
++
++	tpu_config_t *conf = NULL;
++	list_itr_t *iter = list_iterator_create(tpu_config_list);
++	while ((conf = list_next(iter))) {
++		if (conf->pci_device_id && strncasecmp(conf->pci_device_id, device_id_hex, strlen(conf->pci_device_id)) == 0)
++			break;
++	}
++	list_iterator_destroy(iter);
++
++	if (conf)
++		return conf->type;
++
++	return "unknown";
++}
++
++static list_t *_get_system_tpu_list(void)
++{
++	list_t *gres_list = list_create(destroy_gres_slurmd_conf);
++	DIR *dir = opendir("/sys/bus/pci/devices/");
++	if (!dir)
++		return gres_list;
++
++	struct dirent *entry;
++	while ((entry = readdir(dir))) {
++		if (entry->d_name[0] == '.')
++			continue;
++
++		char path[PATH_MAX];
++		char vendor_str[32] = {0};
++
++		snprintf(path, sizeof(path), "/sys/bus/pci/devices/%s/vendor", entry->d_name);
++		if (_read_file(path, vendor_str, sizeof(vendor_str)) <= 0)
++			continue;
++
++		if (strncasecmp(vendor_str, "0x1ae0", 6) != 0)
++			continue;
++
++		char device_str[32] = {0};
++		snprintf(path, sizeof(path), "/sys/bus/pci/devices/%s/device", entry->d_name);
++		_read_file(path, device_str, sizeof(device_str));
++
++		snprintf(path, sizeof(path), "/sys/bus/pci/devices/%s/iommu_group", entry->d_name);
++		char target[PATH_MAX];
++		ssize_t len = readlink(path, target, sizeof(target) - 1);
++		if (len <= 0)
++			continue;
++		target[len] = '\0';
++		char *group_id = strrchr(target, '/');
++		if (!group_id)
++			continue;
++		group_id++;
++
++		char cpulist[128] = {0};
++		snprintf(path, sizeof(path), "/sys/bus/pci/devices/%s/local_cpulist", entry->d_name);
++		_read_file(path, cpulist, sizeof(cpulist));
++
++		gres_slurmd_conf_t *gres = xmalloc(sizeof(gres_slurmd_conf_t));
++		gres->name = xstrdup("tpu");
++		gres->file = xstrdup_printf("/dev/vfio/%s", group_id);
++		gres->cpus = NULL;
++		gres->count = 1;
++		gres->type_name = xstrdup(_tpu_device_id_to_name(device_str));
++		gres->config_flags = GRES_CONF_AUTODETECT | GRES_CONF_HAS_FILE;
++		gres->plugin_id = gres_build_id("tpu");
++
++		list_append(gres_list, gres);
++	}
++	closedir(dir);
++
++	return gres_list;
++}
++
++extern int gres_p_node_config_load(list_t *gres_conf_list,
++				   node_config_load_t *config)
++{
++	int rc = SLURM_SUCCESS;
++
++	if (gres_devices)
++		return rc;
++
++	list_t *system_tpus = _get_system_tpu_list();
++	if (system_tpus && list_count(system_tpus) > 0) {
++		/* Find existing generic tpu entry in gres_conf_list */
++		gres_slurmd_conf_t *conf = NULL;
++		list_itr_t *iter = list_iterator_create(gres_conf_list);
++		while ((conf = list_next(iter))) {
++			if (xstrcmp(conf->name, "tpu") == 0) {
++				if (!conf->type_name || xstrcmp(conf->type_name, "unknown") == 0) {
++					debug("gres/tpu: Found generic tpu entry, removing it in favor of auto-detected devices.");
++					list_delete_item(iter);
++					break;
++				}
++			}
++		}
++		list_iterator_destroy(iter);
++
++		/* Transfer the auto-detected devices */
++		list_transfer(gres_conf_list, system_tpus);
++	}
++	FREE_NULL_LIST(system_tpus);
++
++	rc = gres_node_config_load(gres_conf_list, config, &gres_devices);
++
++	if (rc != SLURM_SUCCESS)
++		fatal("%s failed to load configuration", plugin_name);
++
++	return rc;
++}
++
++extern void gres_p_job_set_env(char ***job_env_ptr,
++			       bitstr_t *gres_bit_alloc,
++			       uint64_t gres_cnt,
++			       gres_internal_flags_t flags)
++{
++	common_gres_env_t gres_env = {
++		.bit_alloc = gres_bit_alloc,
++		.env_ptr = job_env_ptr,
++		.flags = flags,
++		.gres_cnt = gres_cnt,
++		.gres_devices = gres_devices,
++		.is_job = true,
++	};
++	_set_env(&gres_env);
++}
++
++extern void gres_p_step_set_env(char ***step_env_ptr,
++				bitstr_t *gres_bit_alloc,
++				uint64_t gres_cnt,
++				gres_internal_flags_t flags)
++{
++	common_gres_env_t gres_env = {
++		.bit_alloc = gres_bit_alloc,
++		.env_ptr = step_env_ptr,
++		.flags = flags,
++		.gres_cnt = gres_cnt,
++		.gres_devices = gres_devices,
++	};
++	_set_env(&gres_env);
++}
++
++extern void gres_p_task_set_env(char ***task_env_ptr,
++				bitstr_t *gres_bit_alloc,
++				uint64_t gres_cnt,
++				bitstr_t *usable_gres,
++				gres_internal_flags_t flags)
++{
++	common_gres_env_t gres_env = {
++		.bit_alloc = gres_bit_alloc,
++		.env_ptr = task_env_ptr,
++		.flags = flags,
++		.gres_cnt = gres_cnt,
++		.gres_devices = gres_devices,
++		.is_task = true,
++		.usable_gres = usable_gres,
++	};
++	_set_env(&gres_env);
++}
++
++extern void gres_p_send_stepd(buf_t *buffer)
++{
++	gres_send_stepd(buffer, gres_devices);
++}
++
++extern void gres_p_recv_stepd(buf_t *buffer)
++{
++	gres_recv_stepd(buffer, &gres_devices);
++}
++
++extern list_t *gres_p_get_devices(void)
++{
++	return gres_devices;
++}
++
++extern void gres_p_step_hardware_init(bitstr_t *usable_gres, char *settings)
++{
++	return;
++}
++
++extern void gres_p_step_hardware_fini(void)
++{
++	return;
++}
++
++extern gres_prep_t *gres_p_prep_build_env(
++	gres_job_state_t *gres_js)
++{
++	return NULL;
++}
++
++extern void gres_p_prep_set_env(char ***prep_env_ptr,
++				gres_prep_t *gres_prep, int node_inx)
++{
++	return;
++}
++
++extern int init(void)
++{
++	debug("%s: %s loaded", __func__, plugin_name);
++	return _load_tpu_conf();
++}
++
++extern void fini(void)
++{
++	debug("%s: unloading %s", __func__, plugin_name);
++	FREE_NULL_LIST(tpu_config_list);
++	FREE_NULL_LIST(gres_devices);
++}
+diff --git a/src/plugins/job_submit/Makefile.am b/src/plugins/job_submit/Makefile.am
+index d3cc06bba6..fc9a5ba5d6 100644
+--- a/src/plugins/job_submit/Makefile.am
++++ b/src/plugins/job_submit/Makefile.am
+@@ -7,7 +7,8 @@ SUBDIRS = \
+ 	partition \
+ 	pbs \
+ 	require_timelimit \
+-	throttle
++	throttle \
++	tpu
+
+ if HAVE_LUA
+ SUBDIRS += lua
+diff --git a/src/plugins/job_submit/tpu/Makefile.am b/src/plugins/job_submit/tpu/Makefile.am
+new file mode 100644
+index 0000000000..91f577bfd1
+--- /dev/null
++++ b/src/plugins/job_submit/tpu/Makefile.am
+@@ -0,0 +1,13 @@
++# Makefile for job_submit/tpu plugin
++
++AUTOMAKE_OPTIONS = foreign
++
++PLUGIN_FLAGS = -module -avoid-version --export-dynamic
++
++AM_CPPFLAGS = -DSLURM_PLUGIN_DEBUG -I$(top_srcdir)
++
++pkglib_LTLIBRARIES = job_submit_tpu.la
++
++# Job submit tpu plugin.
++job_submit_tpu_la_SOURCES = job_submit_tpu.c
++job_submit_tpu_la_LDFLAGS = $(PLUGIN_FLAGS)
+diff --git a/src/plugins/job_submit/tpu/job_submit_tpu.c b/src/plugins/job_submit/tpu/job_submit_tpu.c
+new file mode 100644
+index 0000000000..bc6a0a857a
+--- /dev/null
++++ b/src/plugins/job_submit/tpu/job_submit_tpu.c
+@@ -0,0 +1,229 @@
++#include <inttypes.h>
++#include <stdio.h>
++#include <string.h>
++#include <sys/types.h>
++#include <unistd.h>
++
++#include "slurm/slurm_errno.h"
++#include "src/common/slurm_xlator.h"
++
++#include "src/common/log.h"
++#include "src/common/xmalloc.h"
++#include "src/common/xstring.h"
++#include "src/common/list.h"
++#include "src/common/parse_config.h"
++#include "src/common/read_config.h"
++#include "src/slurmctld/slurmctld.h"
++
++/* Required Slurm plugin symbols: */
++const char plugin_name[] = "Job submit tpu plugin";
++const char plugin_type[] = "job_submit/tpu";
++const uint32_t plugin_version = SLURM_VERSION_NUMBER;
++
++typedef struct {
++	char *type;
++	uint32_t chips_per_node;
++	uint16_t dimensions;
++	uint32_t nodes_per_sub_block;
++	uint32_t nodes_per_block;
++	char *pci_device_id;
++} tpu_config_t;
++
++static list_t *tpu_config_list = NULL;
++
++static void _tpu_config_destroy(void *x)
++{
++	tpu_config_t *conf = (tpu_config_t *)x;
++	xfree(conf->type);
++	xfree(conf->pci_device_id);
++	xfree(conf);
++}
++
++static int _load_tpu_conf(void)
++{
++	s_p_options_t tpu_options[] = {
++		{"TPUType", S_P_STRING},
++		{"ChipsPerNode", S_P_UINT32},
++		{"Dimensions", S_P_UINT16},
++		{"NodesPerSubBlock", S_P_UINT32},
++		{"NodesPerBlock", S_P_UINT32},
++		{"PciDeviceId", S_P_STRING},
++		{NULL}
++	};
++
++	s_p_options_t options[] = {
++		{"TPUType", S_P_LINE, NULL, NULL, tpu_options},
++		{NULL}
++	};
++
++	s_p_hashtbl_t *tbl = s_p_hashtbl_create(options);
++	char *conf_path = get_extra_conf_path("tpu.conf");
++
++	if (s_p_parse_file(tbl, NULL, conf_path, 0, NULL) == SLURM_ERROR) {
++		error("job_submit/tpu: Failed to parse %s", conf_path);
++		xfree(conf_path);
++		s_p_hashtbl_destroy(tbl);
++		return SLURM_ERROR;
++	}
++	xfree(conf_path);
++
++	tpu_config_list = list_create(_tpu_config_destroy);
++
++	s_p_hashtbl_t **tpu_tbls;
++	int count = 0;
++	if (s_p_get_line(&tpu_tbls, &count, "TPUType", tbl)) {
++		for (int i = 0; i < count; i++) {
++			tpu_config_t *conf = xmalloc(sizeof(tpu_config_t));
++			s_p_get_string(&conf->type, "TPUType", tpu_tbls[i]);
++			s_p_get_uint32(&conf->chips_per_node, "ChipsPerNode", tpu_tbls[i]);
++			s_p_get_uint16(&conf->dimensions, "Dimensions", tpu_tbls[i]);
++			s_p_get_uint32(&conf->nodes_per_sub_block, "NodesPerSubBlock", tpu_tbls[i]);
++			s_p_get_uint32(&conf->nodes_per_block, "NodesPerBlock", tpu_tbls[i]);
++			s_p_get_string(&conf->pci_device_id, "PciDeviceId", tpu_tbls[i]);
++
++			list_append(tpu_config_list, conf);
++			debug("job_submit/tpu: Loaded config for %s", conf->type);
++		}
++	}
++
++	s_p_hashtbl_destroy(tbl);
++	return SLURM_SUCCESS;
++}
++
++static int _process_accelerator_topology(job_desc_msg_t *job_desc, char **err_msg)
++{
++	if (!job_desc->accelerator_topology)
++		return SLURM_SUCCESS;
++
++	if (!tpu_config_list) {
++		if (_load_tpu_conf() != SLURM_SUCCESS) {
++			if (err_msg) *err_msg = xstrdup("Failed to load TPU configuration.");
++			return SLURM_ERROR;
++		}
++	}
++
++	char *tpu_str = xstrdup(job_desc->accelerator_topology);
++	char *colon = strchr(tpu_str, ':');
++
++	if (!colon) {
++		error("job_submit/tpu: Invalid accelerator-topology format (%s). Expected [TYPE]:[TOPOLOGY]", job_desc->accelerator_topology);
++		if (err_msg) *err_msg = xstrdup("Invalid accelerator-topology format. Expected [TYPE]:[TOPOLOGY]");
++		xfree(tpu_str);
++		return SLURM_ERROR;
++	}
++
++	*colon = '\0';
++	char *tpu_type = tpu_str;
++	char *tpu_topology = colon + 1;
++
++	debug("job_submit/tpu: Processing accelerator topology request %s:%s", tpu_type, tpu_topology);
++
++	tpu_config_t *conf = NULL;
++	list_itr_t *iter = list_iterator_create(tpu_config_list);
++	while ((conf = list_next(iter))) {
++		if (xstrcmp(conf->type, tpu_type) == 0)
++			break;
++	}
++	list_iterator_destroy(iter);
++
++	if (!conf) {
++		error("job_submit/tpu: Unknown TPU type %s", tpu_type);
++		if (err_msg) *err_msg = xstrdup_printf("Unknown TPU type %s", tpu_type);
++		xfree(tpu_str);
++		return SLURM_ERROR;
++	}
++
++	int x = 0, y = 0, z = 0;
++	uint32_t num_nodes = 0;
++	uint32_t num_chips = 0;
++	uint32_t tres_count = 1;
++
++	if (conf->dimensions == 2) {
++		if (sscanf(tpu_topology, "%dx%d", &x, &y) == 2 ||
++		    sscanf(tpu_topology, "%d_%d", &x, &y) == 2) {
++			num_chips = x * y;
++			num_nodes = num_chips / conf->chips_per_node;
++			tres_count = (num_chips < conf->chips_per_node) ? (num_chips == 0 ? 1 : num_chips) : conf->chips_per_node;
++
++
++		} else {
++			if (err_msg) *err_msg = xstrdup_printf("Invalid topology format %s for 2D TPU", tpu_topology);
++			xfree(tpu_str);
++			return SLURM_ERROR;
++		}
++	} else if (conf->dimensions == 3) {
++		if (sscanf(tpu_topology, "%dx%dx%d", &x, &y, &z) == 3 ||
++		    sscanf(tpu_topology, "%d_%d_%d", &x, &y, &z) == 3) {
++			num_chips = x * y * z;
++			num_nodes = num_chips / conf->chips_per_node;
++			tres_count = (num_chips < conf->chips_per_node) ? (num_chips == 0 ? 1 : num_chips) : conf->chips_per_node;
++
++
++		} else {
++			if (err_msg) *err_msg = xstrdup_printf("Invalid topology format %s for 3D TPU", tpu_topology);
++			xfree(tpu_str);
++			return SLURM_ERROR;
++		}
++	}
++
++	if (num_nodes > 0) {
++		if (job_desc->min_nodes == 0 || job_desc->min_nodes == NO_VAL ||
++		    (job_desc->min_nodes == 1 && num_nodes > 1)) {
++			job_desc->min_nodes = num_nodes;
++			job_desc->max_nodes = num_nodes;
++		} else if (job_desc->min_nodes != num_nodes) {
++			error("job_submit/tpu: Requested node count (%u) does not match topology shape %s (requires %u nodes)",
++			      job_desc->min_nodes, tpu_topology, num_nodes);
++			if (err_msg) *err_msg = xstrdup("Node count does not match topology shape");
++			xfree(tpu_str);
++			return SLURM_ERROR;
++		}
++	}
++
++	if (num_nodes > conf->nodes_per_block) {
++		error("job_submit/tpu: Requested nodes %u exceeds NodesPerBlock limit %u for %s",
++		      num_nodes, conf->nodes_per_block, tpu_type);
++		if (err_msg) *err_msg = xstrdup_printf("Requested nodes exceeds limit for %s", tpu_type);
++		xfree(tpu_str);
++		return SLURM_ERROR;
++	}
++
++	/* Append to GRES (tres_per_node) */
++	if (job_desc->tres_per_node) {
++		char *new_tres = xstrdup_printf("%s,gres/tpu:%s:%u", job_desc->tres_per_node, tpu_type, tres_count);
++		xfree(job_desc->tres_per_node);
++		job_desc->tres_per_node = new_tres;
++	} else {
++		job_desc->tres_per_node = xstrdup_printf("gres/tpu:%s:%u", tpu_type, tres_count);
++	}
++
++	debug("job_submit/tpu: Computed accelerator_topology %s -> tres_per_node=%s features=%s min_nodes=%u",
++	      job_desc->accelerator_topology, job_desc->tres_per_node, job_desc->features, job_desc->min_nodes);
++
++	xfree(tpu_str);
++	return SLURM_SUCCESS;
++}
++
++extern int job_submit(job_desc_msg_t *job_desc, uint32_t submit_uid,
++		      char **err_msg)
++{
++	return _process_accelerator_topology(job_desc, err_msg);
++}
++
++extern int job_modify(job_desc_msg_t *job_desc, job_record_t *job_ptr,
++		      uint32_t submit_uid, char **err_msg)
++{
++	return _process_accelerator_topology(job_desc, err_msg);
++}
++
++extern int init(void)
++{
++	debug("%s: %s loaded", __func__, plugin_name);
++	return SLURM_SUCCESS;
++}
++
++extern void fini(void)
++{
++	debug("%s: unloading %s", __func__, plugin_name);
++	FREE_NULL_LIST(tpu_config_list);
++}
+diff --git a/src/salloc/opt.c b/src/salloc/opt.c
+index 9a54ab76fc..c95668f24c 100644
+--- a/src/salloc/opt.c
++++ b/src/salloc/opt.c
+@@ -803,7 +803,7 @@ static void _usage(void)
+ "              [--cpus-per-gpu=n] [--gpus=n] [--gpu-bind=...] [--gpu-freq=...]\n"
+ "              [--gpus-per-node=n] [--gpus-per-socket=n] [--gpus-per-task=n]\n"
+ "              [--mem-per-gpu=MB] [--tres-bind=...] [--tres-per-task=list]\n"
+-"              [--oom-kill-step[=0|1]]\n"
++"              [--accelerator-topology=<family>:<shape>] [--oom-kill-step[=0|1]]\n"
+ "              [command [args...]]\n");
+ }
+
+@@ -946,6 +946,14 @@ static void _help(void)
+ 		);
+ 	spank_print_options(stdout, 6, 30);
+
++	printf("\n"
++"Accelerator topology options:\n"
++"      --accelerator-topology=<family>:<shape>\n"
++"                              Specify the accelerator family and geometric topology\n"
++"                              shape for the job, as defined in tpu.conf.\n"
++"                              Examples: 'v6e:4x4' (2D), 'tpu7x:2x2x4' (3D).\n"
++		);
++
+ 	printf("\n"
+ "\n"
+ "Help options:\n"
+diff --git a/src/sbatch/opt.c b/src/sbatch/opt.c
+index d6701a65a3..20ee1fa6f5 100644
+--- a/src/sbatch/opt.c
++++ b/src/sbatch/opt.c
+@@ -1105,7 +1105,7 @@ static void _usage(void)
+ "              [--cpus-per-gpu=n] [--gpus=n] [--gpu-bind=...] [--gpu-freq=...]\n"
+ "              [--gpus-per-node=n] [--gpus-per-socket=n] [--gpus-per-task=n]\n"
+ "              [--mem-per-gpu=MB] [--tres-bind=...] [--tres-per-task=list]\n"
+-"              [--oom-kill-step[=0|1]]\n"
++"              [--accelerator-topology=<family>:<shape>] [--oom-kill-step[=0|1]]\n"
+ "              executable [args...]\n");
+ }
+
+@@ -1263,6 +1263,14 @@ static void _help(void)
+ "      --mem-per-gpu=n         real memory required per allocated GPU\n"
+ 		);
+
++	printf("\n"
++"Accelerator topology options:\n"
++"      --accelerator-topology=<family>:<shape>\n"
++"                              Specify the accelerator family and geometric topology\n"
++"                              shape for the job, as defined in tpu.conf.\n"
++"                              Examples: 'v6e:4x4' (2D), 'tpu7x:2x2x4' (3D).\n"
++		);
++
+ 	printf("\n"
+ "Help options:\n"
+ "  -h, --help                  show this help message\n"
+diff --git a/src/scontrol/info_job.c b/src/scontrol/info_job.c
+index e7390ef396..7003910c30 100644
+--- a/src/scontrol/info_job.c
++++ b/src/scontrol/info_job.c
+@@ -908,6 +908,11 @@ static char *_sprint_job_info(job_info_t *job_ptr)
+ 		xstrcat(out, line_end);
+ 	}
+
++	if (job_ptr->accelerator_topology) {
++		xstrfmtcat(out, "AcceleratorTopology=%s", job_ptr->accelerator_topology);
++		xstrcat(out, line_end);
++	}
++
+ 	/****** Line (optional) ******/
+ 	if (job_ptr->tres_per_socket) {
+ 		xstrfmtcat(out, "TresPerSocket=%s", job_ptr->tres_per_socket);
+diff --git a/src/slurmctld/job_mgr.c b/src/slurmctld/job_mgr.c
+index 444dcbf7c9..0012b5f410 100644
+--- a/src/slurmctld/job_mgr.c
++++ b/src/slurmctld/job_mgr.c
+@@ -8762,6 +8762,7 @@ static int _copy_job_desc_to_job_record(job_desc_msg_t *job_desc,
+ 	job_ptr->restart_cnt = job_desc->restart_cnt;
+ 	job_ptr->comment    = xstrdup(job_desc->comment);
+ 	job_ptr->extra = xstrdup(job_desc->extra);
++	job_ptr->accelerator_topology = xstrdup(job_desc->accelerator_topology);
+ 	job_ptr->container = xstrdup(job_desc->container);
+ 	job_ptr->container_id = xstrdup(job_desc->container_id);
+ 	job_ptr->container_type = xstrdup(job_desc->container_type);
+diff --git a/src/slurmctld/power_save.c b/src/slurmctld/power_save.c
+index 2b6fdc2810..7c36ec5ed6 100644
+--- a/src/slurmctld/power_save.c
++++ b/src/slurmctld/power_save.c
+@@ -653,6 +653,10 @@ static void _do_power_work(time_t now, bool auto_power_save_enabled)
+ 						job_ptr)));
+ 		data_set_string(data_key_set(job_node_data, "extra"),
+ 				job_ptr->extra);
++		if (job_ptr->accelerator_topology) {
++			data_set_string(data_key_set(job_node_data, "accelerator_topology"),
++					job_ptr->accelerator_topology);
++		}
+ 		data_set_int(data_key_set(job_node_data, "job_id"),
+ 			     job_ptr->job_id);
+ 		data_set_int(data_key_set(job_node_data, "priority"),
+diff --git a/src/srun/opt.c b/src/srun/opt.c
+index d534c20dcd..1b1c2489ff 100644
+--- a/src/srun/opt.c
++++ b/src/srun/opt.c
+@@ -1556,7 +1556,7 @@ static void _usage(void)
+ "            [--cpus-per-gpu=n] [--gpus=n] [--gpu-bind=...] [--gpu-freq=...]\n"
+ "            [--gpus-per-node=n] [--gpus-per-socket=n] [--gpus-per-task=n]\n"
+ "            [--mem-per-gpu=MB] [--tres-bind=...] [--tres-per-task=list]\n"
+-"            [--oom-kill-step[=0|1]] [--ignore-signals=signals...]\n"
++"            [--accelerator-topology=<family>:<shape>] [--oom-kill-step[=0|1]] [--ignore-signals=signals...]\n"
+ "            [--async] [--parsable]\n"
+ "            executable [args...]\n");
+
+@@ -1749,6 +1749,14 @@ static void _help(void)
+ "      --mem-per-gpu=n         real memory required per allocated GPU\n"
+ 		);
+
++	printf("\n"
++"Accelerator topology options:\n"
++"      --accelerator-topology=<family>:<shape>\n"
++"                              Specify the accelerator family and geometric topology\n"
++"                              shape for the job, as defined in tpu.conf.\n"
++"                              Examples: 'v6e:4x4' (2D), 'tpu7x:2x2x4' (3D).\n"
++		);
++
+ 	printf("\n"
+ "Help options:\n"
+ "  -h, --help                  show this help message\n"

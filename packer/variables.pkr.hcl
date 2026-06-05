@@ -109,7 +109,7 @@ This value can be:
 > NOTE: Use prefix 'b:' to install via 'git checkout' instead of archive.
 EOD
   type        = string
-  default     = "25.11.4"
+  default     = "26.05.0"
 
   validation {
     condition     = can(regex("^(?P<major>\\d{2})\\.(?P<minor>\\d{2})(?P<end>\\.(?P<patch>\\d+)(?P<sub>-(?P<rev>\\d+\\w*))?|\\-(?P<meta>latest))$|^b:(?P<branch>.+)$", var.slurm_version))
@@ -148,7 +148,7 @@ variable "install_cuda" {
 variable "slurm_patch_files" {
   description = "Name of .patch file (or files) that should be applied to Slurm during image building, assumed to be stored under /ansible/roles/slurm/tasks/files/patch/"
   type        = list(string)
-  default     = []
+  default     = ["tpu-2605.patch"]
 }
 
 variable "nvidia_version" {
