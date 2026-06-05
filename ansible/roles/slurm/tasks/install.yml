@@ -54,6 +54,13 @@
   ignore_errors: true
   when: slurm_patch_files != []
 
+# For any build dependencies added by patches
+- name: Regenerate configure script
+  shell:
+    cmd: autoreconf -i -f
+    chdir: '{{slurm_paths.src}}'
+  when: slurm_patch_files != []
+
 - name: Configure
   shell:
     cmd: >
