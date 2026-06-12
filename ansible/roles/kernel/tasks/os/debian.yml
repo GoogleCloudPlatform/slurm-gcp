@@ -34,12 +34,51 @@
     setup:
   when: reboot
 
-- name: Install running kernel headers and metapackage to ensure upgrades
+- name: Install kernel headers metapackage
   ansible.builtin.apt:
-    name:
-    - linux-headers-{{ ansible_kernel }}
-    - "{{ kernel_headers_package }}"
+    name: "{{ kernel_headers_package }}"
   when: not tpu_docker_image
+
+- name: Install running kernel headers
+  ansible.builtin.apt:
+    name: "linux-headers-{{ ansible_kernel }}"
+  when:
+  - not tpu_docker_image
+  - ansible_kernel != "6.1.0-43-cloud-amd64" # Skip if we are using the manual workaround
+
+- name: Workaround for missing Debian 12 kernel headers (6.1.0-43)
+  when:
+  - ansible_distribution == "Debian"
+  - ansible_kernel == "6.1.0-43-cloud-amd64"
+  - not tpu_docker_image
+  block:
+  - name: Download specific kernel headers and common dependency
+    ansible.builtin.get_url:
+      url: "{{ deb_info.url }}"
+      dest: "{{ deb_info.dest }}"
+      checksum: "sha1:{{ deb_info.checksum }}"
+      mode: '0644' # Added explicit mode
+    loop:
+    - {url: "https://snapshot.debian.org/archive/debian/20260219T203930Z/pool/main/l/linux/linux-headers-6.1.0-43-common_6.1.162-1_all.deb", dest: "/tmp/linux-headers-6.1.0-43-common.deb", checksum: "566a4d70d4be67cda86f36fb8a10efe2fcce9138"}
+    - {url: "https://snapshot.debian.org/archive/debian/20260219T203930Z/pool/main/l/linux/linux-headers-6.1.0-43-cloud-amd64_6.1.162-1_amd64.deb", dest: "/tmp/linux-headers-6.1.0-43-cloud-amd64.deb", checksum: "07d78100f45443669eebac0875b068b1bb506e5f"}
+    loop_control: {loop_var: deb_info}
+
+  - name: Install downloaded kernel headers
+    ansible.builtin.apt:
+      deb: "{{ deb_path }}"
+    loop:
+    - "/tmp/linux-headers-6.1.0-43-common.deb"
+    - "/tmp/linux-headers-6.1.0-43-cloud-amd64.deb"
+    loop_control: {loop_var: deb_path}
+
+  - name: Clean up downloaded debs
+    ansible.builtin.file:
+      path: "{{ deb_path }}"
+      state: absent
+    loop:
+    - "/tmp/linux-headers-6.1.0-43-common.deb"
+    - "/tmp/linux-headers-6.1.0-43-cloud-amd64.deb"
+    loop_control: {loop_var: deb_path}
 
 - name: Install generic kernel headers
   ansible.builtin.apt:
