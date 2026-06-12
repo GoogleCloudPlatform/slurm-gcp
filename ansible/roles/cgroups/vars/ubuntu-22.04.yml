@@ -20,6 +20,6 @@ cgroup_packages:
 - libdbus-1-dev
 
 cgroup_grub_cmdline_linux:
-- systemd.unified_cgroup_hierarchy=0
+- systemd.unified_cgroup_hierarchy=1
 - cgroup_enable=memory
 - swapaccount=1
