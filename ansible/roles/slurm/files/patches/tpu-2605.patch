@@ -64,7 +64,7 @@ index 0000000000..5d6a1384a6
 @@ -0,0 +1,13 @@
 +# Example tpu.conf
 +# Supported parameters:
-+# TPUType: Identifier string (e.g., v5e, v5p, v6e, 7x)
++# TPUType: Identifier string (e.g., v5e, v5p, v6e, tpu7x)
 +# ChipsPerNode: Number of chips per node (default: 4)
 +# Dimensions: 2 or 3
 +# NodesPerSubBlock: Number of nodes per sub-block
@@ -74,7 +74,7 @@ index 0000000000..5d6a1384a6
 +TPUType=v5e ChipsPerNode=4 Dimensions=2 NodesPerSubBlock=64 NodesPerBlock=64 PciDeviceId=0x0063
 +TPUType=v5p ChipsPerNode=4 Dimensions=3 NodesPerSubBlock=16 NodesPerBlock=2240 PciDeviceId=0x0062
 +TPUType=v6e ChipsPerNode=4 Dimensions=2 NodesPerSubBlock=64 NodesPerBlock=64 PciDeviceId=0x006f
-+TPUType=7x ChipsPerNode=4 Dimensions=3 NodesPerSubBlock=16 NodesPerBlock=2304 PciDeviceId=0x0076
++TPUType=tpu7x ChipsPerNode=4 Dimensions=3 NodesPerSubBlock=16 NodesPerBlock=2304 PciDeviceId=0x0076
 diff --git a/slurm/slurm.h b/slurm/slurm.h
 index 2e87869f3f..dec929eef7 100644
 --- a/slurm/slurm.h
@@ -396,7 +396,7 @@ new file mode 100644
 index 0000000000..42c7075443
 --- /dev/null
 +++ b/src/plugins/cli_filter/tpu/cli_filter_tpu.c
-@@ -0,0 +1,219 @@
+@@ -0,0 +1,231 @@
 +#include <inttypes.h>
 +#include <stdio.h>
 +#include <string.h>
@@ -541,6 +541,12 @@ index 0000000000..42c7075443
 +		if (sscanf(tpu_topology, "%dx%d", &x, &y) == 2 ||
 +		    sscanf(tpu_topology, "%d_%d", &x, &y) == 2) {
 +			num_chips = x * y;
++
++			if (x > y) {
++				error("cli_filter/tpu: Malformed 2D TPU topology %s: expected x <= y", tpu_topology);
++				xfree(tpu_str);
++				return SLURM_ERROR;
++			}
 +			num_nodes = num_chips / conf->chips_per_node;
 +
 +		} else {
@@ -552,6 +558,12 @@ index 0000000000..42c7075443
 +		if (sscanf(tpu_topology, "%dx%dx%d", &x, &y, &z) == 3 ||
 +		    sscanf(tpu_topology, "%d_%d_%d", &x, &y, &z) == 3) {
 +			num_chips = x * y * z;
++
++			if (num_chips > 64 && (x > y || y > z)) {
++				error("cli_filter/tpu: Malformed 3D TPU topology %s: expected x <= y <= z", tpu_topology);
++				xfree(tpu_str);
++				return SLURM_ERROR;
++			}
 +			num_nodes = num_chips / conf->chips_per_node;
 +
 +		} else {
