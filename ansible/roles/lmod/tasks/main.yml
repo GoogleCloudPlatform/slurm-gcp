@@ -21,41 +21,50 @@
   - os/{{ ansible_distribution|lower }}.yml
   - os/{{ ansible_os_family|lower }}.yml
 
-- name: Mkdir
-  file:
-    path: '{{item}}'
-    state: directory
-  loop:
-  - '{{paths.apps}}'
-  - '{{paths.modulefiles}}'
+- name: Install Lmod via package manager
+  package:
+    name: Lmod
+    state: present
+  when: lmod_source == 'rpm'
 
-- name: Git Clone
-  git:
-    repo: '{{lmod_git_url}}'
-    dest: '{{lmod_paths.src}}'
-    version: '{{lmod_version}}'
-    clone: yes
-    depth: '1'
+- name: Install Lmod from source
+  when: lmod_source == 'git'
+  block:
+  - name: Mkdir
+    file:
+      path: '{{item}}'
+      state: directory
+    loop:
+    - '{{paths.apps}}'
+    - '{{paths.modulefiles}}'
 
-- name: Create Modulespath
-  template:
-    src: modulespath.j2
-    dest: '{{paths.apps}}/lmod/.modulespath'
-    mode: 0644
+  - name: Git Clone
+    git:
+      repo: '{{lmod_git_url}}'
+      dest: '{{lmod_paths.src}}'
+      version: '{{lmod_version}}'
+      clone: yes
+      depth: '1'
 
-- name: Configure
-  shell:
-    cmd: >
-      {{lmod_paths.src}}/configure
-      --prefix={{paths.apps}}
-      --with-ModulePathInit={{paths.apps}}/lmod/.modulespath
-      > /dev/null
-    chdir: '{{lmod_paths.src}}'
+  - name: Create Modulespath
+    template:
+      src: modulespath.j2
+      dest: '{{paths.apps}}/lmod/.modulespath'
+      mode: 0644
 
-- name: Make Install
-  shell:
-    cmd: make install > /dev/null
-    chdir: '{{lmod_paths.src}}'
+  - name: Configure
+    shell:
+      cmd: >
+        {{lmod_paths.src}}/configure
+        --prefix={{paths.apps}}
+        --with-ModulePathInit={{paths.apps}}/lmod/.modulespath
+        > /dev/null
+      chdir: '{{lmod_paths.src}}'
+
+  - name: Make Install
+    shell:
+      cmd: make install > /dev/null
+      chdir: '{{lmod_paths.src}}'
 
 - name: Disable conflicting default module/scl profile scripts
   ansible.builtin.file:

@@ -65,6 +65,10 @@
     install_pmix: true
     install_pyxis: true
     allow_kernel_upgrades: true
+    install_lmod: true
+    lmod_source: "git"
+    install_environment_modules: false
+    install_scl_utils: false
 
   pre_tasks:
   - name: Minimum Ansible Version Check
@@ -178,7 +182,8 @@
     - install_munge
   - mariadb
   - libjwt
-  - lmod
+  - role: lmod
+    when: install_lmod
   - role: slurm
     when: install_slurm
   - role: slurmcmd

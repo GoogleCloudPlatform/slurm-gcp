@@ -16,6 +16,7 @@
 dependencies:
 - role: common
 - role: lmod
+  when: install_lmod
 - role: slurm
   vars:
     handle_services: false
