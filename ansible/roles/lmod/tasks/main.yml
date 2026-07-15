@@ -23,7 +23,7 @@
 
 - name: Install Lmod via package manager
   package:
-    name: Lmod
+    name: "{{ 'Lmod' if ansible_os_family == 'RedHat' else 'lmod' }}"
     state: present
   when: lmod_source == 'rpm'
 
@@ -66,23 +66,12 @@
       cmd: make install > /dev/null
       chdir: '{{lmod_paths.src}}'
 
-- name: Disable conflicting default module/scl profile scripts
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-  - /etc/profile.d/modules.sh
-  - /etc/profile.d/modules.csh
-  - /etc/profile.d/scl-init.sh
-  - /etc/profile.d/scl.sh
-  when: ansible_os_family == 'RedHat'
-
-- name: Symbolic Link
-  file:
-    src: '{{item.src}}'
-    dest: '{{item.dest}}'
-    state: link
-  with_items:
-  - {src: '{{lmod_paths.build}}/init/profile', dest: /etc/profile.d/z00_lmod.sh}
-  - {src: '{{lmod_paths.build}}/init/cshrc', dest: /etc/profile.d/z00_lmod.csh,}
-  # - { src: "{{lmod_paths.build}}/init/profile.fish", dest: "/etc/fish/conf.d/z00_lmod.fish" }
+  - name: Symbolic Link
+    file:
+      src: '{{item.src}}'
+      dest: '{{item.dest}}'
+      state: link
+    with_items:
+    - {src: '{{lmod_paths.build}}/init/profile', dest: /etc/profile.d/z00_lmod.sh}
+    - {src: '{{lmod_paths.build}}/init/cshrc', dest: /etc/profile.d/z00_lmod.csh,}
+    # - { src: "{{lmod_paths.build}}/init/profile.fish", dest: "/etc/fish/conf.d/z00_lmod.fish" }
