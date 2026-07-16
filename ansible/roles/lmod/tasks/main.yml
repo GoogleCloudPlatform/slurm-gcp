@@ -27,6 +27,19 @@
     state: present
   when: lmod_source == 'rpm'
 
+- name: Ensure OS modulefiles directory exists
+  file:
+    path: /usr/share/modulefiles
+    state: directory
+  when: lmod_source == 'rpm'
+
+- name: Link custom modulefiles to system default path (RPM)
+  file:
+    src: '{{paths.modulefiles}}'
+    dest: /usr/share/modulefiles/slurm-gcp
+    state: link
+  when: lmod_source == 'rpm'
+
 - name: Install Lmod from source
   when: lmod_source == 'git'
   block:
