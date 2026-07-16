@@ -21,6 +21,14 @@
   - os/{{ ansible_distribution|lower }}.yml
   - os/{{ ansible_os_family|lower }}.yml
 
+- name: Ensure custom modulefiles directory exists
+  file:
+    path: '{{item}}'
+    state: directory
+  loop:
+    - '{{paths.apps}}'
+    - '{{paths.modulefiles}}'
+
 - name: Install Lmod via package manager
   package:
     name: "{{ 'Lmod' if ansible_os_family == 'RedHat' else 'lmod' }}"
@@ -43,14 +51,6 @@
 - name: Install Lmod from source
   when: lmod_source == 'git'
   block:
-  - name: Mkdir
-    file:
-      path: '{{item}}'
-      state: directory
-    loop:
-    - '{{paths.apps}}'
-    - '{{paths.modulefiles}}'
-
   - name: Git Clone
     git:
       repo: '{{lmod_git_url}}'
