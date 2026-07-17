@@ -1,4 +1,3 @@
----
 # Copyright (C) SchedMD LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,32 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-slurm_packages:
-- cifs-utils
-- gtk2-devel
-- hdf5-devel
-- http-parser-devel
-- hwloc
-- hwloc-devel
-- hwloc-gui
-- json-c-devel
-- libcurl-devel
-- libevent-devel
-- libibmad
-- libibumad
-- libyaml-devel
-- lua
-- lua-devel
-- lz4-devel
-- man2html-core
-- ncurses-devel
-- numactl
-- numactl-devel
-- openssl-devel
-- pam-devel
-- perl-ExtUtils-MakeMaker
-- readline-devel
-- rrdtool-devel
-- perl-devel
-- perl-ExtUtils-ParseXS
-- perl-ExtUtils-Embed
+###########
+# GENERAL #
+###########
+
+project_id = "<PROJECT_ID>"
+zone       = "us-central1-a"
+
+#########
+# IMAGE #
+#########
+
+# NOTE: Your Project ID will be automatically appended
+source_image_project_id = "cloud-hpc-image-public"
+
+#source_image        = null
+source_image_family = "hpc-rocky-linux-9"
+
+# *NOT* intended for production use
+# skip_create_image = true
+
+#############
+# PROVISION #
+#############
+
+# slurm_version = null

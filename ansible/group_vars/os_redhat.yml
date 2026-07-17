@@ -1,5 +1,5 @@
 ---
-# Copyright (C) SchedMD LLC.
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,32 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-slurm_packages:
-- cifs-utils
-- gtk2-devel
-- hdf5-devel
-- http-parser-devel
-- hwloc
-- hwloc-devel
-- hwloc-gui
-- json-c-devel
-- libcurl-devel
-- libevent-devel
-- libibmad
-- libibumad
-- libyaml-devel
-- lua
-- lua-devel
-- lz4-devel
-- man2html-core
-- ncurses-devel
-- numactl
-- numactl-devel
-- openssl-devel
-- pam-devel
-- perl-ExtUtils-MakeMaker
-- readline-devel
-- rrdtool-devel
-- perl-devel
-- perl-ExtUtils-ParseXS
-- perl-ExtUtils-Embed
+kernel_packages:
+- kernel
+- kernel-core
+- kernel-devel
+- kernel-headers
+- kernel-modules*
+- kernel-tools*
+
+rdma_packages:
+- rdma-core*
+- libibverbs*
+- librdmacm*
+- libibumad*
+- infiniband-diags*

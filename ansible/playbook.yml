@@ -140,6 +140,85 @@
     loop: "{{ kernel_packages }}"
     when: ansible_os_family == "Debian"
 
+  - name: Install dnf versionlock plugin before running playbook (RedHat/Rocky)
+    ansible.builtin.package:
+      name: python3-dnf-plugin-versionlock
+      state: present
+    when: ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
+
+  - name: Freeze kernel before running playbook (RedHat/Rocky)
+    ansible.builtin.command:
+      argv:
+      - dnf
+      - versionlock
+      - add
+      - "{{ item }}"
+    loop: "{{ kernel_packages }}"
+    register: versionlock_add
+    changed_when: "'Adding versionlock on:' in versionlock_add.stdout"
+    when: ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
+
+  - name: Get installed CIQ rdma-core version (RedHat/Rocky)
+    ansible.builtin.command: rpm -q --qf '%{VERSION}-%{RELEASE}' rdma-core
+    register: rdma_core_ver
+    failed_when: false
+    changed_when: false
+    when: ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
+
+  - name: Align and pre-install exact CIQ RDMA/verbs stack to match base driver (RedHat/Rocky)
+    ansible.builtin.dnf:
+      name:
+      - "rdma-core-{{ rdma_core_ver.stdout | trim }}"
+      - "rdma-core-devel-{{ rdma_core_ver.stdout | trim }}"
+      - "libibverbs-{{ rdma_core_ver.stdout | trim }}"
+      - "libibverbs-utils-{{ rdma_core_ver.stdout | trim }}"
+      - "librdmacm-{{ rdma_core_ver.stdout | trim }}"
+      - "librdmacm-utils-{{ rdma_core_ver.stdout | trim }}"
+      - "libibumad-{{ rdma_core_ver.stdout | trim }}"
+      - "infiniband-diags-{{ rdma_core_ver.stdout | trim }}"
+      state: present
+      allow_erasing: true
+      disable_excludes: ciq-sigcloud-next
+      disable_plugin: protected-kmods
+    when:
+    - ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
+    - rdma_core_ver.rc | default(-1) == 0 and 'ciq' in rdma_core_ver.stdout | default('')
+
+  - name: Build and install perftest (ib_send_bw) from source against locked CIQ verbs headers (RedHat/Rocky)
+    ansible.builtin.shell: |
+      set -e
+      dnf --disableexcludes=all install -y git autoconf automake libtool make gcc pciutils-devel
+      rm -rf /tmp/perftest_build
+      git clone --depth=1 --branch v24.07.0-0.43 https://github.com/linux-rdma/perftest.git /tmp/perftest_build
+      cd /tmp/perftest_build && ./autogen.sh && ./configure --prefix=/usr/local && make -j && make install
+      rm -rf /tmp/perftest_build
+    args:
+      creates: /usr/local/bin/ib_send_bw
+    when:
+    - ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
+    - rdma_core_ver.rc | default(-1) == 0 and 'ciq' in rdma_core_ver.stdout | default('')
+
+  - name: Freeze RDMA/interconnect stack before running playbook (RedHat/Rocky)
+    ansible.builtin.command:
+      argv:
+      - dnf
+      - versionlock
+      - add
+      - "{{ item }}"
+    loop: "{{ rdma_packages | default([]) }}"
+    register: versionlock_rdma_add
+    changed_when: "'Adding versionlock on:' in versionlock_rdma_add.stdout"
+    when: ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
+
+  - name: Exclude stock perftest and libfabric RPMs to protect custom base image binaries (RedHat/Rocky)
+    ansible.builtin.ini_file:
+      path: /etc/dnf/dnf.conf
+      section: main
+      option: excludepkgs
+      value: 'perftest* libfabric*'
+      mode: '0644'
+    when: ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
+
   roles:
   - motd
   - common
@@ -203,4 +282,19 @@
     loop: "{{ kernel_packages }}"
     when:
     - ansible_os_family == "Debian"
+    - allow_kernel_upgrades
+
+  - name: Re-enable kernel upgrades by dnf upgrade (RedHat/Rocky)
+    ansible.builtin.command:
+      argv:
+      - dnf
+      - versionlock
+      - delete
+      - "{{ item }}"
+    loop: "{{ kernel_packages }}"
+    register: versionlock_del
+    failed_when: false
+    changed_when: "'No package found' not in versionlock_del.stderr and 'No package found' not in versionlock_del.stdout"
+    when:
+    - ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
     - allow_kernel_upgrades
