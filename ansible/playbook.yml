@@ -182,7 +182,7 @@
   - mariadb
   - libjwt
   - role: lmod
-    when: install_lmod
+    when: install_lmod | default(true)
   - role: slurm
     when: install_slurm
   - role: slurmcmd

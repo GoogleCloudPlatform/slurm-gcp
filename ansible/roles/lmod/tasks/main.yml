@@ -26,8 +26,8 @@
     path: '{{item}}'
     state: directory
   loop:
-    - '{{paths.apps}}'
-    - '{{paths.modulefiles}}'
+  - '{{paths.apps}}'
+  - '{{paths.modulefiles}}'
 
 - name: Git Clone
   git:
