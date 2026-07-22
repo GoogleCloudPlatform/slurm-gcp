@@ -57,17 +57,17 @@
     owner: root
     mode: 0660
 
+- name: Manage environment-modules package
+  package:
+    name: environment-modules
+    state: "{{ 'present' if ((install_environment_modules | default(false)) or ((install_scl_utils | default(false)) and ansible_os_family == 'RedHat')) else 'absent' }}"
+  when: ansible_os_family in ['RedHat', 'Debian']
+
 - name: Manage scl-utils package
   package:
     name: scl-utils
     state: "{{ 'present' if (install_scl_utils | default(false)) else 'absent' }}"
   when: ansible_os_family == 'RedHat'
-
-- name: Manage environment-modules package
-  package:
-    name: environment-modules
-    state: "{{ 'present' if (install_environment_modules | default(false)) else 'absent' }}"
-  when: ansible_os_family in ['RedHat', 'Debian']
 
 - name: Ensure Lmod RPM is absent to avoid conflicts
   package:
