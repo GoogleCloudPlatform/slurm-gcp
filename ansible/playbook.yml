@@ -162,7 +162,9 @@
       - hold
       - "{{ item }}"
     loop: "{{ kernel_packages }}"
-    when: ansible_os_family == "Debian"
+    when:
+    - ansible_os_family == "Debian"
+    - not allow_kernel_upgrades
 
   roles:
   - role: motd
