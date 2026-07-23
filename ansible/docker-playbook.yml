@@ -53,6 +53,7 @@
     install_gcsfuse: true
     install_pmix: true
     install_pyxis: true
+    install_slurm: true
 
   pre_tasks:
   - name: Minimum Ansible Version Check
@@ -109,6 +110,12 @@
       that: ansible_distribution_version is version('20.04', '==') or ansible_distribution_version is version('22.04', '==') or ansible_distribution_version is version('24.04', '==')
       fail_msg: |
         When building Slurm-GCP on Ubuntu, use release 20.04/22.04/24.04
+  - name: Check Pyxis Install Options
+    when: install_pyxis
+    ansible.builtin.assert:
+      that: install_slurm
+      fail_msg: |
+        install_slurm must be true when install_pyxis is true
 
   roles:
   - motd
@@ -137,10 +144,11 @@
   - role: slurm
     vars:
       handle_services: false
-  - slurmcmd
+    when: install_slurm
+  - role: slurmcmd
+    when: install_slurm
   - role: pyxis
-    when:
-    - install_pyxis
+    when: install_pyxis
   - role: ompi
     when: install_ompi
   - role: lustre
