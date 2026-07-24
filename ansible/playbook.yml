@@ -129,6 +129,18 @@
       that: not (install_lustre and install_managed_lustre)
       fail_msg: |
         install_lustre and install_managed_lustre are mutually exclusive Options
+  - name: Warn on OMPI and Lmod dependencies
+    ansible.builtin.debug:
+      msg: "WARNING: install_ompi is true but install_lmod is false. OpenMPI requires Lmod to load properly. Automatically enabling install_lmod."
+    when: install_ompi and not install_lmod
+  - name: Automatically enable install_lmod for OMPI
+    ansible.builtin.set_fact:
+      install_lmod: true
+    when: install_ompi and not install_lmod
+  - name: Warn if scl-utils installs env-modules implicitly
+    ansible.builtin.debug:
+      msg: "WARNING: install_environment_modules is false but install_scl_utils is true. scl-utils will install environment-modules by default."
+    when: not install_environment_modules and install_scl_utils
   - name: Check Managed Lustre Install Options
     when: install_managed_lustre
     ansible.builtin.assert:
