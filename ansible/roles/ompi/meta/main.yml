@@ -16,7 +16,7 @@
 dependencies:
 - role: common
 - role: lmod
-  when: install_lmod | default(true)
+  when: (install_lmod | default(true)) or (install_ompi | default(false))
 - role: slurm
   vars:
     handle_services: false
