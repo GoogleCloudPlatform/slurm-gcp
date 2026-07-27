@@ -138,7 +138,7 @@
   - name: Warn if scl-utils installs env-modules implicitly
     ansible.builtin.debug:
       msg: "WARNING: install_environment_modules is false but install_scl_utils is true. scl-utils will install environment-modules by default."
-    when: not install_environment_modules and install_scl_utils
+    when: not install_environment_modules and install_scl_utils and ansible_os_family == 'RedHat'
   - name: Check Managed Lustre Install Options
     when: install_managed_lustre
     ansible.builtin.assert:
@@ -192,7 +192,7 @@
   - mariadb
   - libjwt
   - role: lmod
-    when: (install_lmod | default(true)) or (install_ompi | default(false))
+    when: install_lmod or install_ompi
   - role: slurm
     when: install_slurm
   - role: slurmcmd
