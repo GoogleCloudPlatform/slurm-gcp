@@ -129,26 +129,19 @@
       that: not (install_lustre and install_managed_lustre)
       fail_msg: |
         install_lustre and install_managed_lustre are mutually exclusive Options
-  - name: Record OMPI and Lmod dependency warning
-    ansible.builtin.set_fact:
-      warning_ompi_lmod: true
+  - name: Resolve OMPI and Lmod dependencies
     when: install_ompi and not install_lmod
-  - name: Warn on OMPI and Lmod dependencies
-    ansible.builtin.debug:
-      msg: "WARNING: install_ompi is true but install_lmod is false. OpenMPI requires Lmod to load properly. Automatically enabling install_lmod."
-    when: warning_ompi_lmod | default(false)
-  - name: Automatically enable install_lmod for OMPI
-    ansible.builtin.set_fact:
-      install_lmod: true
-    when: warning_ompi_lmod | default(false)
-  - name: Record scl-utils and env-modules warning
-    ansible.builtin.set_fact:
-      warning_scl_env_modules: true
-    when: not install_environment_modules and install_scl_utils
+    block:
+    - name: Warn on OMPI and Lmod dependencies
+      ansible.builtin.debug:
+        msg: "WARNING: install_ompi is true but install_lmod is false. OpenMPI requires Lmod to load properly. Automatically enabling install_lmod."
+    - name: Automatically enable install_lmod for OMPI
+      ansible.builtin.set_fact:
+        install_lmod: true
   - name: Warn if scl-utils installs env-modules implicitly
     ansible.builtin.debug:
       msg: "WARNING: install_environment_modules is false but install_scl_utils is true. scl-utils will install environment-modules by default."
-    when: warning_scl_env_modules | default(false)
+    when: not install_environment_modules and install_scl_utils
   - name: Check Managed Lustre Install Options
     when: install_managed_lustre
     ansible.builtin.assert:
@@ -242,15 +235,3 @@
     when:
     - ansible_os_family == "Debian"
     - allow_kernel_upgrades
-  - name: Append OMPI/Lmod warning to MOTD
-    ansible.builtin.lineinfile:
-      path: /etc/motd
-      line: "WARNING: install_ompi was true but install_lmod was false. OpenMPI requires Lmod to load properly. Automatically enabled install_lmod."
-      create: yes
-    when: warning_ompi_lmod | default(false)
-  - name: Append scl-utils warning to MOTD
-    ansible.builtin.lineinfile:
-      path: /etc/motd
-      line: "WARNING: install_environment_modules was false but install_scl_utils was true. scl-utils installed environment-modules by default."
-      create: yes
-    when: warning_scl_env_modules | default(false)
