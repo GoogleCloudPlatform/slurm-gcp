@@ -65,6 +65,9 @@
     install_pmix: true
     install_pyxis: true
     allow_kernel_upgrades: true
+    install_lmod: true
+    install_environment_modules: false
+    install_scl_utils: false
 
   pre_tasks:
   - name: Minimum Ansible Version Check
@@ -126,6 +129,14 @@
       that: not (install_lustre and install_managed_lustre)
       fail_msg: |
         install_lustre and install_managed_lustre are mutually exclusive Options
+  - name: Warn on OMPI and Lmod dependencies
+    ansible.builtin.debug:
+      msg: "WARNING: install_ompi is true but install_lmod is false. OpenMPI requires Lmod to load properly. Automatically installing Lmod as a dependency."
+    when: install_ompi and not install_lmod
+  - name: Warn if scl-utils installs env-modules implicitly
+    ansible.builtin.debug:
+      msg: "WARNING: install_environment_modules is false but install_scl_utils is true. scl-utils will install environment-modules by default."
+    when: not install_environment_modules and install_scl_utils and ansible_os_family == 'RedHat'
   - name: Check Managed Lustre Install Options
     when: install_managed_lustre
     ansible.builtin.assert:
@@ -178,7 +189,8 @@
     - install_munge
   - mariadb
   - libjwt
-  - lmod
+  - role: lmod
+    when: install_lmod or install_ompi
   - role: slurm
     when: install_slurm
   - role: slurmcmd
