@@ -118,7 +118,8 @@
         install_slurm must be true when install_pyxis is true
 
   roles:
-  - motd
+  - role: motd
+    when: install_slurm
   - common
   - role: kernel
     vars:
@@ -159,7 +160,8 @@
     when:
     - install_gcsfuse
     - ansible_architecture == "x86_64"
-  - logrotate
+  - role: logrotate
+    when: install_slurm
   - python
   - role: ldap
     when: ansible_os_family != 'Debian'

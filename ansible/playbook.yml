@@ -165,7 +165,8 @@
     when: ansible_os_family == "Debian"
 
   roles:
-  - motd
+  - role: motd
+    when: install_slurm
   - common
   - kernel
   - selinux
@@ -213,7 +214,8 @@
     when:
     - install_gcsfuse_spank
   - role: cloudagents
-  - logrotate
+  - role: logrotate
+    when: install_slurm
   - python
   - role: ldap
     when: ansible_os_family != 'Debian'
