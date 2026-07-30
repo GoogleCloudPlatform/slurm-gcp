@@ -47,11 +47,11 @@
 
 - name: Apply Slurm patches
   ansible.posix.patch:
-    src: ../files/patches/{{ item }}
+    src: '{{ item }}'
     basedir: '{{slurm_paths.src}}'
     strip: 1
   loop: "{{ slurm_patch_files }}"
-  ignore_errors: true
+  ignore_errors: false
   when: slurm_patch_files != []
 
 # For any build dependencies added by patches
