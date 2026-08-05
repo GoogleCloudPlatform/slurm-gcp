@@ -15,7 +15,6 @@
 
 slurm_packages:
 - cifs-utils
-- gtk2-devel
 - hdf5-devel
 - http-parser-devel
 - hwloc
@@ -40,3 +39,6 @@ slurm_packages:
 - perl-ExtUtils-MakeMaker
 - readline-devel
 - rrdtool-devel
+- perl-devel
+- perl-ExtUtils-ParseXS
+- perl-ExtUtils-Embed

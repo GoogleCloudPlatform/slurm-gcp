@@ -39,3 +39,6 @@ slurm_packages:
 - perl-ExtUtils-MakeMaker
 - readline-devel
 - rrdtool-devel
+- perl-devel
+- perl-ExtUtils-ParseXS
+- perl-ExtUtils-Embed
