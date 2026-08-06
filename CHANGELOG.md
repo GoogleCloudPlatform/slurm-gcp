@@ -2,6 +2,168 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.13.0\]
+
+- Upgrade Slurm to 26.05.2
+
+## \[6.12.2\]
+
+- Modularize package installation with conditional flags
+- Make Slurm installation optional during deployment
+- Update NCCL plugin TCPXO version to v1.0.17 and RxDM version to v1.0.23 in the RxDM prolog
+- Disable conflicting legacy profile scripts to prevent MODULEPATH corruption during Lmod deployment
+- Modify imex_prolog script to use active polling instead of sleep logic
+- Add install_munge control flag to make Munge deployment optional
+
+## \[6.12.1\]
+
+- Upgrade Slurm to 25.11.4
+
+## \[6.11.0\]
+
+- Upgrade Slurm version to 25.11.2
+- Fix IPv6 bind address in slurmrestd service template
+- Daemonize gcsfuse, escape cgroup v2, and propagate failures
+
+## \[6.10.10\]
+
+- Add sbatch and salloc support to the gcsfuse_spank plugin
+- Migrate legacy gsutil usage to gcloud storage
+- Update NCCL plugin TCPXO version to v1.0.15 and RxDM version to v1.0.21
+
+## \[6.10.9\]
+
+- Upgrade NCCL plugin TCPXO version to v1.0.14 and RxDM version to v1.0.20
+- Improve the irdma_health_check reliability by looping over multiple ports
+
+## \[6.10.8\]
+
+- Add gcsfuse spank plugin for mounting GCS buckets
+
+## \[6.10.7\]
+
+- Add kubernetes and cloud container python dependencies to images
+- Add NVIDIA IMEX epilog and prolog scripts
+- Add irdma health check as a prolog for H4D instances
+- Add support for Rocky Linux 9
+
+## \[6.10.6\]
+
+- Upgrade Slurm to 25.05.2
+
+## \[6.10.5\]
+
+- Add managed Lustre support for ARM and Ubuntu 24.04
+- Update cloud ops agent log paths
+
+## \[6.10.4\]
+
+- Ignore errors on failure when applying Slurm patches to image build
+
+## \[6.10.3\]
+
+- Copy patch files locally for image building
+
+## \[6.10.2\]
+
+- Add ability to apply arbitrary Slurm patches during image build
+- Enable RxDM prolog script to run on non-a3m nodes without error
+- Fix and update A3-Mega RxDM prolog with LL128 PROTO default
+- Disable Lustre installation for Ubuntu 24.04
+- Refactor NVIDIA Container Toolkit setup for broader repository support
+
+## \[6.10.1\]
+
+- Add support for Ubuntu 24.04
+
+## \[6.10.0\]
+
+- Add gcp-64k kernel packages to compatibility for holding on ARM64
+- Update Lustre roles to respect installation settings
+- Add managed Lustre role to Slurm image building process
+
+## \[6.9.1\]
+
+- Remove dependencies of slurmrestd service on munge
+- Upgrade Slurm to 24.11.2
+
+## \[6.9.0\]
+
+- Unified python environment and requirements in image building
+
+## \[6.8.10\]
+
+- Revert python installation step to image building
+- Add default value for install_nvidia_repo
+
+## \[6.8.9\]
+
+- Add variable to optionally add NVIDIA container repo
+- Increase RxDM init timeout from 20 seconds to 2 minutes
+- Update A3-Mega with LL128 RxDM prolog
+- Update NCCL plugin TCPXO version to v1.0.7 and RxDM version to v1.0.13 and add --install-nccl to prolog
+
+## \[6.8.8\]
+
+- Update Lustre repository link
+- Remove legacy Terraform modules from slurm-gcp repository
+
+## \[6.8.7\]
+
+- Allow for new nic-types on Google-beta provider
+
+## \[6.8.6\]
+
+- Fix Terraform provider name configuration
+
+## \[6.8.5\]
+
+- Update subnetwork_project default to null
+
+## \[6.8.4\]
+
+- Add check and mkdir for apt keyrings in NVIDIA container role
+
+## \[6.8.3\]
+
+- Update Enroot to install optional dependencies
+
+## \[6.8.2\]
+
+- Update default NVIDIA driver to 550.90.12
+
+## \[6.8.1\]
+
+- Use shfmt to format A3 series prolog/epilog scripts
+- Resolve observed failure of NCCL plugin installation
+- Allow network_ip input to be null in instance templates
+- Remove VmDnsSetting override and rely on project default
+
+## \[6.8.0\]
+
+- Update default Slurm version to 24.05.3 and images for 6.7 compatibility
+
+## \[6.7.0\]
+
+- Add sackd file override to restart on-failure
+- Ensure Enroot runtime dependencies are installed
+- Simplify docker run block for NCCL plugin installation
+
+## \[6.6.3\]
+
+- Reimplement Enroot installation by source compilation rather than system packages
+- Update receive-data-path-manager for A3-High and A3-Mega
+
+## \[6.6.2\]
+
+- Add retry logic for downloading SlurmGCP scripts during node startup
+
+## \[6.6.1\]
+
+- Skip fetching config and slurmd_feature in startup.sh to improve reliability
+- Ensure startup script fails appropriately when failing to download scripts
+- Resolve grpc compatibility issue
+
 ## \[6.6.0\]
 
 - Upgrade Slurm to 23.11.8
