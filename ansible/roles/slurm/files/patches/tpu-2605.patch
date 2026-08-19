@@ -83,7 +83,7 @@ index 2e87869f3f..dec929eef7 100644
  	char *x11_magic_cookie;	/* automatically stolen from submit node */
  	char *x11_target;	/* target hostname, or unix socket if port == 0 */
  	uint16_t x11_target_port; /* target tcp port, 6000 + the display number */
-+	char *accelerator_topology; /* --accelerator-topology option */
++	char *layout; /* --layout option */
  } job_desc_msg_t;
 
  typedef struct job_info {
@@ -91,7 +91,7 @@ index 2e87869f3f..dec929eef7 100644
  	uint16_t exclusive; /* JOB_EXCLUSIVE_* (NONE/NODE/USER/MCS/TOPO) */
  	uint32_t exit_code;	/* exit code for job (status from wait call) */
  	char *extra;		/* Arbitrary string */
-+	char *accelerator_topology; /* --accelerator-topology option */
++	char *layout; /* --layout option */
  	char *failed_node;	/* if set, node that caused job to fail */
  	char *features;		/* comma separated list of required features */
  	char *fed_origin_str;	/* Origin cluster's name */
@@ -186,7 +186,7 @@ index 3d77ce418c..6383003f80 100644
  	xfree(job_ptr->cpus_per_tres);
  	xfree(job_ptr->exclusive);
  	xfree(job_ptr->extra);
-+	xfree(job_ptr->accelerator_topology);
++	xfree(job_ptr->layout);
  	FREE_NULL_EXTRA_CONSTRAINTS(job_ptr->extra_constraints);
  	xfree(job_ptr->failed_node);
  	job_record_free_fed_details(&job_ptr->fed_details);
@@ -194,7 +194,7 @@ index 3d77ce418c..6383003f80 100644
 
  		pack32(dump_job_ptr->exit_code, buffer);
  		packstr(dump_job_ptr->extra, buffer);
-+		packstr(dump_job_ptr->accelerator_topology, buffer);
++		packstr(dump_job_ptr->layout, buffer);
 
  		packstr(dump_job_ptr->failed_node, buffer);
  		_dump_job_fed_details(dump_job_ptr->fed_details, for_state,
@@ -202,7 +202,7 @@ index 3d77ce418c..6383003f80 100644
 
  		safe_unpack32(&job_ptr->exit_code, buffer);
  		safe_unpackstr(&job_ptr->extra, buffer);
-+		safe_unpackstr(&job_ptr->accelerator_topology, buffer);
++		safe_unpackstr(&job_ptr->layout, buffer);
 
  		safe_unpackstr(&job_ptr->failed_node, buffer);
  		if (_load_job_fed_details(&job_ptr->fed_details, buffer,
@@ -214,7 +214,7 @@ index b6118617b7..9bf9cc81be 100644
  	uint32_t exit_code;		/* exit code for job (status from
  					 * wait call) */
  	char *extra;			/* Arbitrary string */
-+	char *accelerator_topology;	/* Requested accelerator topology */
++	char *layout;			/* Requested layout */
  	elem_t *extra_constraints;	/* Head of tree built from constraints
  					 * defined in "extra". Not state saved.
  					 */
@@ -226,14 +226,14 @@ index 23e35b3a73..9b8e883041 100644
  	.reset_each_pass = true,
  };
 
-+COMMON_STRING_OPTION(accelerator_topology);
-+static slurm_cli_opt_t slurm_opt_accelerator_topology = {
-+	.name = "accelerator-topology",
++COMMON_STRING_OPTION(layout);
++static slurm_cli_opt_t slurm_opt_layout = {
++	.name = "layout",
 +	.has_arg = required_argument,
-+	.val = LONG_OPT_ACCELERATOR_TOPOLOGY,
-+	.set_func = arg_set_accelerator_topology,
-+	.get_func = arg_get_accelerator_topology,
-+	.reset_func = arg_reset_accelerator_topology,
++	.val = LONG_OPT_LAYOUT,
++	.set_func = arg_set_layout,
++	.get_func = arg_get_layout,
++	.reset_func = arg_reset_layout,
 +	.reset_each_pass = true,
 +};
 +
@@ -244,7 +244,7 @@ index 23e35b3a73..9b8e883041 100644
  static const slurm_cli_opt_t *common_options[] = {
  	&slurm_opt__unknown_,
  	&slurm_opt_accel_bind,
-+	&slurm_opt_accelerator_topology,
++	&slurm_opt_layout,
  	&slurm_opt_account,
  	&slurm_opt_acctg_freq,
  	&slurm_opt_alloc_nodelist,
@@ -252,7 +252,7 @@ index 23e35b3a73..9b8e883041 100644
  		  opt_local->gpus_per_socket);
 
  	job_desc->tres_per_task = xstrdup(opt_local->tres_per_task);
-+	job_desc->accelerator_topology = xstrdup(opt_local->accelerator_topology);
++	job_desc->layout = xstrdup(opt_local->layout);
  	job_desc->user_id = opt_local->uid;
 
  	/* wait_all_nodes not filled in here */
@@ -264,7 +264,7 @@ index 235c7106ad..49fd3d6af5 100644
  enum {
  	LONG_OPT_ENUM_START = 0x100,
  	LONG_OPT_ACCEL_BIND,
-+	LONG_OPT_ACCELERATOR_TOPOLOGY,
++	LONG_OPT_LAYOUT,
  	LONG_OPT_ACCTG_FREQ,
  	LONG_OPT_ALLOC_NODELIST,
  	LONG_OPT_ARGV,
@@ -272,7 +272,7 @@ index 235c7106ad..49fd3d6af5 100644
  	char *gpus_per_node;		/* --gpus_per_node		*/
  	char *gpus_per_socket;		/* --gpus_per_socket		*/
  	char *gpus_per_task;		/* --gpus_per_task		*/
-+	char *accelerator_topology;		/* --accelerator-topology			*/
++	char *layout;			/* --layout			*/
 
  	int pn_min_cpus;		/* --mincpus			*/
  	uint64_t mem_per_cpu;		/* --mem-per-cpu		*/
@@ -284,7 +284,7 @@ index 35b6819b83..b683847627 100644
  		xfree(msg->work_dir);
  		xfree(msg->x11_magic_cookie);
  		xfree(msg->x11_target);
-+		xfree(msg->accelerator_topology);
++		xfree(msg->layout);
  		xfree(msg);
  	}
  }
@@ -296,7 +296,7 @@ index 0293c7d509..25d7e823bf 100644
 
  		safe_unpack32(&job->exit_code, buffer);
  		safe_unpackstr(&job->extra, buffer);
-+		safe_unpackstr(&job->accelerator_topology, buffer);
++		safe_unpackstr(&job->layout, buffer);
 
  		safe_unpackstr(&job->failed_node, buffer);
  		/* job_record_pack_fed_details */
@@ -304,7 +304,7 @@ index 0293c7d509..25d7e823bf 100644
  		pack32(msg->min_nodes, buffer);
  		pack32(msg->max_nodes, buffer);
  		packstr(msg->job_size_str, buffer);
-+		packstr(msg->accelerator_topology, buffer);
++		packstr(msg->layout, buffer);
  		pack16(msg->boards_per_node, buffer);
  		pack16(msg->sockets_per_board, buffer);
  		pack16(msg->sockets_per_node, buffer);
@@ -312,7 +312,7 @@ index 0293c7d509..25d7e823bf 100644
  		safe_unpack32(&msg->min_nodes, buffer);
  		safe_unpack32(&msg->max_nodes, buffer);
  		safe_unpackstr(&msg->job_size_str, buffer);
-+		safe_unpackstr(&msg->accelerator_topology, buffer);
++		safe_unpackstr(&msg->layout, buffer);
  		safe_unpack16(&msg->boards_per_node, buffer);
  		safe_unpack16(&msg->sockets_per_board, buffer);
  		safe_unpack16(&msg->sockets_per_node, buffer);
@@ -487,11 +487,11 @@ index 0000000000..42c7075443
 +	return SLURM_SUCCESS;
 +}
 +
-+static int _process_accelerator_topology(slurm_opt_t *opt)
++static int _process_layout(slurm_opt_t *opt)
 +{
-+	if (!opt->accelerator_topology) {
++	if (!opt->layout) {
 +		if (opt->gres && strstr(opt->gres, "tpu")) {
-+			info("Warning: TPU GRES detected but --accelerator-topology unspecified.");
++			info("Warning: TPU GRES detected but --layout unspecified.");
 +			info("Implications: NodesPerBlock limit will not be enforced, and hardware topology may not be optimized.");
 +		}
 +		return SLURM_SUCCESS;
@@ -504,11 +504,11 @@ index 0000000000..42c7075443
 +		}
 +	}
 +
-+	char *tpu_str = xstrdup(opt->accelerator_topology);
++	char *tpu_str = xstrdup(opt->layout);
 +	char *colon = strchr(tpu_str, ':');
 +
 +	if (!colon) {
-+		error("cli_filter/tpu: Invalid accelerator-topology format (%s). Expected [TYPE]:[TOPOLOGY]", opt->accelerator_topology);
++		error("cli_filter/tpu: Invalid layout format (%s). Expected [TYPE]:[TOPOLOGY]", opt->layout);
 +		xfree(tpu_str);
 +		return SLURM_ERROR;
 +	}
@@ -517,7 +517,7 @@ index 0000000000..42c7075443
 +	char *tpu_type = tpu_str;
 +	char *tpu_topology = colon + 1;
 +
-+	debug("cli_filter/tpu: Processing accelerator topology request %s:%s", tpu_type, tpu_topology);
++	debug("cli_filter/tpu: Processing layout request %s:%s", tpu_type, tpu_topology);
 +
 +	tpu_config_t *conf = NULL;
 +	list_itr_t *iter = list_iterator_create(tpu_config_list);
@@ -621,7 +621,7 @@ index 0000000000..42c7075443
 +
 +extern int cli_filter_p_pre_submit(slurm_opt_t *opt, int offset)
 +{
-+	return _process_accelerator_topology(opt);
++	return _process_layout(opt);
 +}
 +
 +extern void cli_filter_p_post_submit(int offset, uint32_t jobid, uint32_t stepid)
@@ -1149,9 +1149,9 @@ index 0000000000..bc6a0a857a
 +	return SLURM_SUCCESS;
 +}
 +
-+static int _process_accelerator_topology(job_desc_msg_t *job_desc, char **err_msg)
++static int _process_layout(job_desc_msg_t *job_desc, char **err_msg)
 +{
-+	if (!job_desc->accelerator_topology)
++	if (!job_desc->layout)
 +		return SLURM_SUCCESS;
 +
 +	if (!tpu_config_list) {
@@ -1161,12 +1161,12 @@ index 0000000000..bc6a0a857a
 +		}
 +	}
 +
-+	char *tpu_str = xstrdup(job_desc->accelerator_topology);
++	char *tpu_str = xstrdup(job_desc->layout);
 +	char *colon = strchr(tpu_str, ':');
 +
 +	if (!colon) {
-+		error("job_submit/tpu: Invalid accelerator-topology format (%s). Expected [TYPE]:[TOPOLOGY]", job_desc->accelerator_topology);
-+		if (err_msg) *err_msg = xstrdup("Invalid accelerator-topology format. Expected [TYPE]:[TOPOLOGY]");
++		error("job_submit/tpu: Invalid layout format (%s). Expected [TYPE]:[TOPOLOGY]", job_desc->layout);
++		if (err_msg) *err_msg = xstrdup("Invalid layout format. Expected [TYPE]:[TOPOLOGY]");
 +		xfree(tpu_str);
 +		return SLURM_ERROR;
 +	}
@@ -1175,7 +1175,7 @@ index 0000000000..bc6a0a857a
 +	char *tpu_type = tpu_str;
 +	char *tpu_topology = colon + 1;
 +
-+	debug("job_submit/tpu: Processing accelerator topology request %s:%s", tpu_type, tpu_topology);
++	debug("job_submit/tpu: Processing layout request %s:%s", tpu_type, tpu_topology);
 +
 +	tpu_config_t *conf = NULL;
 +	list_itr_t *iter = list_iterator_create(tpu_config_list);
@@ -1256,8 +1256,8 @@ index 0000000000..bc6a0a857a
 +		job_desc->tres_per_node = xstrdup_printf("gres/tpu:%s:%u", tpu_type, tres_count);
 +	}
 +
-+	debug("job_submit/tpu: Computed accelerator_topology %s -> tres_per_node=%s features=%s min_nodes=%u",
-+	      job_desc->accelerator_topology, job_desc->tres_per_node, job_desc->features, job_desc->min_nodes);
++	debug("job_submit/tpu: Computed layout %s -> tres_per_node=%s features=%s min_nodes=%u",
++	      job_desc->layout, job_desc->tres_per_node, job_desc->features, job_desc->min_nodes);
 +
 +	xfree(tpu_str);
 +	return SLURM_SUCCESS;
@@ -1266,13 +1266,13 @@ index 0000000000..bc6a0a857a
 +extern int job_submit(job_desc_msg_t *job_desc, uint32_t submit_uid,
 +		      char **err_msg)
 +{
-+	return _process_accelerator_topology(job_desc, err_msg);
++	return _process_layout(job_desc, err_msg);
 +}
 +
 +extern int job_modify(job_desc_msg_t *job_desc, job_record_t *job_ptr,
 +		      uint32_t submit_uid, char **err_msg)
 +{
-+	return _process_accelerator_topology(job_desc, err_msg);
++	return _process_layout(job_desc, err_msg);
 +}
 +
 +extern int init(void)
@@ -1295,7 +1295,7 @@ index 9a54ab76fc..c95668f24c 100644
  "              [--gpus-per-node=n] [--gpus-per-socket=n] [--gpus-per-task=n]\n"
  "              [--mem-per-gpu=MB] [--tres-bind=...] [--tres-per-task=list]\n"
 -"              [--oom-kill-step[=0|1]]\n"
-+"              [--accelerator-topology=<family>:<shape>] [--oom-kill-step[=0|1]]\n"
++"              [--layout=<family>:<shape>] [--oom-kill-step[=0|1]]\n"
  "              [command [args...]]\n");
  }
 
@@ -1304,9 +1304,9 @@ index 9a54ab76fc..c95668f24c 100644
  	spank_print_options(stdout, 6, 30);
 
 +	printf("\n"
-+"Accelerator topology options:\n"
-+"      --accelerator-topology=<family>:<shape>\n"
-+"                              Specify the accelerator family and geometric topology\n"
++"Layout options:\n"
++"      --layout=<family>:<shape>\n"
++"                              Specify the layout family and geometric topology\n"
 +"                              shape for the job, as defined in tpu.conf.\n"
 +"                              Examples: 'v6e:4x4' (2D), 'tpu7x:2x2x4' (3D).\n"
 +		);
@@ -1323,7 +1323,7 @@ index d6701a65a3..20ee1fa6f5 100644
  "              [--gpus-per-node=n] [--gpus-per-socket=n] [--gpus-per-task=n]\n"
  "              [--mem-per-gpu=MB] [--tres-bind=...] [--tres-per-task=list]\n"
 -"              [--oom-kill-step[=0|1]]\n"
-+"              [--accelerator-topology=<family>:<shape>] [--oom-kill-step[=0|1]]\n"
++"              [--layout=<family>:<shape>] [--oom-kill-step[=0|1]]\n"
  "              executable [args...]\n");
  }
 
@@ -1332,9 +1332,9 @@ index d6701a65a3..20ee1fa6f5 100644
  		);
 
 +	printf("\n"
-+"Accelerator topology options:\n"
-+"      --accelerator-topology=<family>:<shape>\n"
-+"                              Specify the accelerator family and geometric topology\n"
++"Layout options:\n"
++"      --layout=<family>:<shape>\n"
++"                              Specify the layout family and geometric topology\n"
 +"                              shape for the job, as defined in tpu.conf.\n"
 +"                              Examples: 'v6e:4x4' (2D), 'tpu7x:2x2x4' (3D).\n"
 +		);
@@ -1350,8 +1350,8 @@ index e7390ef396..7003910c30 100644
  		xstrcat(out, line_end);
  	}
 
-+	if (job_ptr->accelerator_topology) {
-+		xstrfmtcat(out, "AcceleratorTopology=%s", job_ptr->accelerator_topology);
++	if (job_ptr->layout) {
++		xstrfmtcat(out, "Layout=%s", job_ptr->layout);
 +		xstrcat(out, line_end);
 +	}
 +
@@ -1366,7 +1366,7 @@ index 444dcbf7c9..0012b5f410 100644
  	job_ptr->restart_cnt = job_desc->restart_cnt;
  	job_ptr->comment    = xstrdup(job_desc->comment);
  	job_ptr->extra = xstrdup(job_desc->extra);
-+	job_ptr->accelerator_topology = xstrdup(job_desc->accelerator_topology);
++	job_ptr->layout = xstrdup(job_desc->layout);
  	job_ptr->container = xstrdup(job_desc->container);
  	job_ptr->container_id = xstrdup(job_desc->container_id);
  	job_ptr->container_type = xstrdup(job_desc->container_type);
@@ -1378,9 +1378,9 @@ index 2b6fdc2810..7c36ec5ed6 100644
  						job_ptr)));
  		data_set_string(data_key_set(job_node_data, "extra"),
  				job_ptr->extra);
-+		if (job_ptr->accelerator_topology) {
-+			data_set_string(data_key_set(job_node_data, "accelerator_topology"),
-+					job_ptr->accelerator_topology);
++		if (job_ptr->layout) {
++			data_set_string(data_key_set(job_node_data, "layout"),
++					job_ptr->layout);
 +		}
  		data_set_int(data_key_set(job_node_data, "job_id"),
  			     job_ptr->job_id);
@@ -1394,7 +1394,7 @@ index d534c20dcd..1b1c2489ff 100644
  "            [--gpus-per-node=n] [--gpus-per-socket=n] [--gpus-per-task=n]\n"
  "            [--mem-per-gpu=MB] [--tres-bind=...] [--tres-per-task=list]\n"
 -"            [--oom-kill-step[=0|1]] [--ignore-signals=signals...]\n"
-+"            [--accelerator-topology=<family>:<shape>] [--oom-kill-step[=0|1]] [--ignore-signals=signals...]\n"
++"            [--layout=<family>:<shape>] [--oom-kill-step[=0|1]] [--ignore-signals=signals...]\n"
  "            [--async] [--parsable]\n"
  "            executable [args...]\n");
 
@@ -1403,9 +1403,9 @@ index d534c20dcd..1b1c2489ff 100644
  		);
 
 +	printf("\n"
-+"Accelerator topology options:\n"
-+"      --accelerator-topology=<family>:<shape>\n"
-+"                              Specify the accelerator family and geometric topology\n"
++"Layout options:\n"
++"      --layout=<family>:<shape>\n"
++"                              Specify the layout family and geometric topology\n"
 +"                              shape for the job, as defined in tpu.conf.\n"
 +"                              Examples: 'v6e:4x4' (2D), 'tpu7x:2x2x4' (3D).\n"
 +		);
