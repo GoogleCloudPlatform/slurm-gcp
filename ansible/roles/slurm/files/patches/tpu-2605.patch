@@ -538,8 +538,8 @@ index 0000000000..42c7075443
 +	uint32_t num_chips = 0;
 +
 +	if (conf->dimensions == 2) {
-+		if (sscanf(tpu_topology, "%dx%d", &x, &y) == 2 ||
-+		    sscanf(tpu_topology, "%d_%d", &x, &y) == 2) {
++		if (sscanf(tpu_topology, "%dx%dx%d", &x, &y, &z) == 2 ||
++		    sscanf(tpu_topology, "%d_%d_%d", &x, &y, &z) == 2) {
 +			num_chips = x * y;
 +
 +			if (x > y) {
@@ -559,7 +559,7 @@ index 0000000000..42c7075443
 +		    sscanf(tpu_topology, "%d_%d_%d", &x, &y, &z) == 3) {
 +			num_chips = x * y * z;
 +
-+			if (num_chips > 64 && (x > y || y > z)) {
++			if (num_chips > 4 && (x > y || y > z)) {
 +				error("cli_filter/tpu: Malformed 3D TPU topology %s: expected x <= y <= z", tpu_topology);
 +				xfree(tpu_str);
 +				return SLURM_ERROR;
@@ -1198,8 +1198,8 @@ index 0000000000..bc6a0a857a
 +	uint32_t tres_count = 1;
 +
 +	if (conf->dimensions == 2) {
-+		if (sscanf(tpu_topology, "%dx%d", &x, &y) == 2 ||
-+		    sscanf(tpu_topology, "%d_%d", &x, &y) == 2) {
++		if (sscanf(tpu_topology, "%dx%dx%d", &x, &y, &z) == 2 ||
++		    sscanf(tpu_topology, "%d_%d_%d", &x, &y, &z) == 2) {
 +			num_chips = x * y;
 +			num_nodes = num_chips / conf->chips_per_node;
 +			tres_count = (num_chips < conf->chips_per_node) ? (num_chips == 0 ? 1 : num_chips) : conf->chips_per_node;
