@@ -1,0 +1,18 @@
+---
+default:
+  publish_project: schedmd-slurm-public
+  source_project: schedmd-public-292016
+  prefix: "slurm-gcp"
+  slurm_gcp_version: "6.12"
+  source_image_family: "{prefix}-{slurm_gcp_version}-{os_tag}"
+  source_image: null
+  license: "{default_license}"
+  copy: true
+
+builds:
+- os_tag: hpc-rocky-linux-8
+- os_tag: debian-12
+- os_tag: ubuntu-2204-lts-nvidia-570
+- os_tag: ubuntu-2404-lts-nvidia-570
+- os_tag: ubuntu-2204-lts-arm64
+- os_tag: ubuntu-2404-lts-arm64
