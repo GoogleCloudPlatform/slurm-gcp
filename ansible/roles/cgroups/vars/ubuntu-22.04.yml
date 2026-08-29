@@ -14,12 +14,12 @@
 # limitations under the License.
 
 cgroup_packages:
-- libcgroup1
+- libcgroup2
 - libcgroup-dev
 - libpam-cgroup
 - libdbus-1-dev
 
 cgroup_grub_cmdline_linux:
-- systemd.unified_cgroup_hierarchy=0
+- systemd.unified_cgroup_hierarchy=1
 - cgroup_enable=memory
 - swapaccount=1
