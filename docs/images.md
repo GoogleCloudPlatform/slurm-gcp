@@ -46,7 +46,7 @@ can be created and used instead.
 ### Installed Software for HPC
 
 - [Slurm](https://www.schedmd.com/downloads.php)
-  - 26.05.2
+  - 26.05.4
 - [lmod](https://lmod.readthedocs.io/en/latest/index.html)
 - [openmpi](https://www.open-mpi.org/)
   - v4.1.x
