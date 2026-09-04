@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## \[6.12.3\]
+
+- Upgrade Slurm to 25.11.8
+
 ## \[6.6.0\]
 
 - Upgrade Slurm to 23.11.8
