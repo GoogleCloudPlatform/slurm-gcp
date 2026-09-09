@@ -422,7 +422,7 @@ new file mode 100644
 index 0000000000..85da6f2f5a
 --- /dev/null
 +++ b/src/plugins/cli_filter/tpu/cli_filter_tpu.c
-@@ -0,0 +1,239 @@
+@@ -0,0 +1,232 @@
 +#include <inttypes.h>
 +#include <stdio.h>
 +#include <string.h>
@@ -533,13 +533,6 @@ index 0000000000..85da6f2f5a
 +
 +	char *tpu_str = xstrdup(opt->layout);
 +	char *sep = strchr(tpu_str, '=');
-+	if (!sep) {
-+		sep = strchr(tpu_str, ':');
-+		if (sep) {
-+			info("Warning: Using ':' in layout '%s' is deprecated, please use '=' (e.g. %.*s=%s)",
-+			     opt->layout, (int)(sep - tpu_str), tpu_str, sep + 1);
-+		}
-+	}
 +
 +	if (!sep) {
 +		error("cli_filter/tpu: Invalid layout format (%s). Expected [TYPE]=[TOPOLOGY]", opt->layout);
@@ -1090,7 +1083,7 @@ new file mode 100644
 index 0000000000..19ddad05c7
 --- /dev/null
 +++ b/src/plugins/job_submit/tpu/job_submit_tpu.c
-@@ -0,0 +1,236 @@
+@@ -0,0 +1,229 @@
 +#include <inttypes.h>
 +#include <stdio.h>
 +#include <string.h>
@@ -1197,13 +1190,6 @@ index 0000000000..19ddad05c7
 +
 +	char *tpu_str = xstrdup(job_desc->layout);
 +	char *sep = strchr(tpu_str, '=');
-+	if (!sep) {
-+		sep = strchr(tpu_str, ':');
-+		if (sep) {
-+			info("Warning: Using ':' in layout '%s' is deprecated, please use '=' (e.g. %.*s=%s)",
-+			     job_desc->layout, (int)(sep - tpu_str), tpu_str, sep + 1);
-+		}
-+	}
 +
 +	if (!sep) {
 +		error("job_submit/tpu: Invalid layout format (%s). Expected [TYPE]=[TOPOLOGY]", job_desc->layout);
