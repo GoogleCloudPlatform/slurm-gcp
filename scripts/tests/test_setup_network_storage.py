@@ -368,3 +368,85 @@ def test_setup_network_storage_client_invokes_preflight():
         assert server_arg == "10.0.0.1"
         assert "/home" in paths_arg
         assert "/etc/munge" in paths_arg
+
+
+def test_setup_network_storage_client_preflight_failure_aborts_before_fstab():
+    mock_log = MagicMock()
+    internal_mount = NSDict(
+        {
+            "server_ip": "10.0.0.1",
+            "remote_mount": "/home",
+            "local_mount": "/home",
+            "fs_type": "nfs",
+            "mount_options": "defaults",
+        }
+    )
+
+    with patch("setup_network_storage.lkp") as mock_lkp, patch(
+        "setup_network_storage.resolve_network_storage",
+        return_value=[internal_mount],
+    ), patch(
+        "setup_network_storage.separate_external_internal_mounts",
+        return_value=([], [internal_mount]),
+    ), patch(
+        "setup_network_storage.wait_for_controller_nfs",
+        side_effect=TimeoutError("Timed out waiting for NFS"),
+    ), patch(
+        "shutil.copy2"
+    ) as mock_copy, patch(
+        "builtins.open", mock_open()
+    ) as mock_file:
+        mock_lkp.instance_role = "login"
+        with pytest.raises(TimeoutError, match="Timed out waiting for NFS"):
+            run_setup_network_storage(mock_log)
+
+        # Ensure /etc/fstab was never copied or modified
+        mock_copy.assert_not_called()
+        mock_file.assert_not_called()
+
+
+def test_setup_network_storage_standalone_munge_mount_invokes_preflight():
+    """Verify that when disable_default_mounts is true, munge_mount alone still triggers preflight."""
+    mock_log = MagicMock()
+
+    with patch("setup_network_storage.lkp") as mock_lkp, patch(
+        "setup_network_storage.cfg"
+    ) as mock_cfg, patch(
+        "setup_network_storage.resolve_network_storage",
+        return_value=[],
+    ), patch(
+        "setup_network_storage.separate_external_internal_mounts",
+        return_value=([], []),
+    ), patch(
+        "setup_network_storage.wait_for_controller_nfs"
+    ) as mock_wait, patch(
+        "pathlib.Path.is_file", return_value=True
+    ), patch(
+        "shutil.copy2"
+    ), patch(
+        "builtins.open", mock_open()
+    ), patch(
+        "setup_network_storage.mount_fstab"
+    ), patch(
+        "setup_network_storage.munge_mount_handler"
+    ), patch(
+        "setup_network_storage.util.mkdirp"
+    ):
+        mock_lkp.instance_role = "login"
+        mock_lkp.control_host = "test-controller"
+        mock_lkp.control_host_addr = "10.0.0.1"
+        mock_lkp.control_addr = "10.0.0.1"
+        mock_cfg.munge_mount = NSDict(
+            {
+                "server_ip": "10.0.0.1",
+                "remote_mount": "/etc/munge",
+                "fs_type": "nfs",
+            }
+        )
+
+        run_setup_network_storage(mock_log)
+        mock_wait.assert_called_once()
+        server_arg = mock_wait.call_args[0][0]
+        paths_arg = mock_wait.call_args[0][1]
+        assert server_arg == "10.0.0.1"
+        assert "/etc/munge" in paths_arg

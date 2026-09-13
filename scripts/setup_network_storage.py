@@ -364,28 +364,38 @@ def setup_network_storage(log):
 
     # Pre-flight check on client nodes: wait for controller NFS exports to be ready
     if lkp.instance_role != "controller":
-        controller_nfs_mounts = [
-            m for m in int_mounts if m.fs_type == "nfs" and m.server_ip
-        ]
-        if controller_nfs_mounts:
-            server = controller_nfs_mounts[0].server_ip
-            expected_paths = [str(m.remote_mount) for m in controller_nfs_mounts]
-            if cfg.munge_mount and (cfg.munge_mount.fs_type or "nfs").lower() == "nfs":
-                munge_server = (
-                    cfg.munge_mount.server_ip
-                    or cfg.slurm_control_addr
-                    or cfg.slurm_control_host
+        controller_mounts_by_server: dict[str, set[str]] = {}
+        for m in int_mounts:
+            if m.fs_type == "nfs" and m.server_ip and m.remote_mount:
+                server = m.server_ip.split("@")[0]
+                controller_mounts_by_server.setdefault(server, set()).add(
+                    str(m.remote_mount)
                 )
-                if munge_server in (
-                    server,
-                    lkp.control_host,
-                    lkp.control_host_addr,
-                    lkp.control_addr,
+
+        if cfg.munge_mount and (cfg.munge_mount.fs_type or "nfs").lower() == "nfs":
+            munge_server = (
+                cfg.munge_mount.server_ip
+                or cfg.slurm_control_addr
+                or cfg.slurm_control_host
+            )
+            if munge_server:
+                munge_server = munge_server.split("@")[0]
+                if (
+                    munge_server
+                    in (
+                        lkp.control_host,
+                        lkp.control_host_addr,
+                        lkp.control_addr,
+                    )
+                    or not controller_mounts_by_server
                 ):
                     munge_remote = str(cfg.munge_mount.remote_mount or "/etc/munge")
-                    if munge_remote not in expected_paths:
-                        expected_paths.append(munge_remote)
-            wait_for_controller_nfs(server, expected_paths, log=log)
+                    controller_mounts_by_server.setdefault(munge_server, set()).add(
+                        munge_remote
+                    )
+
+        for server, paths in controller_mounts_by_server.items():
+            wait_for_controller_nfs(server, sorted(paths), log=log)
 
     # Determine fstab entries and write them out
     fstab_entries = []
