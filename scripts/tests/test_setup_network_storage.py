@@ -199,10 +199,13 @@ def test_wait_for_controller_nfs_happy_path_tier1():
 def test_wait_for_controller_nfs_tier2_fallback():
     with patch("setup_network_storage._probe_tcp_port", return_value=True), patch(
         "setup_network_storage._check_nfs_exports_showmount", return_value=None
-    ), patch("setup_network_storage._probe_nfs_mount", return_value=True), patch(
+    ), patch(
+        "setup_network_storage._probe_nfs_mount", return_value=True
+    ) as mock_probe, patch(
         "time.sleep"
     ) as mock_sleep:
-        wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=10)
+        wait_for_controller_nfs("10.0.0.1", ["/home", "/apps"], timeout=10)
+        assert mock_probe.call_count == 2
         mock_sleep.assert_called_once_with(0.5)
 
 
@@ -449,3 +452,75 @@ def test_setup_network_storage_standalone_munge_mount_invokes_preflight():
         paths_arg = mock_wait.call_args[0][1]
         assert server_arg == "10.0.0.1"
         assert "/etc/munge" in paths_arg
+
+
+def test_wait_for_controller_nfs_tier2_fallback_partial_failure_times_out():
+    """Verify that if one of multiple exports fails in Tier 2, wait_for_controller_nfs times out."""
+
+    def mock_probe(server, path, timeout=4.0, log=None):
+        return path == "/home"  # /apps fails
+
+    with patch("setup_network_storage._probe_tcp_port", return_value=True), patch(
+        "setup_network_storage._check_nfs_exports_showmount", return_value=None
+    ), patch("setup_network_storage._probe_nfs_mount", side_effect=mock_probe), patch(
+        "time.sleep"
+    ):
+        with pytest.raises(TimeoutError, match="Timed out after 1s waiting"):
+            wait_for_controller_nfs("10.0.0.1", ["/home", "/apps"], timeout=1)
+
+
+def test_setup_network_storage_case_insensitive_fs_type():
+    """Verify that uppercase NFS and mixed-case Nfs are recognized and trigger preflight."""
+    mock_log = MagicMock()
+    mount_upper = NSDict(
+        {
+            "server_ip": "10.0.0.1",
+            "remote_mount": "/home",
+            "local_mount": "/home",
+            "fs_type": "NFS",
+            "mount_options": "defaults",
+        }
+    )
+    mount_mixed = NSDict(
+        {
+            "server_ip": "10.0.0.1",
+            "remote_mount": "/apps",
+            "local_mount": "/apps",
+            "fs_type": "Nfs",
+            "mount_options": "defaults",
+        }
+    )
+
+    with patch("setup_network_storage.lkp") as mock_lkp, patch(
+        "setup_network_storage.cfg"
+    ) as mock_cfg, patch(
+        "setup_network_storage.resolve_network_storage",
+        return_value=[mount_upper, mount_mixed],
+    ), patch(
+        "setup_network_storage.separate_external_internal_mounts",
+        return_value=([], [mount_upper, mount_mixed]),
+    ), patch(
+        "setup_network_storage.wait_for_controller_nfs"
+    ) as mock_wait, patch(
+        "pathlib.Path.is_file", return_value=True
+    ), patch(
+        "shutil.copy2"
+    ), patch(
+        "builtins.open", mock_open()
+    ), patch(
+        "setup_network_storage.mount_fstab"
+    ), patch(
+        "setup_network_storage.munge_mount_handler"
+    ), patch(
+        "setup_network_storage.util.mkdirp"
+    ):
+        mock_lkp.instance_role = "login"
+        mock_cfg.munge_mount = None
+
+        run_setup_network_storage(mock_log)
+        mock_wait.assert_called_once()
+        server_arg = mock_wait.call_args[0][0]
+        paths_arg = mock_wait.call_args[0][1]
+        assert server_arg == "10.0.0.1"
+        assert "/home" in paths_arg
+        assert "/apps" in paths_arg
