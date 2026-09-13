@@ -15,18 +15,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Iterable, Optional, Set, Union
+
 import os
+import posixpath
+import random
+import socket
 import sys
 import stat
 import time
-
+import logging
 import shutil
+import tempfile
 from pathlib import Path
 from concurrent.futures import as_completed
 from addict import Dict as NSDict
 
 import util
 from util import lkp, run, cfg, dirs, separate
+
+log = logging.getLogger(__name__)
 
 
 def mounts_by_local(mounts):
@@ -83,11 +91,262 @@ def separate_external_internal_mounts(mounts):
 
     def internal_mount(mount):
         # NOTE: Valid Lustre server_ip can take the form of '<IP>@tcp'
-        server_ip = mount.server_ip.split("@")[0]
-        mount_addr = util.host_lookup(server_ip)
+        server_ip = (mount.server_ip or "").split("@")[0]
+        if not server_ip:
+            return lkp.instance_role == "controller"
+        if lkp.control_host is not None and server_ip == lkp.control_host:
+            return True
+        if lkp.control_host_addr is not None and server_ip == lkp.control_host_addr:
+            return True
+        if lkp.control_addr is not None and server_ip == lkp.control_addr:
+            return True
+        try:
+            mount_addr = util.host_lookup(server_ip)
+        except Exception:
+            mount_addr = None
         return mount_addr == lkp.control_host_addr
 
     return separate(internal_mount, mounts)
+
+
+def _probe_tcp_port(host: str, port: int = 2049, timeout: float = 1.0) -> bool:
+    """Check if TCP port is accepting connections (pure Python, IPv4/IPv6 compatible)."""
+    if not host or not host.strip():
+        return False
+    try:
+        with socket.create_connection((host.strip(), port), timeout=timeout):
+            return True
+    except (OSError, TypeError, OverflowError):
+        return False
+
+
+def _find_showmount() -> Optional[str]:
+    """Find showmount binary in PATH or standard system binary paths."""
+    bin_path = shutil.which("showmount")
+    if bin_path:
+        return bin_path
+    for candidate in ("/usr/sbin/showmount", "/sbin/showmount", "/usr/bin/showmount"):
+        if Path(candidate).is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def _check_nfs_exports_showmount(
+    server: str,
+    expected_paths: Set[str],
+    timeout: float = 3.0,
+    log: Optional[logging.Logger] = None,
+) -> Optional[bool]:
+    """Verify exports via showmount -e if available and port 111 is reachable.
+
+    Returns:
+        True: All expected paths are confirmed exported by the server.
+        False: Port 111 is reachable, but expected paths are not yet exported.
+        None: showmount unavailable, port 111 blocked/closed, or RPC query failed (trigger fallback).
+    """
+    logger = log or logging.getLogger(__name__)
+    showmount_bin = _find_showmount()
+    if not showmount_bin:
+        logger.debug("showmount binary not found; bypassing Tier 1 probe.")
+        return None
+
+    # Guard: probe port 111 with a strict 0.5s timeout. If firewalled or closed, NEVER call showmount.
+    if not _probe_tcp_port(server, port=111, timeout=0.5):
+        logger.debug(
+            f"Port 111 unreachable on {server}; firewall blocks RPC or rpcbind disabled."
+        )
+        return None
+
+    env = os.environ.copy()
+    env["LC_ALL"] = "C"
+    if "/usr/sbin" not in env.get("PATH", ""):
+        env["PATH"] = f"/usr/sbin:/sbin:{env.get('PATH', '')}"
+
+    try:
+        res = run(
+            [showmount_bin, "--no-headers", "-e", server],
+            timeout=timeout,
+            check=False,
+            env=env,
+        )
+        if res.returncode != 0:
+            logger.debug(
+                f"showmount -e {server} returned exit code {res.returncode}: {res.stderr}"
+            )
+            return None
+
+        active_exports: Set[str] = set()
+        for line in res.stdout.splitlines():
+            line = line.strip()
+            if not line or line.startswith("Export list"):
+                continue
+            parts = line.split()
+            if parts:
+                active_exports.add(posixpath.normpath(parts[0]))
+
+        if expected_paths.issubset(active_exports):
+            logger.info(
+                f"showmount confirmed exports {sorted(expected_paths)} on {server}."
+            )
+            return True
+        else:
+            missing = expected_paths - active_exports
+            logger.debug(
+                f"showmount exports on {server} missing expected shares: {sorted(missing)}"
+            )
+            return False
+
+    except Exception as e:
+        logger.debug(f"showmount query on {server} failed with exception: {e}")
+        return None
+
+
+def _probe_nfs_mount(
+    server: str,
+    remote_path: str,
+    timeout: float = 5.0,
+    log: Optional[logging.Logger] = None,
+) -> bool:
+    """Probe kernel NFS export readiness via a transient non-destructive mount.
+
+    Fallback for environments where port 111 is firewalled or showmount is absent.
+    """
+    logger = log or logging.getLogger(__name__)
+    try:
+        probe_base = Path("/run/slurm")
+        probe_base.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        probe_base = Path(tempfile.gettempdir())
+
+    probe_dir = Path(tempfile.mkdtemp(prefix=".nfs_probe_", dir=str(probe_base)))
+
+    cmd = [
+        "mount",
+        "-t",
+        "nfs",
+        "-o",
+        "ro,soft,timeo=20,retrans=1,retry=0",
+        f"{server}:{remote_path}",
+        str(probe_dir),
+    ]
+    try:
+        res = run(cmd, timeout=timeout, check=False)
+        if res.returncode == 0:
+            logger.info(f"Transient probe mount succeeded for {server}:{remote_path}.")
+            return True
+        else:
+            logger.debug(
+                f"Probe mount {server}:{remote_path} returned {res.returncode}: {res.stderr}"
+            )
+            return False
+    except Exception as e:
+        logger.debug(f"Probe mount {server}:{remote_path} exception: {e}")
+        return False
+    finally:
+        try:
+            if probe_dir.is_mount():
+                run(f"umount -l {probe_dir}", timeout=10, check=False)
+            if probe_dir.is_dir():
+                probe_dir.rmdir()
+        except Exception:
+            pass
+
+
+def wait_for_controller_nfs(
+    server: str,
+    expected_paths: Iterable[Union[str, Path]],
+    timeout: int = 360,
+    log: Optional[logging.Logger] = None,
+) -> None:
+    """Wait for controller NFS server to export all expected paths.
+
+    Employs a multi-tier probe strategy:
+      - Tier 0: Pure-Python TCP 2049 probe with backoff.
+      - Tier 1: Port 111 pre-checked showmount -e structured query.
+      - Tier 2: Transient probe mount fallback (handles firewalled port 111 and NFSv4-only).
+      - Anti-thundering-herd jitter on all polling intervals.
+    """
+    logger = log or logging.getLogger(__name__)
+    if timeout <= 0:
+        raise TimeoutError(
+            f"Invalid timeout {timeout}s waiting for controller NFS server '{server}'."
+        )
+
+    normalized_expected = {posixpath.normpath(str(p)) for p in expected_paths}
+    logger.info(
+        f"Waiting up to {timeout}s for controller NFS server '{server}' "
+        f"to export {sorted(normalized_expected)}..."
+    )
+
+    deadline = time.monotonic() + timeout
+    start_delay = min(1.5, float(timeout))
+    sample_path = sorted(normalized_expected)[0] if normalized_expected else None
+
+    # Step 1: Wait for TCP 2049 readiness (Tier 0)
+    port_2049_open = False
+    for wait in util.backoff_delay(start_delay, timeout=timeout):
+        if _probe_tcp_port(server, port=2049, timeout=1.0):
+            port_2049_open = True
+            logger.info(f"NFS TCP port 2049 is open on {server}.")
+            break
+        if time.monotonic() >= deadline:
+            break
+        sleep_sec = min(
+            wait * random.uniform(0.8, 1.2), max(0.0, deadline - time.monotonic())
+        )
+        time.sleep(sleep_sec)
+
+    if not port_2049_open:
+        raise TimeoutError(
+            f"Timed out after {timeout}s waiting for NFS port 2049 on {server}. "
+            "Controller setup failed or NFS service is down."
+        )
+
+    if not normalized_expected:
+        time.sleep(0.5)
+        return
+
+    # Step 2: Actively verify exports (Tier 1 showmount -> Tier 2 transient probe)
+    exports_ready = False
+    remaining_timeout = deadline - time.monotonic()
+    if remaining_timeout > 0.05:
+        step2_start = min(start_delay, remaining_timeout)
+        for wait in util.backoff_delay(step2_start, timeout=remaining_timeout):
+            # Tier 1: showmount probe
+            showmount_res = _check_nfs_exports_showmount(
+                server, normalized_expected, timeout=3.0, log=logger
+            )
+            if showmount_res is True:
+                exports_ready = True
+                break
+            elif showmount_res is False:
+                # Server is running and reachable on RPC, but exportfs -ra hasn't exported these shares yet
+                pass
+            else:
+                # Tier 2 Fallback: Port 111 firewalled, showmount missing, or NFSv4-only
+                if sample_path and _probe_nfs_mount(
+                    server, sample_path, timeout=4.0, log=logger
+                ):
+                    exports_ready = True
+                    break
+
+            if time.monotonic() >= deadline:
+                break
+
+            sleep_sec = min(
+                wait * random.uniform(0.8, 1.2), max(0.0, deadline - time.monotonic())
+            )
+            time.sleep(sleep_sec)
+
+    if not exports_ready:
+        raise TimeoutError(
+            f"Timed out after {timeout}s waiting for controller '{server}' to export "
+            f"{sorted(normalized_expected)}. Controller setup.py likely failed."
+        )
+
+    logger.info(f"Controller NFS exports confirmed ready on {server}.")
+    # Brief 0.5s settle window for kernel filehandle propagation
+    time.sleep(0.5)
 
 
 def setup_network_storage(log):
@@ -102,6 +361,31 @@ def setup_network_storage(log):
         mounts = ext_mounts
     else:
         mounts = ext_mounts + int_mounts
+
+    # Pre-flight check on client nodes: wait for controller NFS exports to be ready
+    if lkp.instance_role != "controller":
+        controller_nfs_mounts = [
+            m for m in int_mounts if m.fs_type == "nfs" and m.server_ip
+        ]
+        if controller_nfs_mounts:
+            server = controller_nfs_mounts[0].server_ip
+            expected_paths = [str(m.remote_mount) for m in controller_nfs_mounts]
+            if cfg.munge_mount and (cfg.munge_mount.fs_type or "nfs").lower() == "nfs":
+                munge_server = (
+                    cfg.munge_mount.server_ip
+                    or cfg.slurm_control_addr
+                    or cfg.slurm_control_host
+                )
+                if munge_server in (
+                    server,
+                    lkp.control_host,
+                    lkp.control_host_addr,
+                    lkp.control_addr,
+                ):
+                    munge_remote = str(cfg.munge_mount.remote_mount or "/etc/munge")
+                    if munge_remote not in expected_paths:
+                        expected_paths.append(munge_remote)
+            wait_for_controller_nfs(server, expected_paths, log=log)
 
     # Determine fstab entries and write them out
     fstab_entries = []
