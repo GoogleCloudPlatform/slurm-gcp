@@ -201,7 +201,7 @@
       - "libibumad-{{ rdma_core_ver.stdout | default('') | trim }}"
       - "infiniband-diags-{{ rdma_core_ver.stdout | default('') | trim }}"
       state: present
-      allow_erasing: true
+      allowerasing: true
       disable_excludes: ciq-sigcloud-next
       disable_plugin: protected-kmods
     when:
@@ -228,7 +228,7 @@
     ansible.builtin.shell: |
       set -e
       rm -rf /tmp/perftest_build
-      git clone --depth=1 --branch v24.07.0-0.43 https://github.com/linux-rdma/perftest.git /tmp/perftest_build
+      git clone --depth=1 --branch v4.5-0.20 https://github.com/linux-rdma/perftest.git /tmp/perftest_build
       cd /tmp/perftest_build && ./autogen.sh && ./configure --prefix=/usr/local && make -j {{ ansible_processor_vcpus }} && make install
       rm -rf /tmp/perftest_build
     args:
