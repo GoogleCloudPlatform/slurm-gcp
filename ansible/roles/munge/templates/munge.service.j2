@@ -17,6 +17,7 @@ Description=MUNGE authentication service
 Documentation=man:munged(8)
 After=network.target remote-fs.target
 After=syslog.target
+ConditionPathExists={{ munge_key_path | default('/etc/munge/munge.key') }}
 
 [Service]
 Type=forking
