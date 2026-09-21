@@ -28,7 +28,6 @@
         {{ (grub_args.stdout.split(' ') + grub_cmdline_args) | unique }}
   when:
   - not grub_cmdline_replace
-  - grub_cmdline_args | length > 0
 
 - name: Set GRUB_CMDLINE_LINUX arguments
   ansible.builtin.lineinfile:
