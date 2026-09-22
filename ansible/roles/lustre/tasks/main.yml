@@ -59,6 +59,29 @@
     state: present
   when: install_lustre
 
+- name: Ensure Lustre DKMS module is built for all installed kernels (RedHat/Rocky)
+  ansible.builtin.shell: |
+    set -e
+    DKMS_LINE=$(dkms status | grep -E '^lustre' | head -n 1 || true)
+    if [ -n "$DKMS_LINE" ]; then
+      MODULE_NAME=$(echo "$DKMS_LINE" | awk -F'[/,:]' '{print $1}' | tr -d ' ')
+      MODULE_VERSION=$(echo "$DKMS_LINE" | awk -F'[/,:]' '{print $2}' | tr -d ' ')
+      for k in $(ls -1 /lib/modules); do
+        if [ -d "/lib/modules/$k/build" ]; then
+          echo "Building DKMS module $MODULE_NAME version $MODULE_VERSION for kernel $k..."
+          dkms install -m "$MODULE_NAME" -v "$MODULE_VERSION" -k "$k" || true
+        else
+          echo "Headers missing for $k, skipping DKMS build."
+        fi
+      done
+    else
+      echo "Lustre module not found in dkms status."
+    fi
+  become: yes
+  when:
+  - install_lustre
+  - ansible_os_family == 'RedHat'
+
 - name: Skip Lustre install
   ansible.builtin.debug:
     msg: Lustre install has been disabled for this OS
