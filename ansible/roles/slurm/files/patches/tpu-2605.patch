@@ -1083,7 +1083,7 @@ new file mode 100644
 index 0000000000..19ddad05c7
 --- /dev/null
 +++ b/src/plugins/job_submit/tpu/job_submit_tpu.c
-@@ -0,0 +1,229 @@
+@@ -0,0 +1,299 @@
 +#include <inttypes.h>
 +#include <stdio.h>
 +#include <string.h>
@@ -1095,11 +1095,13 @@ index 0000000000..19ddad05c7
 +
 +#include "src/common/log.h"
 +#include "src/common/xmalloc.h"
++#include "src/common/node_conf.h"
 +#include "src/common/xstring.h"
 +#include "src/common/list.h"
 +#include "src/common/parse_config.h"
 +#include "src/common/read_config.h"
 +#include "src/slurmctld/slurmctld.h"
++#include "src/slurmctld/reservation.h"
 +
 +/* Required Slurm plugin symbols: */
 +const char plugin_name[] = "Job submit tpu plugin";
@@ -1181,12 +1183,6 @@ index 0000000000..19ddad05c7
 +	if (!job_desc->layout)
 +		return SLURM_SUCCESS;
 +
-+	if (!tpu_config_list) {
-+		if (_load_tpu_conf() != SLURM_SUCCESS) {
-+			if (err_msg) *err_msg = xstrdup("Failed to load TPU configuration.");
-+			return SLURM_ERROR;
-+		}
-+	}
 +
 +	char *tpu_str = xstrdup(job_desc->layout);
 +	char *sep = strchr(tpu_str, '=');
@@ -1283,6 +1279,32 @@ index 0000000000..19ddad05c7
 +		job_desc->tres_per_node = xstrdup_printf("gres/tpu:%s:%u", tpu_type, tres_count);
 +	}
 +
++	/* Enforce well-fitting slices via node features */
++	char *topo_feature = xstrdup_printf("%s_%s", tpu_type, tpu_topology);
++	bool topo_exists = (avail_feature_list &&
++	                    list_find_first(avail_feature_list, list_find_feature, topo_feature));
++	bool dyn_exists  = (avail_feature_list &&
++	                    list_find_first(avail_feature_list, list_find_feature, "tpu_dynamic"));
++	char *tpu_features = NULL;
++	if (topo_exists && dyn_exists) {
++		tpu_features = xstrdup_printf("(%s|tpu_dynamic)", topo_feature);
++	} else if (dyn_exists) {
++		tpu_features = xstrdup("tpu_dynamic");
++	} else {
++		tpu_features = xstrdup(topo_feature);
++	}
++	if (job_desc->features) {
++		if (!strstr(job_desc->features, tpu_features)) {
++			char *new_features = xstrdup_printf("(%s)&%s", job_desc->features, tpu_features);
++			xfree(job_desc->features);
++			job_desc->features = new_features;
++		}
++		xfree(tpu_features);
++	} else {
++		job_desc->features = tpu_features;
++	}
++	xfree(topo_feature);
++
 +	debug("job_submit/tpu: Computed layout %s -> tres_per_node=%s features=%s min_nodes=%u",
 +	      job_desc->layout, job_desc->tres_per_node, job_desc->features, job_desc->min_nodes);
 +
@@ -1290,22 +1312,70 @@ index 0000000000..19ddad05c7
 +	return SLURM_SUCCESS;
 +}
 +
++static bool _part_has_tpu(part_record_t *part)
++{
++	return (part && part->tres_fmt_str &&
++		xstrstr(part->tres_fmt_str, "gres/tpu"));
++}
++
++static bool _job_targets_tpu_part(job_desc_msg_t *job_desc)
++{
++	if (!job_desc->partition) {
++		part_record_t *part = NULL;
++		if (job_desc->reservation && job_desc->reservation[0] != '\0') {
++			slurmctld_resv_t *resv =
++				find_resv_name(job_desc->reservation);
++			if (resv)
++				part = resv->part_ptr;
++		}
++		if (!part)
++			part = default_part_loc;
++		return _part_has_tpu(part);
++	}
++
++	bool found = false;
++	char *names = xstrdup(job_desc->partition);
++	char *save_ptr = NULL;
++	for (char *tok = strtok_r(names, ",", &save_ptr); tok;
++	     tok = strtok_r(NULL, ",", &save_ptr)) {
++		if (_part_has_tpu(find_part_record(tok))) {
++			found = true;
++			break;
++		}
++	}
++	xfree(names);
++	return found;
++}
++
 +extern int job_submit(job_desc_msg_t *job_desc, uint32_t submit_uid,
 +		      char **err_msg)
 +{
++	if (!job_desc->layout && _job_targets_tpu_part(job_desc)) {
++		error("job_submit/tpu: --layout is required for jobs submitted to a TPU partition");
++		if (err_msg)
++			*err_msg = xstrdup("--layout is required for jobs submitted to a TPU partition");
++		return SLURM_ERROR;
++	}
 +	return _process_layout(job_desc, err_msg);
 +}
 +
 +extern int job_modify(job_desc_msg_t *job_desc, job_record_t *job_ptr,
 +		      uint32_t submit_uid, char **err_msg)
 +{
++	if (job_desc->partition && !job_desc->layout && !job_ptr->layout &&
++	    _job_targets_tpu_part(job_desc)) {
++		error("job_submit/tpu: --layout is required for jobs submitted to a TPU partition");
++		if (err_msg)
++			*err_msg = xstrdup("--layout is required for jobs submitted to a TPU partition");
++		return SLURM_ERROR;
++	}
 +	return _process_layout(job_desc, err_msg);
 +}
 +
 +extern int init(void)
 +{
 +	debug("%s: %s loaded", __func__, plugin_name);
-+	return SLURM_SUCCESS;
++	return _load_tpu_conf();
 +}
 +
 +extern void fini(void)
