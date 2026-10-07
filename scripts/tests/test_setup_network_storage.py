@@ -17,7 +17,6 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
-import pytest
 from addict import Dict as NSDict
 
 PARENT_DIR = str(Path(__file__).resolve().parent.parent)
@@ -27,12 +26,15 @@ if PARENT_DIR not in sys.path:
 from setup_network_storage import (  # noqa: E402
     _check_nfs_exports_showmount,
     _find_showmount,
+    _is_controller_nfs_server,
+    _is_path_exported,
     _probe_nfs_mount,
     _probe_tcp_port,
     separate_external_internal_mounts,
     setup_network_storage as run_setup_network_storage,
     wait_for_controller_nfs,
 )
+import util  # noqa: E402
 
 
 def test_probe_tcp_port_success():
@@ -87,6 +89,28 @@ def test_find_showmount():
         assert _find_showmount() is None
 
 
+def test_is_path_exported():
+    active = {"/home", "/opt/apps"}
+    assert _is_path_exported("/home", active) is True
+    assert _is_path_exported("/home/", active) is True
+    assert _is_path_exported("/home/shared", active) is True
+    assert _is_path_exported("//home/shared", active) is True
+    assert _is_path_exported("/opt/apps/cuda/12.0", active) is True
+    # Prefix collision must NOT match
+    assert _is_path_exported("/home2", active) is False
+    assert _is_path_exported("/home_other", active) is False
+    assert _is_path_exported("/opt/apps2", active) is False
+    assert _is_path_exported("/scratch", active) is False
+    # Empty or relative paths must NOT match
+    assert _is_path_exported("", active) is False
+    assert _is_path_exported("", {""}) is False
+    assert _is_path_exported("relative/path", active) is False
+    assert _is_path_exported("/home", {""}) is False
+    # Root export matches any absolute path (including double-slash root)
+    assert _is_path_exported("/any/nested/path", {"/"}) is True
+    assert _is_path_exported("/home", {"//"}) is True
+
+
 def test_check_nfs_exports_showmount_success():
     showmount_output = """Export list for 10.0.0.1:
 /home                *
@@ -103,6 +127,27 @@ def test_check_nfs_exports_showmount_success():
         result = _check_nfs_exports_showmount("10.0.0.1", {"/home", "/opt/apps"})
         assert result is True
         mock_run.assert_called_once()
+
+
+def test_check_nfs_exports_showmount_subdirectories():
+    showmount_output = """Export list for 10.0.0.1:
+/home                *
+/opt/apps            10.0.0.0/16
+"""
+    mock_res = MagicMock(returncode=0, stdout=showmount_output)
+    with patch(
+        "setup_network_storage._find_showmount",
+        return_value="/usr/sbin/showmount",
+    ), patch("setup_network_storage._probe_tcp_port", return_value=True), patch(
+        "setup_network_storage.run", return_value=mock_res
+    ):
+        assert (
+            _check_nfs_exports_showmount(
+                "10.0.0.1", {"/home/shared", "/opt/apps/cuda/12.0"}
+            )
+            is True
+        )
+        assert _check_nfs_exports_showmount("10.0.0.1", {"/home_other"}) is False
 
 
 def test_check_nfs_exports_showmount_missing_share():
@@ -182,17 +227,26 @@ def test_probe_nfs_mount_failure():
 
 
 def test_wait_for_controller_nfs_invalid_timeout():
-    with pytest.raises(TimeoutError, match="Invalid timeout 0s"):
-        wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=0)
-    with pytest.raises(TimeoutError, match="Invalid timeout -5s"):
-        wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=-5)
+    mock_log = MagicMock()
+    assert (
+        wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=0, log=mock_log) is False
+    )
+    assert (
+        wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=-5, log=mock_log)
+        is False
+    )
+    assert mock_log.warning.call_count == 2
+    assert "Invalid timeout 0s" in mock_log.warning.call_args_list[0][0][0]
+    assert "Invalid timeout -5s" in mock_log.warning.call_args_list[1][0][0]
 
 
 def test_wait_for_controller_nfs_happy_path_tier1():
     with patch("setup_network_storage._probe_tcp_port", return_value=True), patch(
         "setup_network_storage._check_nfs_exports_showmount", return_value=True
     ), patch("time.sleep") as mock_sleep:
-        wait_for_controller_nfs("10.0.0.1", ["/home", "/apps"], timeout=10)
+        assert (
+            wait_for_controller_nfs("10.0.0.1", ["/home", "/apps"], timeout=10) is True
+        )
         mock_sleep.assert_called_once_with(0.5)
 
 
@@ -204,7 +258,9 @@ def test_wait_for_controller_nfs_tier2_fallback():
     ) as mock_probe, patch(
         "time.sleep"
     ) as mock_sleep:
-        wait_for_controller_nfs("10.0.0.1", ["/home", "/apps"], timeout=10)
+        assert (
+            wait_for_controller_nfs("10.0.0.1", ["/home", "/apps"], timeout=10) is True
+        )
         assert mock_probe.call_count == 2
         mock_sleep.assert_called_once_with(0.5)
 
@@ -221,7 +277,7 @@ def test_wait_for_controller_nfs_retries_on_unready_exports_then_succeeds():
         "setup_network_storage._check_nfs_exports_showmount",
         side_effect=mock_check,
     ), patch("time.sleep"):
-        wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=30)
+        assert wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=30) is True
         assert attempts == 3
 
 
@@ -229,12 +285,13 @@ def test_wait_for_controller_nfs_empty_paths():
     with patch("setup_network_storage._probe_tcp_port", return_value=True), patch(
         "time.sleep"
     ) as mock_sleep:
-        wait_for_controller_nfs("10.0.0.1", [], timeout=10)
+        assert wait_for_controller_nfs("10.0.0.1", [], timeout=10) is True
         mock_sleep.assert_called_once_with(0.5)
 
 
 def test_wait_for_controller_nfs_port_2049_timeout():
     fake_time = [100.0]
+    mock_log = MagicMock()
 
     def mock_monotonic():
         fake_time[0] += 5.0
@@ -243,15 +300,20 @@ def test_wait_for_controller_nfs_port_2049_timeout():
     with patch("setup_network_storage._probe_tcp_port", return_value=False), patch(
         "time.monotonic", side_effect=mock_monotonic
     ), patch("time.sleep"):
-        with pytest.raises(
-            TimeoutError,
-            match=r"Timed out after 5s waiting for NFS port 2049 on 10\.0\.0\.1",
-        ):
-            wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=5)
+        assert (
+            wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=5, log=mock_log)
+            is False
+        )
+        mock_log.warning.assert_called_once()
+        assert (
+            "Timed out after 5s waiting for NFS port 2049 on 10.0.0.1"
+            in mock_log.warning.call_args[0][0]
+        )
 
 
 def test_wait_for_controller_nfs_exports_timeout():
     fake_time = [100.0]
+    mock_log = MagicMock()
 
     def mock_monotonic():
         fake_time[0] += 5.0
@@ -260,11 +322,15 @@ def test_wait_for_controller_nfs_exports_timeout():
     with patch("setup_network_storage._probe_tcp_port", return_value=True), patch(
         "setup_network_storage._check_nfs_exports_showmount", return_value=False
     ), patch("time.monotonic", side_effect=mock_monotonic), patch("time.sleep"):
-        with pytest.raises(
-            TimeoutError,
-            match=r"Timed out after 5s waiting for controller '10\.0\.0\.1' to export",
-        ):
-            wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=5)
+        assert (
+            wait_for_controller_nfs("10.0.0.1", ["/home"], timeout=5, log=mock_log)
+            is False
+        )
+        mock_log.warning.assert_called_once()
+        assert (
+            "Timed out after 5s waiting for controller '10.0.0.1' to export"
+            in mock_log.warning.call_args[0][0]
+        )
 
 
 def test_separate_external_internal_mounts_dns_fast_path():
@@ -289,6 +355,62 @@ def test_separate_external_internal_mounts_dns_fast_path():
             assert len(ext) == 1
             # host_lookup should only have been called for the external server, not the 3 fast-path matches
             mock_lookup.assert_called_once_with("10.99.99.99")
+
+
+def test_is_controller_nfs_server_variants():
+    cfg = NSDict(slurm_control_host="slurm-controller", slurm_control_addr="10.0.0.2")
+    lookup_obj = util.Lookup(cfg)
+
+    with patch("setup_network_storage.util.host_lookup") as mock_host_lookup, patch(
+        "socket.gethostbyname"
+    ) as mock_gethostbyname:
+        assert _is_controller_nfs_server("", lookup_obj) is False
+        assert _is_controller_nfs_server("slurm-controller", lookup_obj) is True
+        assert _is_controller_nfs_server("10.0.0.2", lookup_obj) is True
+        mock_host_lookup.assert_not_called()
+        mock_gethostbyname.assert_not_called()
+
+    # External unresolvable hostname: single gethostbyname call, no util.host_lookup retry
+    with patch("setup_network_storage.util.host_lookup") as mock_host_lookup, patch(
+        "socket.gethostbyname", side_effect=socket.gaierror("Name not known")
+    ) as mock_gethostbyname:
+        assert (
+            _is_controller_nfs_server("external-nfs.example.internal", lookup_obj)
+            is False
+        )
+        mock_gethostbyname.assert_called_once_with("external-nfs.example.internal")
+        mock_host_lookup.assert_not_called()
+
+    # External resolvable hostname resolving to non-controller IP
+    with patch("setup_network_storage.util.host_lookup") as mock_host_lookup, patch(
+        "socket.gethostbyname",
+        side_effect=lambda h: "10.99.0.5"
+        if h == "filestore.example.internal"
+        else "10.0.0.2",
+    ):
+        assert (
+            _is_controller_nfs_server("filestore.example.internal", lookup_obj) is False
+        )
+        mock_host_lookup.assert_not_called()
+
+    # Alias hostname resolving to controller IP
+    with patch("setup_network_storage.util.host_lookup") as mock_host_lookup, patch(
+        "socket.gethostbyname", return_value="10.0.0.2"
+    ) as mock_gethostbyname:
+        assert (
+            _is_controller_nfs_server("controller-alias.internal", lookup_obj) is True
+        )
+        mock_gethostbyname.assert_called_once_with("controller-alias.internal")
+        mock_host_lookup.assert_not_called()
+
+    # slurm_control_addr=None where server IP matches socket.gethostbyname(control_host)
+    cfg_no_addr = NSDict(slurm_control_host="slurm-controller", slurm_control_addr=None)
+    lookup_no_addr = util.Lookup(cfg_no_addr)
+    with patch("setup_network_storage.util.host_lookup") as mock_host_lookup, patch(
+        "socket.gethostbyname", return_value="10.0.0.2"
+    ):
+        assert _is_controller_nfs_server("10.0.0.2", lookup_no_addr) is True
+        mock_host_lookup.assert_not_called()
 
 
 def test_setup_network_storage_controller_skips_preflight():
@@ -337,7 +459,7 @@ def test_setup_network_storage_client_invokes_preflight():
         "setup_network_storage.separate_external_internal_mounts",
         return_value=([], [internal_mount]),
     ), patch(
-        "setup_network_storage.wait_for_controller_nfs"
+        "setup_network_storage.wait_for_controller_nfs", return_value=True
     ) as mock_wait, patch(
         "pathlib.Path.is_file", return_value=True
     ), patch(
@@ -364,15 +486,12 @@ def test_setup_network_storage_client_invokes_preflight():
         )
 
         run_setup_network_storage(mock_log)
-        mock_wait.assert_called_once()
-        server_arg = mock_wait.call_args[0][0]
-        paths_arg = mock_wait.call_args[0][1]
-        assert server_arg == "10.0.0.1"
-        assert "/home" in paths_arg
-        assert "/etc/munge" in paths_arg
+        mock_wait.assert_called_once_with(
+            "10.0.0.1", ["/etc/munge", "/home"], timeout=600, log=mock_log
+        )
 
 
-def test_setup_network_storage_client_preflight_failure_aborts_before_fstab():
+def test_setup_network_storage_client_preflight_timeout_falls_back_to_mount_fstab():
     mock_log = MagicMock()
     internal_mount = NSDict(
         {
@@ -384,27 +503,208 @@ def test_setup_network_storage_client_preflight_failure_aborts_before_fstab():
         }
     )
 
+    fake_time = [100.0]
+
+    def mock_monotonic():
+        fake_time[0] += 700.0
+        return fake_time[0]
+
     with patch("setup_network_storage.lkp") as mock_lkp, patch(
+        "setup_network_storage.cfg"
+    ) as mock_cfg, patch(
         "setup_network_storage.resolve_network_storage",
         return_value=[internal_mount],
     ), patch(
-        "setup_network_storage.separate_external_internal_mounts",
-        return_value=([], [internal_mount]),
+        "setup_network_storage.separate_external_internal_mounts"
+    ) as mock_separate, patch(
+        "setup_network_storage._probe_tcp_port", return_value=False
     ), patch(
-        "setup_network_storage.wait_for_controller_nfs",
-        side_effect=TimeoutError("Timed out waiting for NFS"),
+        "time.monotonic", side_effect=mock_monotonic
+    ), patch(
+        "time.sleep"
+    ), patch(
+        "pathlib.Path.is_file", return_value=True
     ), patch(
         "shutil.copy2"
     ) as mock_copy, patch(
         "builtins.open", mock_open()
-    ) as mock_file:
+    ) as mock_file, patch(
+        "setup_network_storage.mount_fstab"
+    ) as mock_mount_fstab, patch(
+        "setup_network_storage.munge_mount_handler"
+    ) as mock_munge, patch(
+        "setup_network_storage.util.mkdirp"
+    ):
         mock_lkp.instance_role = "login"
-        with pytest.raises(TimeoutError, match="Timed out waiting for NFS"):
-            run_setup_network_storage(mock_log)
+        mock_lkp.control_addr = "10.0.0.1"
+        mock_cfg.munge_mount = None
 
-        # Ensure /etc/fstab was never copied or modified
-        mock_copy.assert_not_called()
-        mock_file.assert_not_called()
+        run_setup_network_storage(mock_log)
+        mock_separate.assert_not_called()
+        mock_log.warning.assert_called_once()
+        assert (
+            "Proceeding to standard mount retries" in mock_log.warning.call_args[0][0]
+        )
+        # Ensure /etc/fstab is written and mount_fstab is called as fallback
+        assert mock_copy.called
+        assert mock_file.called
+        mock_mount_fstab.assert_called_once()
+        mock_munge.assert_called_once_with(mock_log)
+
+
+def test_setup_network_storage_startup_timeout_calculation():
+    mock_log = MagicMock()
+    internal_mount = NSDict(
+        {
+            "server_ip": "10.0.0.1",
+            "remote_mount": "/home",
+            "local_mount": "/home",
+            "fs_type": "nfs",
+            "mount_options": "defaults",
+        }
+    )
+
+    # Verify omitted key in NSDict does not auto-vivify controller_startup_scripts_timeout
+    cfg_omitted = NSDict({"munge_mount": None})
+    with patch("setup_network_storage.lkp") as mock_lkp, patch(
+        "setup_network_storage.cfg", cfg_omitted
+    ), patch(
+        "setup_network_storage.resolve_network_storage",
+        return_value=[internal_mount],
+    ), patch(
+        "setup_network_storage.wait_for_controller_nfs", return_value=True
+    ) as mock_wait, patch(
+        "pathlib.Path.is_file", return_value=True
+    ), patch(
+        "shutil.copy2"
+    ), patch(
+        "builtins.open", mock_open()
+    ), patch(
+        "setup_network_storage.mount_fstab"
+    ), patch(
+        "setup_network_storage.munge_mount_handler"
+    ), patch(
+        "setup_network_storage.util.mkdirp"
+    ):
+        mock_lkp.instance_role = "login"
+        mock_lkp.control_addr = "10.0.0.1"
+        run_setup_network_storage(mock_log)
+        mock_wait.assert_called_once_with(
+            "10.0.0.1", ["/home"], timeout=600, log=mock_log
+        )
+        assert "controller_startup_scripts_timeout" not in cfg_omitted
+
+    for cfg_timeout, expected_wait in (
+        (None, 600),
+        (True, 600),
+        (120, 600),
+        (300, 600),
+        (900, 1200),
+    ):
+        cfg_obj = NSDict(
+            {
+                "munge_mount": None,
+                "controller_startup_scripts_timeout": cfg_timeout,
+            }
+        )
+        with patch("setup_network_storage.lkp") as mock_lkp, patch(
+            "setup_network_storage.cfg", cfg_obj
+        ), patch(
+            "setup_network_storage.resolve_network_storage",
+            return_value=[internal_mount],
+        ), patch(
+            "setup_network_storage.wait_for_controller_nfs", return_value=True
+        ) as mock_wait, patch(
+            "pathlib.Path.is_file", return_value=True
+        ), patch(
+            "shutil.copy2"
+        ), patch(
+            "builtins.open", mock_open()
+        ), patch(
+            "setup_network_storage.mount_fstab"
+        ), patch(
+            "setup_network_storage.munge_mount_handler"
+        ), patch(
+            "setup_network_storage.util.mkdirp"
+        ):
+            mock_lkp.instance_role = "login"
+            mock_lkp.control_addr = "10.0.0.1"
+            run_setup_network_storage(mock_log)
+            mock_wait.assert_called_once_with(
+                "10.0.0.1", ["/home"], timeout=expected_wait, log=mock_log
+            )
+
+
+def test_setup_network_storage_external_nfs_server_avoids_host_lookup_retries():
+    mock_log = MagicMock()
+    cfg_obj = NSDict(
+        {
+            "slurm_control_host": "slurm-controller",
+            "munge_mount": NSDict(
+                {
+                    "server_ip": "slurm-controller",
+                    "remote_mount": "/etc/munge",
+                    "fs_type": "nfs",
+                }
+            ),
+        }
+    )
+    lookup_obj = util.Lookup(cfg_obj)
+
+    external_mount = NSDict(
+        {
+            "server_ip": "unresolvable-external-filestore.local",
+            "remote_mount": "/datasets",
+            "local_mount": "/mnt/datasets",
+            "fs_type": "nfs",
+            "mount_options": "defaults",
+        }
+    )
+    home_mount = NSDict(
+        {
+            "server_ip": "slurm-controller",
+            "remote_mount": "/home",
+            "local_mount": "/home",
+            "fs_type": "nfs",
+            "mount_options": "defaults",
+        }
+    )
+
+    with patch.object(util.Lookup, "instance_role", new="login"), patch(
+        "setup_network_storage.lkp", lookup_obj
+    ), patch("setup_network_storage.cfg", cfg_obj), patch(
+        "setup_network_storage.resolve_network_storage",
+        return_value=[external_mount, home_mount],
+    ), patch(
+        "setup_network_storage.separate_external_internal_mounts"
+    ) as mock_separate, patch(
+        "setup_network_storage.util.host_lookup"
+    ) as mock_host_lookup, patch(
+        "socket.gethostbyname", side_effect=socket.gaierror("DNS failed")
+    ) as mock_gethostbyname, patch(
+        "setup_network_storage.wait_for_controller_nfs", return_value=True
+    ) as mock_wait, patch(
+        "pathlib.Path.is_file", return_value=True
+    ), patch(
+        "shutil.copy2"
+    ), patch(
+        "builtins.open", mock_open()
+    ), patch(
+        "setup_network_storage.mount_fstab"
+    ), patch(
+        "setup_network_storage.munge_mount_handler"
+    ), patch(
+        "setup_network_storage.util.mkdirp"
+    ):
+        run_setup_network_storage(mock_log)
+        mock_separate.assert_not_called()
+        mock_host_lookup.assert_not_called()
+        mock_gethostbyname.assert_called_once_with(
+            "unresolvable-external-filestore.local"
+        )
+        mock_wait.assert_called_once_with(
+            "slurm-controller", ["/etc/munge", "/home"], timeout=600, log=mock_log
+        )
 
 
 def test_setup_network_storage_standalone_munge_mount_invokes_preflight():
@@ -420,7 +720,7 @@ def test_setup_network_storage_standalone_munge_mount_invokes_preflight():
         "setup_network_storage.separate_external_internal_mounts",
         return_value=([], []),
     ), patch(
-        "setup_network_storage.wait_for_controller_nfs"
+        "setup_network_storage.wait_for_controller_nfs", return_value=True
     ) as mock_wait, patch(
         "pathlib.Path.is_file", return_value=True
     ), patch(
@@ -447,15 +747,14 @@ def test_setup_network_storage_standalone_munge_mount_invokes_preflight():
         )
 
         run_setup_network_storage(mock_log)
-        mock_wait.assert_called_once()
-        server_arg = mock_wait.call_args[0][0]
-        paths_arg = mock_wait.call_args[0][1]
-        assert server_arg == "10.0.0.1"
-        assert "/etc/munge" in paths_arg
+        mock_wait.assert_called_once_with(
+            "10.0.0.1", ["/etc/munge"], timeout=600, log=mock_log
+        )
 
 
 def test_wait_for_controller_nfs_tier2_fallback_partial_failure_times_out():
-    """Verify that if one of multiple exports fails in Tier 2, wait_for_controller_nfs times out."""
+    """Verify that if one of multiple exports fails in Tier 2, wait_for_controller_nfs times out and returns False."""
+    mock_log = MagicMock()
 
     def mock_probe(server, path, timeout=4.0, log=None):
         return path == "/home"  # /apps fails
@@ -465,8 +764,14 @@ def test_wait_for_controller_nfs_tier2_fallback_partial_failure_times_out():
     ), patch("setup_network_storage._probe_nfs_mount", side_effect=mock_probe), patch(
         "time.sleep"
     ):
-        with pytest.raises(TimeoutError, match="Timed out after 1s waiting"):
-            wait_for_controller_nfs("10.0.0.1", ["/home", "/apps"], timeout=1)
+        assert (
+            wait_for_controller_nfs(
+                "10.0.0.1", ["/home", "/apps"], timeout=1, log=mock_log
+            )
+            is False
+        )
+        mock_log.warning.assert_called_once()
+        assert "Timed out after 1s waiting" in mock_log.warning.call_args[0][0]
 
 
 def test_setup_network_storage_case_insensitive_fs_type():
@@ -497,10 +802,7 @@ def test_setup_network_storage_case_insensitive_fs_type():
         "setup_network_storage.resolve_network_storage",
         return_value=[mount_upper, mount_mixed],
     ), patch(
-        "setup_network_storage.separate_external_internal_mounts",
-        return_value=([], [mount_upper, mount_mixed]),
-    ), patch(
-        "setup_network_storage.wait_for_controller_nfs"
+        "setup_network_storage.wait_for_controller_nfs", return_value=True
     ) as mock_wait, patch(
         "pathlib.Path.is_file", return_value=True
     ), patch(
@@ -515,12 +817,10 @@ def test_setup_network_storage_case_insensitive_fs_type():
         "setup_network_storage.util.mkdirp"
     ):
         mock_lkp.instance_role = "login"
+        mock_lkp.control_addr = "10.0.0.1"
         mock_cfg.munge_mount = None
 
         run_setup_network_storage(mock_log)
-        mock_wait.assert_called_once()
-        server_arg = mock_wait.call_args[0][0]
-        paths_arg = mock_wait.call_args[0][1]
-        assert server_arg == "10.0.0.1"
-        assert "/home" in paths_arg
-        assert "/apps" in paths_arg
+        mock_wait.assert_called_once_with(
+            "10.0.0.1", ["/apps", "/home"], timeout=600, log=mock_log
+        )
