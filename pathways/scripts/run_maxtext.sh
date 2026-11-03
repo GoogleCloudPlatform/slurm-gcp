@@ -43,9 +43,7 @@
 #   # On a cluster without a cpu partition, run it on the login node instead:
 #   bash run_maxtext.sh
 
-
 set -euo pipefail
-
 
 export USER="${USER:-${SLURM_JOB_USER:-$(id -un)}}"
 export HOME="${HOME:-/home/${USER}}"
@@ -53,7 +51,6 @@ WORK_DIR="${WORK_DIR:-/home/${USER}/pathways}"
 MAXTEXT_DIR="${MAXTEXT_DIR:-${WORK_DIR}/maxtext}"
 VENV_PYTHON="${VENV_PYTHON:-${WORK_DIR}/venv/bin/python}"
 CLUSTER_NAME="$(scontrol show config 2>/dev/null | awk '/^ClusterName/ {print $3}' || echo default)"
-
 
 # Wait until the Pathways service is READY: its discovery file exists and its
 # IFRT proxy accepts connections. A file left behind by a service that died
@@ -85,18 +82,15 @@ while true; do
 done
 CLUSTER_ENV_FILE="${env_file}"
 
-
 # Load JAX_BACKEND_TARGET, SLICE_SHAPE, MIN_SLICES, MAX_SLICES, GCS_BUCKET
 # shellcheck disable=SC1090
 source "${CLUSTER_ENV_FILE}"
-
 
 STEPS="${STEPS:-30}"
 CHECKPOINT_PERIOD="${CHECKPOINT_PERIOD:-5}"
 REDUCED_LAYERS="${REDUCED_LAYERS:-0}"
 RUN_NAME="${RUN_NAME:-llama3_1_8b_${SLURM_JOB_ID:-$(date +%s)}}"
 BASE_OUTPUT_DIR="${BASE_OUTPUT_DIR:-${GCS_BUCKET%/}/maxtext-runs}"
-
 
 MODEL_FLAGS=(
   "model_name=llama3.1-8b"
@@ -122,7 +116,6 @@ MODEL_FLAGS=(
   "sa_use_fused_bwd_kernel=True"
 )
 
-
 if [[ "${REDUCED_LAYERS}" == "1" ]]; then
   LAYER_DESC="8 layers (REDUCED_LAYERS=1)"
   MODEL_FLAGS+=(
@@ -139,7 +132,6 @@ else
   )
 fi
 
-
 echo "=================================================================="
 echo "Launching Elastic MaxText Client Workload (Llama 3.1 8B)"
 echo "  Pathways Proxy     : ${JAX_BACKEND_TARGET}"
@@ -150,11 +142,9 @@ echo "  Steps / Ckpt Period: steps=${STEPS}, checkpoint_period=${CHECKPOINT_PERI
 echo "  Output Directory   : ${BASE_OUTPUT_DIR}/${RUN_NAME}"
 echo "=================================================================="
 
-
 cd "${MAXTEXT_DIR}"
 export PYTHONPATH="${MAXTEXT_DIR}/src:${MAXTEXT_DIR}:${PYTHONPATH:-}"
 export ENABLE_PATHWAYS_PERSISTENCE="${ENABLE_PATHWAYS_PERSISTENCE:-1}"
-
 
 exec "${VENV_PYTHON}" -u -m maxtext.trainers.pre_train.train \
   src/maxtext/configs/base.yml \

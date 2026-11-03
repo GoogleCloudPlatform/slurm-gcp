@@ -30,15 +30,12 @@
 # Once MIN_SLICES slices are running, it writes ~/pathways/cluster.env so client
 # workloads such as run_maxtext.sh can connect. It runs until you stop it.
 
-
 set -euo pipefail
 ulimit -l unlimited 2>/dev/null || true
-
 
 # Slurm can start this script with a minimal environment.
 export USER="${USER:-${SLURM_JOB_USER:-$(id -un)}}"
 export HOME="${HOME:-/home/${USER}}"
-
 
 # ---------------------------------------------------------------------------
 # Settings (override any of these as environment variables when you submit)
@@ -52,13 +49,11 @@ GCS_PATH="${GCS_PATH:-${GCS_BUCKET%/}/pathways-scratch/shared}"
 RM_PORT="${RM_PORT:-29001}"
 PROXY_PORT="${PROXY_PORT:-29000}"
 
-
 WORK_DIR="${WORK_DIR:-/home/${USER}/pathways}"   # set up by setup_env.sh
 SERVER_SQSH="${SERVER_SQSH:-${WORK_DIR}/server.sqsh}"
 PROXY_SQSH="${PROXY_SQSH:-${WORK_DIR}/proxy.sqsh}"
 BIN_DIR="${BIN_DIR:-${WORK_DIR}/bin}"
 CLUSTER_ENV_FILE="${CLUSTER_ENV_FILE:-${WORK_DIR}/cluster.env}"
-
 
 # run_worker_slice.sh: taken from the submit directory (or this script's
 # directory when run with bash), else from WORK_DIR.
@@ -68,13 +63,11 @@ if [[ -z "${WORKER_SCRIPT:-}" ]]; then
   [[ -f "${WORKER_SCRIPT}" ]] || WORKER_SCRIPT="${WORK_DIR}/run_worker_slice.sh"
 fi
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
-
 
 # wait_for_port HOST PORT NAME: waits up to about 6 minutes for a listener.
 wait_for_port() {
@@ -89,17 +82,14 @@ wait_for_port() {
   die "Timed out waiting for ${name} on ${host}:${port}; see ${LOG_DIR}"
 }
 
-
 # make_container NAME IMAGE: creates a fresh Enroot container from a .sqsh image.
 make_container() {
   enroot remove -f "$1" 2>/dev/null || true
   enroot create --name "$1" "$2"
 }
 
-
 # Every container gets /tmp, plus the wrapper scripts from BIN_DIR as /pathways.
 ENROOT_START=(enroot start --rw --mount /tmp:/tmp --mount "${BIN_DIR}:/pathways")
-
 
 cleanup() {
   local exit_code=$?
@@ -118,7 +108,6 @@ cleanup() {
   exit "${exit_code}"
 }
 
-
 # ---------------------------------------------------------------------------
 # Checks: fail now, with a clear message, rather than halfway through
 # ---------------------------------------------------------------------------
@@ -136,14 +125,12 @@ for f in "${SERVER_SQSH}" "${PROXY_SQSH}" "${BIN_DIR}/server" "${BIN_DIR}/proxy_
   [[ -e "${f}" ]] || die "Missing ${f}. Run setup_env.sh first."
 done
 
-
 # ---------------------------------------------------------------------------
 # Derived values and run directories
 # ---------------------------------------------------------------------------
 NUM_ELASTIC_SLICES=$(( MAX_SLICES - MIN_SLICES ))
 IFS='x' read -r TOPO_X TOPO_Y <<< "${SLICE_TOPOLOGY}"
 CHIPS_PER_SLICE=$(( TOPO_X * TOPO_Y ))
-
 
 JOB_ID="${SLURM_JOB_ID:-login-$(date +%s)}"   # login-<time> when not run as a job
 RUN_DIR="${WORK_DIR}/service_${JOB_ID}"
@@ -152,19 +139,16 @@ RM_NODE="$(hostname -s)"
 RM_IP="$(getent ahostsv4 "${RM_NODE}" 2>/dev/null | awk 'NR==1 {print $1}' || true)"
 [[ -n "${RM_IP}" ]] || die "Couldn't resolve the IP address of ${RM_NODE}"
 
-
 # run_maxtext.sh reads cluster_<ClusterName>.env first, then cluster.env.
 CLUSTER_NAME="$(scontrol show config 2>/dev/null | awk '/^ClusterName/ {print $3}' || echo default)"
 CLUSTER_ENV_FILES=("${WORK_DIR}/cluster_${CLUSTER_NAME}.env" "${CLUSTER_ENV_FILE}")
 # Remove a previous run's files so clients never connect to a dead service.
 rm -f "${CLUSTER_ENV_FILES[@]}" 2>/dev/null || true
 
-
 PARTITION_FLAGS=()
 if [[ -n "${PARTITION}" ]]; then PARTITION_FLAGS=(-p "${PARTITION}"); fi
 PROXY_FLAGS=()
 if (( NUM_ELASTIC_SLICES > 0 )); then PROXY_FLAGS=("--num_elastic_instances=${NUM_ELASTIC_SLICES}"); fi
-
 
 # Enroot keeps its runtime state on this node's local /tmp.
 export ENROOT_CONFIG_PATH="${HOME}/.enroot"
@@ -175,10 +159,8 @@ export ENROOT_TEMP_PATH="/tmp/enroot-$(id -u)/tmp"
 mkdir -p "${LOG_DIR}" "${ENROOT_CONFIG_PATH}" "${ENROOT_RUNTIME_PATH}" \
   "${ENROOT_CACHE_PATH}" "${ENROOT_DATA_PATH}" "${ENROOT_TEMP_PATH}"
 
-
 ARRAY_JOB_ID="" RM_PID="" PROXY_PID="" RECOVERY_PID=""
 trap cleanup EXIT INT TERM HUP   # HUP: closing the terminal also stops it cleanly
-
 
 cat <<EOF
 ==================================================================
@@ -190,7 +172,6 @@ Starting Standing Pathways Runtime Service
   Logs Directory     : ${LOG_DIR}
 ==================================================================
 EOF
-
 
 # ---------------------------------------------------------------------------
 # 1. Resource Manager
@@ -207,7 +188,6 @@ make_container "pw_rm_${JOB_ID}" "${SERVER_SQSH}"
 RM_PID=$!
 wait_for_port "${RM_IP}" "${RM_PORT}" "Pathways Resource Manager"
 
-
 # ---------------------------------------------------------------------------
 # 2. IFRT proxy: a long-running service like the Resource Manager. It stays up
 #    while slices come and go, and between client jobs.
@@ -221,7 +201,6 @@ make_container "pw_proxy_${JOB_ID}" "${PROXY_SQSH}"
   > "${LOG_DIR}/proxy.log" 2>&1 &
 PROXY_PID=$!
 wait_for_port "${RM_IP}" "${PROXY_PORT}" "Pathways IFRT Proxy Server"
-
 
 # ---------------------------------------------------------------------------
 # 3. Discovery file, read by the worker slices now and by clients later
@@ -246,7 +225,6 @@ export LOG_DIR="${LOG_DIR}"
 export COORD_JOB_ID="${JOB_ID}"
 EOF
 
-
 # ---------------------------------------------------------------------------
 # 4. Worker slices: an array job with one task per slice
 # ---------------------------------------------------------------------------
@@ -266,7 +244,6 @@ ARRAY_JOB_ID="$(env -u SLURM_TRES_PER_TASK -u SLURM_CPUS_PER_TASK \
     "${WORKER_SCRIPT}")"
 echo "export WORKER_ARRAY_JOB_ID=\"${ARRAY_JOB_ID}\"" >> "${RUN_DIR}/service.env"
 log "Submitted TPU Worker Slice Array Job: ${ARRAY_JOB_ID} (tasks 1..${MAX_SLICES})"
-
 
 # ---------------------------------------------------------------------------
 # 5. Slice recovery
@@ -303,7 +280,6 @@ if [[ -n "${PARTITION}" ]]; then SINFO_ARGS+=(-p "${PARTITION}"); fi
 ) &
 RECOVERY_PID=$!
 
-
 # ---------------------------------------------------------------------------
 # 6. Wait until MIN_SLICES slices are running
 # ---------------------------------------------------------------------------
@@ -319,12 +295,10 @@ while true; do
   sleep 3
 done
 
-
 # ---------------------------------------------------------------------------
 # 7. Publish the discovery file for clients
 # ---------------------------------------------------------------------------
 for f in "${CLUSTER_ENV_FILES[@]}"; do cp -f "${RUN_DIR}/service.env" "${f}"; done
-
 
 if [[ -n "${SLURM_JOB_ID:-}" ]]; then
   RUN_CMD="sbatch run_maxtext.sh"
@@ -337,7 +311,6 @@ else
   STOP_CMD="kill $$   (or press Ctrl+C in this terminal)"
 fi
 
-
 cat <<EOF
 ==================================================================
 Pathways Runtime Service is READY!
@@ -345,16 +318,13 @@ Pathways Runtime Service is READY!
   IFRT Proxy Target  : grpc://${RM_IP}:${PROXY_PORT}
   Running TPU Slices : ${running_slices} / ${MAX_SLICES} (min=${MIN_SLICES})
 
-
 To launch the Elastic MaxText Llama 3.1 8B workload, run:
   ${RUN_CMD}
-
 
 To stop the Pathways runtime service when finished, run:
   ${STOP_CMD}
 ==================================================================
 EOF
-
 
 # Run until the service is stopped. If the Resource Manager or the proxy exits,
 # stop the whole service so the failure is visible.

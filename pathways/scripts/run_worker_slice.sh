@@ -21,11 +21,9 @@
 # by start_pathways.sh). Each array task manages one TPU slice independently.
 # If a Spot slice is preempted, only that array task exits and is requeued by Slurm.
 
-
 set -euo pipefail
 ulimit -l unlimited 2>/dev/null || true
 unset SLURM_TRES_PER_TASK SLURM_CPUS_PER_TASK SLURM_MEM_PER_NODE SLURM_MEM_PER_CPU
-
 
 export USER="${USER:-${SLURM_JOB_USER:-$(id -un)}}"
 export HOME="${HOME:-/home/${USER}}"
@@ -33,15 +31,12 @@ WORK_DIR="${WORK_DIR:-/home/${USER}/pathways}"
 SERVER_SQSH="${SERVER_SQSH:-${WORK_DIR}/server.sqsh}"
 BIN_DIR="${BIN_DIR:-${WORK_DIR}/bin}"
 
-
 # shellcheck disable=SC1090
 source "${SERVICE_ENV:?ERROR: SERVICE_ENV must point to service.env}"
-
 
 SLICE_TASK_ID="${SLURM_ARRAY_TASK_ID:-1}"
 SLICE_INDEX=$(( SLICE_TASK_ID - 1 ))
 RESTART_COUNT="${SLURM_RESTART_COUNT:-0}"
-
 
 resolve_ip() {
   local host="$1"
@@ -57,11 +52,9 @@ resolve_ip() {
   return 1
 }
 
-
 mapfile -t SLICE_NODES < <(scontrol show hostnames "${SLURM_JOB_NODELIST}")
 NUM_SLICE_NODES="${#SLICE_NODES[@]}"
 SLICE_NODELIST_CSV="$(IFS=,; echo "${SLICE_NODES[*]}")"
-
 
 SLICE_IPS=()
 for node in "${SLICE_NODES[@]}"; do
@@ -69,23 +62,19 @@ for node in "${SLICE_NODES[@]}"; do
 done
 SLICE_IPS_CSV="$(IFS=,; echo "${SLICE_IPS[*]}")"
 
-
 IFS='x' read -r TOPO_X TOPO_Y <<< "${SLICE_TOPOLOGY}"
 CHIPS_PER_SLICE=$(( TOPO_X * TOPO_Y ))
 TPU_HOST_BOUNDS="$(( TOPO_X / 2 )),$(( TOPO_Y / 2 )),1"
 TPU_ACCELERATOR_TYPE="${SLICE_TPU_TYPE}-${CHIPS_PER_SLICE}"
-
 
 echo "=== Pathways Worker Slice ${SLICE_TASK_ID}/${MAX_SLICES} (attempt ${RESTART_COUNT}) ==="
 echo "  Nodes    : ${SLICE_NODELIST_CSV} (${SLICE_IPS_CSV})"
 echo "  Topology : ${SLICE_TPU_TYPE}:${SLICE_TOPOLOGY} (${TPU_ACCELERATOR_TYPE}, host_bounds=${TPU_HOST_BOUNDS})"
 echo "  RM Target: ${RM_IP}:${RM_PORT}"
 
-
 # Ensure Enroot runtime directories exist on all hosts in this slice.
 srun --propagate=NONE --overlap --gres=none --mem=4G -N "${NUM_SLICE_NODES}" -n "${NUM_SLICE_NODES}" --ntasks-per-node=1 \
   /bin/bash -c 'mkdir -p "${HOME}/.enroot" "/tmp/enroot-$(id -u)/"{tmp,runtime,cache,data} 2>/dev/null || true'
-
 
 # Run the Pathways worker server inside the Enroot container across all hosts in
 # the slice. The inner loop restarts the server cleanly whenever a client
@@ -135,11 +124,9 @@ srun \
 SRUN_RC=$?
 set -e
 
-
 if [[ -f "${RUN_DIR}/shutdown" ]]; then
   exit 0
 fi
-
 
 # If srun exited because a VM in the slice was preempted or became unhealthy,
 # power-cycle the slice so Cluster Director recreates the multi-host slice MIG.
