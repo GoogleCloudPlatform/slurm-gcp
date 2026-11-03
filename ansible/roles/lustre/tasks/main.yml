@@ -77,10 +77,12 @@
     else
       echo "Lustre module not found in dkms status."
     fi
+    modinfo -k "$(uname -r)" lustre > /dev/null
   become: yes
   when:
   - install_lustre
   - ansible_os_family == 'RedHat'
+  - ansible_distribution_major_version == '9'
 
 - name: Skip Lustre install
   ansible.builtin.debug:
