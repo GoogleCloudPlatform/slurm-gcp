@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=48G
+#SBATCH --mem=80G
 #SBATCH --no-requeue
 #
 # Copyright 2026 Google LLC
