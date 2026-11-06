@@ -24,12 +24,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="${WORK_DIR:-/home/pathways}"
 MAXTEXT_DIR="${MAXTEXT_DIR:-${WORK_DIR}/maxtext}"
+MAXTEXT_COMMIT="${MAXTEXT_COMMIT:-ce608b918c4fdfbfdb62f5a7976d2e15e4fdd720}"
 
 # JAX version for the client, and the Pathways build to pair it with. Pathways
 # image tags are <build>-jax_<version>, and each build is tagged once for every
 # JAX version it's compatible with, so a missing tag means an unsupported pair.
 JAX_VERSION="${JAX_VERSION:-0.11.1}"
-PATHWAYS_BUILD="${PATHWAYS_BUILD:-20260901}"
+PATHWAYS_BUILD="${PATHWAYS_BUILD:-20261103}"
 PATHWAYS_REPO="us-docker.pkg.dev/cloud-tpu-v2-images/pathways"
 SERVER_IMAGE="${SERVER_IMAGE:-${PATHWAYS_REPO}/server:${PATHWAYS_BUILD}-jax_${JAX_VERSION}}"
 PROXY_IMAGE="${PROXY_IMAGE:-${PATHWAYS_REPO}/proxy_server:${PATHWAYS_BUILD}-jax_${JAX_VERSION}}"
@@ -132,13 +133,23 @@ fi
   pathwaysutils
 
 echo "=== [4/4] Setting up MaxText (${MAXTEXT_DIR}) ==="
-if [[ ! -d "${MAXTEXT_DIR}" ]]; then
-  git clone --depth 1 https://github.com/AI-Hypercomputer/maxtext.git "${MAXTEXT_DIR}"
+if [[ ! -d "${MAXTEXT_DIR}/.git" ]]; then
+  rm -rf "${MAXTEXT_DIR}"
+  mkdir -p "${MAXTEXT_DIR}"
+  git -C "${MAXTEXT_DIR}" init -q
+  git -C "${MAXTEXT_DIR}" remote add origin https://github.com/AI-Hypercomputer/maxtext.git
+fi
+
+if [[ "$(git -C "${MAXTEXT_DIR}" rev-parse HEAD 2>/dev/null)" != "${MAXTEXT_COMMIT}" ]]; then
+  git -C "${MAXTEXT_DIR}" fetch --depth 1 origin "${MAXTEXT_COMMIT}"
+  git -C "${MAXTEXT_DIR}" checkout -q FETCH_HEAD
 fi
 "${UV_BIN}" pip install --python "${VENV_DIR}/bin/python" --no-deps -e "${MAXTEXT_DIR}"
 "${UV_BIN}" pip install --python "${VENV_DIR}/bin/python" \
+  "jax==${JAX_VERSION}" "jaxlib==${JAX_VERSION}" \
   flax optax orbax-checkpoint grain tensorflow-datasets tiktoken transformers sentencepiece \
-  ml-collections absl-py pyyaml rich pillow protobuf google-cloud-storage cloud-tpu-diagnostics
+  ml-collections absl-py pyyaml rich pillow protobuf google-cloud-storage cloud-tpu-diagnostics \
+  omegaconf jinja2 aqtp qwix tokamax drjax sympy
 
 echo "=== Setup Complete ==="
 chmod -R a+rX "${WORK_DIR}" 2>/dev/null || sudo -n chmod -R a+rX "${WORK_DIR}" 2>/dev/null || true
