@@ -133,11 +133,14 @@ fi
   pathwaysutils
 
 echo "=== [4/4] Setting up MaxText (${MAXTEXT_DIR}) ==="
-if [[ ! -f "${MAXTEXT_DIR}/pyproject.toml" ]]; then
+if [[ ! -d "${MAXTEXT_DIR}/.git" ]]; then
   rm -rf "${MAXTEXT_DIR}"
   mkdir -p "${MAXTEXT_DIR}"
   git -C "${MAXTEXT_DIR}" init -q
   git -C "${MAXTEXT_DIR}" remote add origin https://github.com/AI-Hypercomputer/maxtext.git
+fi
+
+if [[ "$(git -C "${MAXTEXT_DIR}" rev-parse HEAD 2>/dev/null)" != "${MAXTEXT_COMMIT}" ]]; then
   git -C "${MAXTEXT_DIR}" fetch --depth 1 origin "${MAXTEXT_COMMIT}"
   git -C "${MAXTEXT_DIR}" checkout -q FETCH_HEAD
 fi
