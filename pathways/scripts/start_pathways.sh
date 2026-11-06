@@ -128,7 +128,10 @@ done
 # ---------------------------------------------------------------------------
 # Derived values and run directories
 # ---------------------------------------------------------------------------
-NUM_ELASTIC_SLICES=$(( MAX_SLICES - MIN_SLICES ))
+# Setting --num_elastic_instances to MAX_SLICES keeps the proxy's minimum slice
+# count at 0 so slice loss returns PlacementDataLoss instead of terminating the
+# proxy and active client sessions; clients enforce MIN_SLICES.
+NUM_ELASTIC_SLICES="${MAX_SLICES}"
 IFS='x' read -r TOPO_X TOPO_Y <<< "${SLICE_TOPOLOGY}"
 CHIPS_PER_SLICE=$(( TOPO_X * TOPO_Y ))
 

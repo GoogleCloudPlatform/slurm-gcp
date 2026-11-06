@@ -88,6 +88,9 @@ source "${CLUSTER_ENV_FILE}"
 
 STEPS="${STEPS:-30}"
 CHECKPOINT_PERIOD="${CHECKPOINT_PERIOD:-5}"
+# MaxText defaults elastic_timeout_seconds to 300s, which is shorter than
+# Slurm's default 600s cred_expire requeue hold plus slice recreation time.
+ELASTIC_TIMEOUT_SECONDS="${ELASTIC_TIMEOUT_SECONDS:-3600}"
 REDUCED_LAYERS="${REDUCED_LAYERS:-0}"
 RUN_NAME="${RUN_NAME:-llama3_1_8b_${SLURM_JOB_ID:-$(date +%s)}}"
 BASE_OUTPUT_DIR="${BASE_OUTPUT_DIR:-${GCS_BUCKET%/}/maxtext-runs}"
@@ -153,6 +156,7 @@ exec "${VENV_PYTHON}" -u -m maxtext.trainers.pre_train.train \
   enable_single_controller=True \
   elastic_enabled=True \
   elastic_min_slice_count="${MIN_SLICES}" \
+  elastic_timeout_seconds="${ELASTIC_TIMEOUT_SECONDS}" \
   enable_checkpointing=True \
   async_checkpointing=False \
   save_checkpoint_on_start="${SAVE_CHECKPOINT_ON_START:-False}" \
