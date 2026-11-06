@@ -23,6 +23,7 @@
 
 set -euo pipefail
 ulimit -l unlimited 2>/dev/null || true
+ulimit -c 0 2>/dev/null || true
 unset SLURM_TRES_PER_TASK SLURM_CPUS_PER_TASK SLURM_MEM_PER_NODE SLURM_MEM_PER_CPU
 
 export USER="${USER:-${SLURM_JOB_USER:-$(id -un)}}"
@@ -93,6 +94,9 @@ srun \
   --container-mounts="/dev:/dev,/tmp:/tmp,${BIN_DIR}:/pathways,${RUN_DIR}:${RUN_DIR}" \
   --container-writable \
   /bin/sh -c "
+    # --propagate=NONE resets RLIMIT_CORE; disable core dumps so worker SIGABRTs
+    # do not write ~89 GB /tmp/core files onto the 100 GB TPU boot disk.
+    ulimit -c 0 2>/dev/null || true
     export TPU_SKIP_MDS_QUERY=true
     export TPU_ACCELERATOR_TYPE='${TPU_ACCELERATOR_TYPE}'
     export TPU_TOPOLOGY='${SLICE_TOPOLOGY}'
