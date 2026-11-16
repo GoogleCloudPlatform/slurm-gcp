@@ -21,11 +21,17 @@
         grep -E "^GRUB_CMDLINE_LINUX=.*" {{ grub_cmdline_file }} |
         sed -e "s/^GRUB_CMDLINE_LINUX=//" -e "s/^\"//" -e "s/\"$//"
     register: grub_args
+    changed_when: false
+    failed_when: false
+
+  - name: Compute missing GRUB_CMDLINE_LINUX arguments
+    ansible.builtin.set_fact:
+      grub_existing_args: "{{ grub_args.stdout.split() if grub_args.stdout else [] }}"
+      grub_new_args: "{{ grub_cmdline_args | difference(grub_args.stdout.split() if grub_args.stdout else []) }}"
 
   - name: Set facts
     ansible.builtin.set_fact:
-      grub_cmdline_args: |
-        {{ (grub_args.stdout.split(' ') + grub_cmdline_args) | unique }}
+      grub_cmdline_args: "{{ (grub_existing_args + grub_new_args) | unique }}"
   when:
   - not grub_cmdline_replace
   - grub_cmdline_args | length > 0
@@ -36,5 +42,6 @@
     regexp: ^GRUB_CMDLINE_LINUX=.*$
     line: GRUB_CMDLINE_LINUX="{{ grub_cmdline_args | join(' ') }}"
     state: present
-    backup: true
+  when:
+  - grub_cmdline_replace or (grub_new_args | default([]) | length > 0)
   notify: Update Grub2 ({{ ansible_os_family }} Family)
