@@ -21,27 +21,28 @@
         grep -E "^GRUB_CMDLINE_LINUX=.*" {{ grub_cmdline_file }} |
         sed -e "s/^GRUB_CMDLINE_LINUX=//" -e "s/^\"//" -e "s/\"$//"
     register: grub_args
+    check_mode: false
     changed_when: false
     failed_when: false
 
   - name: Compute missing GRUB_CMDLINE_LINUX arguments
     ansible.builtin.set_fact:
-      grub_existing_args: "{{ grub_args.stdout.split() if grub_args.stdout else [] }}"
-      grub_new_args: "{{ grub_cmdline_args | difference(grub_args.stdout.split() if grub_args.stdout else []) }}"
+      grub_existing_args: "{{ grub_args.stdout.split() }}"
+      grub_new_args: "{{ grub_cmdline_args | difference(grub_args.stdout.split()) }}"
 
   - name: Set facts
     ansible.builtin.set_fact:
       grub_cmdline_args: "{{ (grub_existing_args + grub_new_args) | unique }}"
   when:
   - not grub_cmdline_replace
-  - grub_cmdline_args | length > 0
+  - grub_cmdline_args | default([], true) | length > 0
 
 - name: Set GRUB_CMDLINE_LINUX arguments
   ansible.builtin.lineinfile:
     dest: '{{ grub_cmdline_file }}'
     regexp: ^GRUB_CMDLINE_LINUX=.*$
-    line: GRUB_CMDLINE_LINUX="{{ grub_cmdline_args | join(' ') }}"
+    line: GRUB_CMDLINE_LINUX="{{ (grub_cmdline_args | default([], true)) | join(' ') }}"
     state: present
   when:
-  - grub_cmdline_replace or (grub_new_args | default([]) | length > 0)
+  - grub_cmdline_replace or (grub_new_args | default([], true) | length > 0)
   notify: Update Grub2 ({{ ansible_os_family }} Family)

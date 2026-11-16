@@ -36,4 +36,4 @@
     grub_cmdline_replace: false
   when:
   - change_grub
-  - cgroup_grub_cmdline_linux | default([]) | length > 0
+  - cgroup_grub_cmdline_linux | default([], true) | length > 0
