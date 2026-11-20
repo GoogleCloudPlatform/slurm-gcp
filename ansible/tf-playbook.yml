@@ -76,7 +76,7 @@
           - Ubuntu 20.04, 22.04, 24.04
   - name: Minimum Ansible Version Check
     assert:
-      that: ansible_version.full is version_compare({{min_ansible_version}}, '>=')
+      that: ansible_version.full is version_compare(min_ansible_version, '>=')
       msg: Update Ansible to at least {{min_ansible_version}} to use this playbook.
 
   roles:
