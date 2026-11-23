@@ -91,7 +91,7 @@ def start_instance_op(inst, project=None):
 def start_instances(node_list):
     log.info("{} instances to start ({})".format(len(node_list), ",".join(node_list)))
 
-    invalid, valid = separate(lambda inst: bool(lkp.instance), node_list)
+    invalid, valid = separate(lambda inst: bool(lkp.instance(inst)), node_list)
 
     ops = {inst: start_instance_op(inst) for inst in valid}
 

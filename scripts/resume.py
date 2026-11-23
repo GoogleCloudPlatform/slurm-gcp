@@ -281,6 +281,7 @@ def group_nodes_bulk(nodes, resume_data=None):
         for prefix, nodes in util.groupby_unsorted(pg_nodes, lkp.node_prefix)
         for i, chunk_nodes in enumerate(chunked(nodes, n=BULK_INSERT_LIMIT))
     ]
+
     def group_name(chunk: BulkChunk):
         if chunk.placement_group is not None:
             return f"{chunk.prefix}:job{chunk.job_id}:{chunk.placement_group}:{chunk.i}"
