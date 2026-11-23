@@ -58,7 +58,7 @@
   pre_tasks:
   - name: Minimum Ansible Version Check
     assert:
-      that: ansible_version.full is version_compare({{min_ansible_version}}, '>=')
+      that: ansible_version.full is version(min_ansible_version, '>=')
       msg: Update Ansible to at least {{min_ansible_version}} to use this playbook.
   - name: Check Supported Distribution
     ansible.builtin.assert:
