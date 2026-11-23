@@ -53,12 +53,6 @@ def conflines(cloud_parameters, lkp: util.Lookup) -> str:
         for nodeset in lkp.cfg.nodeset.values()
     )
 
-    any_tpu = any(
-        tpu_nodeset is not None
-        for part in lkp.cfg.partitions.values()
-        for tpu_nodeset in part.partition_nodeset_tpu
-    )
-
     any_dynamic = any(bool(p.partition_feature) for p in lkp.cfg.partitions.values())
     comma_params = {
         "PrivateData": [
@@ -69,7 +63,7 @@ def conflines(cloud_parameters, lkp: util.Lookup) -> str:
             "use_interactive_step",
         ],
         "SlurmctldParameters": [
-            "cloud_reg_addrs" if any_dynamic or any_tpu else "cloud_dns",
+            "cloud_reg_addrs" if any_dynamic else "cloud_dns",
             "enable_configless",
             "idle_on_node_suspend",
         ],
@@ -97,7 +91,6 @@ def conflines(cloud_parameters, lkp: util.Lookup) -> str:
         "SuspendRate": cloud_parameters.get("suspend_rate", 0),
         "SuspendTimeout": cloud_parameters.get("suspend_timeout", 300),
         "TreeWidth": cloud_parameters.get("tree_width", default_tree_width),
-        "JobSubmitPlugins": "lua" if any_tpu else None,
         "TopologyPlugin": cloud_parameters.get("topology_plugin", "topology/tree"),
     }
     return dict_to_conf(conf_options, delim="\n")
@@ -156,26 +149,6 @@ def nodeset_lines(nodeset, lkp: util.Lookup) -> str:
     )
 
 
-def nodeset_tpu_lines(nodeset, lkp: util.Lookup) -> str:
-    node_def = {
-        "NodeName": "DEFAULT",
-        "State": "UNKNOWN",
-        **nodeset.node_conf,
-    }
-    nodelist = lkp.nodelist(nodeset)
-
-    return "\n".join(
-        map(
-            dict_to_conf,
-            [
-                node_def,
-                {"NodeName": nodelist, "State": "CLOUD"},
-                {"NodeSet": nodeset.nodeset_name, "Nodes": nodelist},
-            ],
-        )
-    )
-
-
 def nodeset_dyn_lines(nodeset):
     """generate slurm NodeSet definition for dynamic nodeset"""
     return dict_to_conf(
@@ -200,14 +173,12 @@ def partitionlines(partition, lkp: util.Lookup) -> str:
         chain(
             partition.partition_nodeset,
             partition.partition_nodeset_dyn,
-            partition.partition_nodeset_tpu,
         )
     )
 
-    is_tpu = len(partition.partition_nodeset_tpu) > 0
     is_dyn = len(partition.partition_nodeset_dyn) > 0
 
-    oversub_exlusive = partition.enable_job_exclusive or is_tpu
+    oversub_exlusive = partition.enable_job_exclusive
     power_down_on_idle = partition.enable_job_exclusive and not is_dyn
 
     line_elements = {
@@ -256,7 +227,6 @@ def make_cloud_conf(lkp: util.Lookup) -> str:
         loginlines(),
         *(nodeset_lines(n, lkp) for n in lkp.cfg.nodeset.values()),
         *(nodeset_dyn_lines(n) for n in lkp.cfg.nodeset_dyn.values()),
-        *(nodeset_tpu_lines(n, lkp) for n in lkp.cfg.nodeset_tpu.values()),
         *(partitionlines(p, lkp) for p in lkp.cfg.partitions.values()),
         *(suspend_exc_lines(lkp)),
     ]
@@ -339,23 +309,6 @@ def install_cgroup_conf(lkp: util.Lookup) -> None:
     conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "cgroup.conf"
     conf_file.write_text(lkp.cfg.cgroup_conf_tpl)
     util.chown_slurm(conf_file, mode=0o600)
-
-
-def install_jobsubmit_lua(lkp: util.Lookup) -> None:
-    """install job_submit.lua if there are tpu nodes in the cluster"""
-    if any(
-        tpu_nodeset is not None
-        for part in lkp.cfg.partitions.values()
-        for tpu_nodeset in part.partition_nodeset_tpu
-    ):
-        conf_options = {
-            "scripts_dir": lkp.cfg.slurm_scripts_dir or dirs.scripts,
-        }
-        conf = lkp.cfg.jobsubmit_lua_tpl.format(**conf_options)
-
-        conf_file = Path(lkp.cfg.output_dir or slurmdirs.etc) / "job_submit.lua"
-        conf_file.write_text(conf)
-        util.chown_slurm(conf_file, 0o600)
 
 
 def gen_cloud_gres_conf(lkp: util.Lookup) -> None:
@@ -443,24 +396,6 @@ class TopologyBuilder:
             yield from s.render_conf_lines()
 
 
-def add_tpu_nodeset_topology(nodeset: object, bldr: TopologyBuilder, lkp: util.Lookup):
-    tpuobj = util.TPU(nodeset)
-    static, dynamic = lkp.nodenames(nodeset)
-
-    pref = ["nodeset_tpu-root", nodeset.nodeset_name]
-    if tpuobj.vmcount == 1:  # Put all nodes in one switch
-        bldr.add(pref, list(chain(static, dynamic)))
-        return
-
-    # Chunk nodes into sub-switches of size `vmcount`
-    chunk_num = 0
-    for nodenames in (static, dynamic):
-        for nodeschunk in util.chunked(nodenames, n=tpuobj.vmcount):
-            chunk_name = f"{nodeset.nodeset_name}-{chunk_num}"
-            chunk_num += 1
-            bldr.add([*pref, chunk_name], list(nodeschunk))
-
-
 def add_nodeset_topology(
     nodeset: object, bldr: TopologyBuilder, lkp: util.Lookup
 ) -> None:
@@ -471,8 +406,6 @@ def add_nodeset_topology(
 
 def gen_topology(lkp: util.Lookup) -> TopologyBuilder:
     bldr = TopologyBuilder()
-    for ns in lkp.cfg.nodeset_tpu.values():
-        add_tpu_nodeset_topology(ns, bldr, lkp)
     for ns in lkp.cfg.nodeset.values():
         add_nodeset_topology(ns, bldr, lkp)
     return bldr

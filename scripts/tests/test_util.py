@@ -117,14 +117,6 @@ def test_to_hostlist_fast(names, expected):
                 universe_domain="googleapis.com",
             ),
         ),
-        (
-            util.ApiEndpoint.TPU,
-            "alpha",
-            ClientOptions(
-                api_endpoint="https://tpu.googleapis.com/alpha/",
-                universe_domain="googleapis.com",
-            ),
-        ),
     ],
 )
 def test_create_client_options(

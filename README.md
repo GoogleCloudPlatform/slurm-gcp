@@ -108,8 +108,22 @@ See the [Upgrade to v6 Guide](./docs/upgrade_to_v6.md) for details.
 
 ## TPU support
 
-slurm-gcp supports using TPU-vm nodes. See [TPU guide](./docs/tpu.md) for
-details.
+Legacy Cloud [TPU](./docs/glossary.md#tpu) VM nodesets (TPU v2, v3, and v4
+through the Cloud TPU API, with `slurmd` running in a Docker container) are no
+longer supported, and the TPU container image build has been removed from this
+repository. Before upgrading a cluster that uses legacy TPU nodesets, delete
+the TPU VMs that Slurm created by using your current release, for example:
+
+```shell
+gcloud compute tpus tpu-vm list --zone=<ZONE> --filter="name~<CLUSTER>-<NODESET>" --format="value(name)"
+# Then, for each name returned:
+gcloud compute tpus tpu-vm delete <NAME> --zone=<ZONE>
+```
+
+For TPU v5e, v5p, v6e, and TPU7x on Slurm, use the `schedmd-slurm-gcp-v6-nodeset`
+module in [Cluster Toolkit](https://github.com/GoogleCloudPlatform/cluster-toolkit)
+(see its `examples/machine-learning/tpu-v5e-v5p-v6e/` and
+`examples/machine-learning/tpu7x-standard-4t/` examples).
 
 ## Help and Support
 

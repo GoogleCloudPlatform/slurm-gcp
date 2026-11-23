@@ -39,11 +39,3 @@
     name:
     - linux-headers-{{ ansible_kernel }}
     - "{{ kernel_headers_package }}"
-  when: not tpu_docker_image
-
-- name: Install generic kernel headers
-  ansible.builtin.apt:
-    name: linux-headers-generic
-  when:
-  - tpu_docker_image
-  - ansible_distribution == "Ubuntu"

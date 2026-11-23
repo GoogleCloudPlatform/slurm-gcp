@@ -31,7 +31,6 @@ import util
 from util import (
     batch_execute,
     ensure_execute,
-    execute_with_futures,
     fetch_config_yaml,
     fetch_config_yaml_md5,
     install_custom_scripts,
@@ -42,12 +41,9 @@ from util import (
     to_hostlist_fast,
     Lookup,
     NSDict,
-    TPU,
-    chunked,
 )
 from util import lkp, cfg, compute, CONFIG_FILE
 from suspend import delete_instances
-from resume import start_tpu
 from conf import (
     gen_cloud_conf,
     gen_cloud_gres_conf,
@@ -95,19 +91,11 @@ def start_instance_op(inst, project=None):
 def start_instances(node_list):
     log.info("{} instances to start ({})".format(len(node_list), ",".join(node_list)))
 
-    normal, tpu_nodes = separate(lkp.node_is_tpu, node_list)
-    invalid, valid = separate(lambda inst: bool(lkp.instance), normal)
+    invalid, valid = separate(lambda inst: bool(lkp.instance), node_list)
 
     ops = {inst: start_instance_op(inst) for inst in valid}
 
     done, failed = batch_execute(ops)
-
-    tpu_start_data = []
-    for ns, nodes in util.groupby_unsorted(tpu_nodes, lkp.node_nodeset_name):
-        tpuobj = TPU(lkp.cfg.nodeset_tpu[ns])
-        for snodes in chunked(nodes, n=tpuobj.vmcount):
-            tpu_start_data.append({"tpu": tpuobj, "node": snodes})
-    execute_with_futures(start_tpu, tpu_start_data)
 
 
 def _find_dynamic_node_status() -> NodeStatus:
@@ -115,67 +103,6 @@ def _find_dynamic_node_status() -> NodeStatus:
     # * delete dead dynamic nodes
     # * delete orhpaned instances
     return NodeStatus.unchanged  # don't touch dynamic nodes
-
-
-def _find_tpu_node_status(nodename, state):
-    ns = lkp.node_nodeset(nodename)
-    tpuobj = TPU(ns)
-    inst = tpuobj.get_node(nodename)
-    # If we do not find the node but it is from a Tpu that has multiple vms look for the master node
-    if inst is None and tpuobj.vmcount > 1:
-        # Get the tpu slurm nodelist of the nodes in the same tpu group as nodename
-        nodelist = run(
-            f"{lkp.scontrol} show topo {nodename}"
-            + " | awk -F'=' '/Level=0/ { print $NF }'",
-            shell=True,
-        ).stdout
-        l_nodelist = util.to_hostnames(nodelist)
-        group_names = set(l_nodelist)
-        # get the list of all the existing tpus in the nodeset
-        tpus_list = set(tpuobj.list_node_names())
-        # In the intersection there must be only one node that is the master
-        tpus_int = list(group_names.intersection(tpus_list))
-        if len(tpus_int) > 1:
-            log.error(
-                f"More than one cloud tpu node for tpu group {nodelist}, there should be only one that should be {l_nodelist[0]}, but we have found {tpus_int}"
-            )
-            return NodeStatus.unknown
-        if len(tpus_int) == 1:
-            inst = tpuobj.get_node(tpus_int[0])
-        # if len(tpus_int ==0) this case is not relevant as this would be the case always that a TPU group is not running
-    if inst is None:
-        if state.base == "DOWN" and "POWERED_DOWN" in state.flags:
-            return NodeStatus.restore
-        if "POWERING_DOWN" in state.flags:
-            return NodeStatus.restore
-        if "COMPLETING" in state.flags:
-            return NodeStatus.unbacked
-        if state.base != "DOWN" and not (
-            set(("POWER_DOWN", "POWERING_UP", "POWERING_DOWN", "POWERED_DOWN"))
-            & state.flags
-        ):
-            return NodeStatus.unbacked
-        if lkp.is_static_node(nodename):
-            return NodeStatus.resume
-    elif (
-        state is not None
-        and "POWERED_DOWN" not in state.flags
-        and "POWERING_DOWN" not in state.flags
-        and inst.state == TPU.State.STOPPED
-    ):
-        if tpuobj.preemptible:
-            return NodeStatus.preempted
-        if not state.base.startswith("DOWN"):
-            return NodeStatus.terminated
-    elif (
-        state is None or "POWERED_DOWN" in state.flags
-    ) and inst.state == TPU.State.READY:
-        return NodeStatus.orphan
-    elif state is None:
-        # if state is None here, the instance exists but it's not in Slurm
-        return NodeStatus.unknown
-
-    return NodeStatus.unchanged
 
 
 def allow_power_down(state):
@@ -196,9 +123,6 @@ def find_node_status(nodename):
 
     if lkp.node_is_dyn(nodename):
         return _find_dynamic_node_status()
-
-    if lkp.node_is_tpu(nodename):
-        return _find_tpu_node_status(nodename, state)
 
     # split below is workaround for VMs whose hostname is FQDN
     inst = lkp.instance(nodename.split(".")[0])
