@@ -184,33 +184,35 @@
 
   - name: Check for DNF protected-kmods plugin config (RedHat/Rocky)
     ansible.builtin.stat:
-      path: "{{ item }}"
-    loop:
-    - /etc/dnf/plugins/protected-kmods.conf
-    - /etc/dnf/plugins/protected_kmods.conf
-    register: protected_kmods_conf_stats
+      path: /etc/dnf/plugins/protected-kmods.conf
+    register: protected_kmods_conf_stat
     when: ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
 
-  - name: Back up DNF protected-kmods plugin config in memory (RedHat/Rocky)
+  - name: Check for DNF protected-kmods.d directory (RedHat/Rocky)
+    ansible.builtin.stat:
+      path: /etc/dnf/plugins/protected-kmods.d
+    register: protected_kmods_dir_stat
+    when: ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
+
+  - name: Back up existing DNF protected-kmods plugin config in memory (RedHat/Rocky)
     ansible.builtin.slurp:
-      src: "{{ item.stat.path }}"
-    loop: "{{ protected_kmods_conf_stats.results | default([]) }}"
-    register: protected_kmods_backups
+      src: /etc/dnf/plugins/protected-kmods.conf
+    register: protected_kmods_conf_backup
     when:
     - ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
-    - item.stat.exists | default(false)
+    - protected_kmods_conf_stat.stat.exists | default(false)
 
   - name: Temporarily disable DNF protected-kmods plugin while kernel is versionlocked (RedHat/Rocky)
     ansible.builtin.ini_file:
-      path: "{{ item.stat.path }}"
+      path: /etc/dnf/plugins/protected-kmods.conf
       section: main
       option: enabled
       value: '0'
-      create: false
-    loop: "{{ protected_kmods_conf_stats.results | default([]) }}"
+      create: true
+      mode: "{{ protected_kmods_conf_stat.stat.mode | default('0644') }}"
     when:
     - ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
-    - item.stat.exists | default(false)
+    - (protected_kmods_conf_stat.stat.exists | default(false)) or (protected_kmods_dir_stat.stat.exists | default(false))
 
   - name: Get installed CIQ rdma-core version (RedHat/Rocky)
     ansible.builtin.command: rpm -q --qf '%{VERSION}-%{RELEASE}' rdma-core
@@ -381,13 +383,21 @@
     - ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
     - allow_kernel_upgrades
 
-  - name: Restore DNF protected-kmods plugin config after playbook run (RedHat/Rocky)
+  - name: Restore existing DNF protected-kmods plugin config after playbook run (RedHat/Rocky)
     ansible.builtin.copy:
-      content: "{{ item.content | b64decode }}"
-      dest: "{{ item.source }}"
-      mode: "{{ item.item.stat.mode | default('0644') }}"
-    loop: "{{ protected_kmods_backups.results | default([]) }}"
+      content: "{{ protected_kmods_conf_backup.content | b64decode }}"
+      dest: /etc/dnf/plugins/protected-kmods.conf
+      mode: "{{ protected_kmods_conf_stat.stat.mode | default('0644') }}"
     when:
     - ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
-    - not (item.skipped | default(false))
-    - item.content is defined
+    - protected_kmods_conf_stat.stat.exists | default(false)
+    - protected_kmods_conf_backup.content is defined
+
+  - name: Remove temporary DNF protected-kmods plugin config after playbook run (RedHat/Rocky)
+    ansible.builtin.file:
+      path: /etc/dnf/plugins/protected-kmods.conf
+      state: absent
+    when:
+    - ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
+    - not (protected_kmods_conf_stat.stat.exists | default(false))
+    - protected_kmods_dir_stat.stat.exists | default(false)
