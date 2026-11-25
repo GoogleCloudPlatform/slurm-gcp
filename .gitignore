@@ -27,7 +27,6 @@ __pycache__/
 *.tfstate.*
 *.tfvars
 !example.tfvars
-!tpu_example.tfvars
 .terraform.lock.hcl
 
 ### Vagrant ###

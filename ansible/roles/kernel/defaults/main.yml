@@ -14,4 +14,3 @@
 # limitations under the License.
 
 reboot: true
-tpu_docker_image: false

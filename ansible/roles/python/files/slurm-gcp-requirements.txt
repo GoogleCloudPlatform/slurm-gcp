@@ -14,6 +14,9 @@ google-cloud-container==2.59.0
 google-cloud-core==2.4.1
 google-cloud-secret-manager==2.23.0
 google-cloud-storage==2.10.0
+# Kept for released Cluster Toolkit versions (v1.109.0 and earlier), whose
+# controller scripts import google.cloud.tpu_v2 unconditionally. Remove once
+# those versions are out of support.
 google-cloud-tpu==1.23.0
 google-crc32c==1.5.0
 google-resumable-media==2.5.0
