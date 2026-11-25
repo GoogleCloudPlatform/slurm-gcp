@@ -29,6 +29,20 @@
   - '{{paths.apps}}'
   - '{{paths.modulefiles}}'
 
+- name: Check existing Lmod git ref
+  ansible.builtin.shell: >
+    git -C '{{ lmod_paths.src }}' symbolic-ref -q --short HEAD 2>/dev/null ||
+    git -C '{{ lmod_paths.src }}' describe --tags --exact-match HEAD 2>/dev/null
+  register: lmod_existing_ref
+  changed_when: false
+  failed_when: false
+
+- name: Remove mismatched Lmod checkout before shallow clone
+  ansible.builtin.file:
+    path: '{{ lmod_paths.src }}'
+    state: absent
+  when: (lmod_existing_ref.stdout | default('') | trim) != (lmod_version | string)
+
 - name: Git Clone
   git:
     repo: '{{lmod_git_url}}'
@@ -36,6 +50,7 @@
     version: '{{lmod_version}}'
     clone: yes
     depth: '1'
+  when: (lmod_existing_ref.stdout | default('') | trim) != (lmod_version | string)
 
 - name: Create Modulespath
   template:

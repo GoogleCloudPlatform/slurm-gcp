@@ -36,6 +36,23 @@
       state: link
   when: not slurm_version.startswith("b:")
 
+- name: Check existing Slurm git ref
+  ansible.builtin.shell: >
+    git -C '{{ slurm_paths.src }}' symbolic-ref -q --short HEAD 2>/dev/null ||
+    git -C '{{ slurm_paths.src }}' describe --tags --exact-match HEAD 2>/dev/null
+  register: slurm_existing_ref
+  changed_when: false
+  failed_when: false
+  when: slurm_version.startswith("b:")
+
+- name: Remove mismatched Slurm checkout before shallow clone
+  ansible.builtin.file:
+    path: '{{ slurm_paths.src }}'
+    state: absent
+  when:
+  - slurm_version.startswith("b:")
+  - (slurm_existing_ref.stdout | default('') | trim) != (slurm_version | regex_replace('^b:', ''))
+
 - name: Slurm From Git Branch
   git:
     repo: '{{slurm_git_url}}'
@@ -43,7 +60,9 @@
     version: "{{slurm_version|regex_replace('^b:', '')}}"
     clone: yes
     depth: '1'
-  when: slurm_version.startswith("b:")
+  when:
+  - slurm_version.startswith("b:")
+  - (slurm_existing_ref.stdout | default('') | trim) != (slurm_version | regex_replace('^b:', ''))
 
 - name: Apply Slurm patches
   ansible.posix.patch:

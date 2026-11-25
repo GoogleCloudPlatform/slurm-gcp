@@ -32,6 +32,20 @@
   - '{{ompi_paths.apps}}'
   - '{{ompi_paths.modulefiles}}'
 
+- name: Check existing OpenMPI git ref
+  ansible.builtin.shell: >
+    git -C '{{ ompi_paths.src }}' symbolic-ref -q --short HEAD 2>/dev/null ||
+    git -C '{{ ompi_paths.src }}' describe --tags --exact-match HEAD 2>/dev/null
+  register: ompi_existing_ref
+  changed_when: false
+  failed_when: false
+
+- name: Remove mismatched OpenMPI checkout before shallow clone
+  ansible.builtin.file:
+    path: '{{ ompi_paths.src }}'
+    state: absent
+  when: (ompi_existing_ref.stdout | default('') | trim) != (ompi_version | string)
+
 - name: Git Clone
   git:
     repo: '{{ompi_git_url}}'
@@ -39,6 +53,7 @@
     version: '{{ompi_version}}'
     clone: yes
     depth: '1'
+  when: (ompi_existing_ref.stdout | default('') | trim) != (ompi_version | string)
 
 - name: Autogen
   shell:
