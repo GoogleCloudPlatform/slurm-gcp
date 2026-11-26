@@ -200,7 +200,7 @@
     register: protected_kmods_conf_backup
     when:
     - ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
-    - protected_kmods_conf_stat.stat.exists | default(false)
+    - "(protected_kmods_conf_stat.stat | default({'exists': false})).exists"
 
   - name: Temporarily disable DNF protected-kmods plugin while kernel is versionlocked (RedHat/Rocky)
     ansible.builtin.ini_file:
@@ -209,10 +209,10 @@
       option: enabled
       value: '0'
       create: true
-      mode: "{{ protected_kmods_conf_stat.stat.mode | default('0644') }}"
+      mode: "{{ (protected_kmods_conf_stat.stat | default({})).mode | default('0644') }}"
     when:
     - ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
-    - (protected_kmods_conf_stat.stat.exists | default(false)) or (protected_kmods_dir_stat.stat.exists | default(false))
+    - "(protected_kmods_conf_stat.stat | default({'exists': false})).exists or (protected_kmods_dir_stat.stat | default({'exists': false})).exists"
 
   - name: Get installed CIQ rdma-core version (RedHat/Rocky)
     ansible.builtin.command: rpm -q --qf '%{VERSION}-%{RELEASE}' rdma-core
@@ -385,12 +385,12 @@
 
   - name: Restore existing DNF protected-kmods plugin config after playbook run (RedHat/Rocky)
     ansible.builtin.copy:
-      content: "{{ protected_kmods_conf_backup.content | b64decode }}"
+      content: "{{ (protected_kmods_conf_backup.content | default('')) | b64decode }}"
       dest: /etc/dnf/plugins/protected-kmods.conf
-      mode: "{{ protected_kmods_conf_stat.stat.mode | default('0644') }}"
+      mode: "{{ (protected_kmods_conf_stat.stat | default({})).mode | default('0644') }}"
     when:
     - ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
-    - protected_kmods_conf_stat.stat.exists | default(false)
+    - "(protected_kmods_conf_stat.stat | default({'exists': false})).exists"
     - protected_kmods_conf_backup.content is defined
 
   - name: Remove temporary DNF protected-kmods plugin config after playbook run (RedHat/Rocky)
@@ -399,5 +399,5 @@
       state: absent
     when:
     - ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
-    - not (protected_kmods_conf_stat.stat.exists | default(false))
-    - protected_kmods_dir_stat.stat.exists | default(false)
+    - "not (protected_kmods_conf_stat.stat | default({'exists': false})).exists"
+    - "(protected_kmods_dir_stat.stat | default({'exists': false})).exists"

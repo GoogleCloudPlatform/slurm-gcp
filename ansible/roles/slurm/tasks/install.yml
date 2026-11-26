@@ -38,8 +38,10 @@
 
 - name: Check existing Slurm git ref
   ansible.builtin.shell: >
+    test -d '{{ slurm_paths.src }}/.git' && (
     git -C '{{ slurm_paths.src }}' symbolic-ref -q --short HEAD 2>/dev/null ||
     git -C '{{ slurm_paths.src }}' describe --tags --exact-match HEAD 2>/dev/null
+    ) || true
   register: slurm_existing_ref
   changed_when: false
   failed_when: false
