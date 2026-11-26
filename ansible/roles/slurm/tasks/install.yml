@@ -36,13 +36,13 @@
       state: link
   when: not slurm_version.startswith("b:")
 
-- name: Check existing Slurm git ref
+- name: Check if existing Slurm checkout matches target version
   ansible.builtin.shell: >
-    test -d '{{ slurm_paths.src }}/.git' && (
-    git -C '{{ slurm_paths.src }}' symbolic-ref -q --short HEAD 2>/dev/null ||
-    git -C '{{ slurm_paths.src }}' describe --tags --exact-match HEAD 2>/dev/null
-    ) || true
-  register: slurm_existing_ref
+    test -d '{{ slurm_paths.src }}/.git' &&
+    head_sha=$(git -C '{{ slurm_paths.src }}' rev-parse --verify -q 'HEAD^{commit}' 2>/dev/null) &&
+    target_sha=$(git -C '{{ slurm_paths.src }}' rev-parse --verify -q '{{ slurm_version | regex_replace("^b:", "") }}^{commit}' 2>/dev/null) &&
+    [ -n "$head_sha" ] && [ "$head_sha" = "$target_sha" ]
+  register: slurm_ref_match
   changed_when: false
   failed_when: false
   when: slurm_version.startswith("b:")
@@ -53,7 +53,7 @@
     state: absent
   when:
   - slurm_version.startswith("b:")
-  - (slurm_existing_ref.stdout | default('') | trim) != (slurm_version | regex_replace('^b:', ''))
+  - slurm_ref_match.rc | default(1) != 0
 
 - name: Slurm From Git Branch
   git:
@@ -64,7 +64,7 @@
     depth: '1'
   when:
   - slurm_version.startswith("b:")
-  - (slurm_existing_ref.stdout | default('') | trim) != (slurm_version | regex_replace('^b:', ''))
+  - slurm_ref_match.rc | default(1) != 0
 
 - name: Apply Slurm patches
   ansible.posix.patch:

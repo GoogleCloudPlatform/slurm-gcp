@@ -32,13 +32,13 @@
   - '{{ompi_paths.apps}}'
   - '{{ompi_paths.modulefiles}}'
 
-- name: Check existing OpenMPI git ref
+- name: Check if existing OpenMPI checkout matches target version
   ansible.builtin.shell: >
-    test -d '{{ ompi_paths.src }}/.git' && (
-    git -C '{{ ompi_paths.src }}' symbolic-ref -q --short HEAD 2>/dev/null ||
-    git -C '{{ ompi_paths.src }}' describe --tags --exact-match HEAD 2>/dev/null
-    ) || true
-  register: ompi_existing_ref
+    test -d '{{ ompi_paths.src }}/.git' &&
+    head_sha=$(git -C '{{ ompi_paths.src }}' rev-parse --verify -q 'HEAD^{commit}' 2>/dev/null) &&
+    target_sha=$(git -C '{{ ompi_paths.src }}' rev-parse --verify -q '{{ ompi_version }}^{commit}' 2>/dev/null) &&
+    [ -n "$head_sha" ] && [ "$head_sha" = "$target_sha" ]
+  register: ompi_ref_match
   changed_when: false
   failed_when: false
 
@@ -46,7 +46,7 @@
   ansible.builtin.file:
     path: '{{ ompi_paths.src }}'
     state: absent
-  when: (ompi_existing_ref.stdout | default('') | trim) != (ompi_version | string)
+  when: ompi_ref_match.rc != 0
 
 - name: Git Clone
   git:
@@ -55,7 +55,7 @@
     version: '{{ompi_version}}'
     clone: yes
     depth: '1'
-  when: (ompi_existing_ref.stdout | default('') | trim) != (ompi_version | string)
+  when: ompi_ref_match.rc != 0
 
 - name: Autogen
   shell:
