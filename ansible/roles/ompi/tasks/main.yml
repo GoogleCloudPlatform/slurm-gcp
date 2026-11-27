@@ -41,12 +41,13 @@
   register: ompi_ref_match
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: Remove mismatched OpenMPI checkout before shallow clone
   ansible.builtin.file:
     path: '{{ ompi_paths.src }}'
     state: absent
-  when: ompi_ref_match.rc != 0
+  when: ompi_ref_match.rc | default(1) != 0
 
 - name: Git Clone
   git:
@@ -55,7 +56,7 @@
     version: '{{ompi_version}}'
     clone: yes
     depth: '1'
-  when: ompi_ref_match.rc != 0
+  when: ompi_ref_match.rc | default(1) != 0
 
 - name: Autogen
   shell:

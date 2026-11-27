@@ -38,12 +38,13 @@
   register: lmod_ref_match
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: Remove mismatched Lmod checkout before shallow clone
   ansible.builtin.file:
     path: '{{ lmod_paths.src }}'
     state: absent
-  when: lmod_ref_match.rc != 0
+  when: lmod_ref_match.rc | default(1) != 0
 
 - name: Git Clone
   git:
@@ -52,7 +53,7 @@
     version: '{{lmod_version}}'
     clone: yes
     depth: '1'
-  when: lmod_ref_match.rc != 0
+  when: lmod_ref_match.rc | default(1) != 0
 
 - name: Create Modulespath
   template:

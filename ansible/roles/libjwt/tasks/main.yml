@@ -40,12 +40,13 @@
   register: libjwt_ref_match
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: Remove mismatched libjwt checkout before shallow clone
   ansible.builtin.file:
     path: '{{ libjwt_paths.src }}'
     state: absent
-  when: libjwt_ref_match.rc != 0
+  when: libjwt_ref_match.rc | default(1) != 0
 
 - name: Git Clone
   git:
@@ -54,7 +55,7 @@
     version: '{{libjwt_version}}'
     clone: yes
     depth: '1'
-  when: libjwt_ref_match.rc != 0
+  when: libjwt_ref_match.rc | default(1) != 0
 
 - name: Autoreconf
   shell:

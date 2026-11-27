@@ -164,24 +164,6 @@
     loop: "{{ kernel_packages }}"
     when: ansible_os_family == "Debian"
 
-  - name: Install dnf versionlock plugin before running playbook (RedHat/Rocky)
-    ansible.builtin.package:
-      name: python3-dnf-plugin-versionlock
-      state: present
-    when: ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
-
-  - name: Freeze kernel before running playbook (RedHat/Rocky)
-    ansible.builtin.command:
-      argv:
-      - dnf
-      - versionlock
-      - add
-      - "{{ item }}"
-    loop: "{{ kernel_packages }}"
-    register: versionlock_add
-    changed_when: "'Adding versionlock on:' in versionlock_add.stdout"
-    when: ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
-
   - name: Check for DNF protected-kmods plugin config (RedHat/Rocky)
     ansible.builtin.stat:
       path: /etc/dnf/plugins/protected-kmods.conf
@@ -213,6 +195,24 @@
     when:
     - ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] in ['8', '9']
     - "((protected_kmods_conf_stat | default({})).stat | default({'exists': false})).exists or ((protected_kmods_dir_stat | default({})).stat | default({'exists': false})).exists"
+
+  - name: Install dnf versionlock plugin before running playbook (RedHat/Rocky)
+    ansible.builtin.package:
+      name: python3-dnf-plugin-versionlock
+      state: present
+    when: ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
+
+  - name: Freeze kernel before running playbook (RedHat/Rocky)
+    ansible.builtin.command:
+      argv:
+      - dnf
+      - versionlock
+      - add
+      - "{{ item }}"
+    loop: "{{ kernel_packages }}"
+    register: versionlock_add
+    changed_when: "'Adding versionlock on:' in versionlock_add.stdout"
+    when: ansible_os_family == "RedHat" and ansible_distribution_major_version in ['8', '9']
 
   - name: Get installed CIQ rdma-core version (RedHat/Rocky)
     ansible.builtin.command: rpm -q --qf '%{VERSION}-%{RELEASE}' rdma-core
