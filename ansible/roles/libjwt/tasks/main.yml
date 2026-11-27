@@ -31,6 +31,23 @@
   - '{{libjwt_paths.build}}'
   - '{{libjwt_paths.etc}}'
 
+- name: Check if existing libjwt checkout matches target version
+  ansible.builtin.shell: >
+    test -d '{{ libjwt_paths.src }}/.git' &&
+    head_sha=$(git -C '{{ libjwt_paths.src }}' rev-parse --verify -q 'HEAD^{commit}' 2>/dev/null) &&
+    target_sha=$(git -C '{{ libjwt_paths.src }}' rev-parse --verify -q '{{ libjwt_version }}^{commit}' 2>/dev/null) &&
+    [ -n "$head_sha" ] && [ "$head_sha" = "$target_sha" ]
+  register: libjwt_ref_match
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Remove mismatched libjwt checkout before shallow clone
+  ansible.builtin.file:
+    path: '{{ libjwt_paths.src }}'
+    state: absent
+  when: libjwt_ref_match.rc | default(1) != 0
+
 - name: Git Clone
   git:
     repo: '{{libjwt_git_url}}'
@@ -38,6 +55,7 @@
     version: '{{libjwt_version}}'
     clone: yes
     depth: '1'
+  when: libjwt_ref_match.rc | default(1) != 0
 
 - name: Autoreconf
   shell:

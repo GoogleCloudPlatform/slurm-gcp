@@ -29,6 +29,23 @@
   - '{{paths.apps}}'
   - '{{paths.modulefiles}}'
 
+- name: Check if existing Lmod checkout matches target version
+  ansible.builtin.shell: >
+    test -d '{{ lmod_paths.src }}/.git' &&
+    head_sha=$(git -C '{{ lmod_paths.src }}' rev-parse --verify -q 'HEAD^{commit}' 2>/dev/null) &&
+    target_sha=$(git -C '{{ lmod_paths.src }}' rev-parse --verify -q '{{ lmod_version }}^{commit}' 2>/dev/null) &&
+    [ -n "$head_sha" ] && [ "$head_sha" = "$target_sha" ]
+  register: lmod_ref_match
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Remove mismatched Lmod checkout before shallow clone
+  ansible.builtin.file:
+    path: '{{ lmod_paths.src }}'
+    state: absent
+  when: lmod_ref_match.rc | default(1) != 0
+
 - name: Git Clone
   git:
     repo: '{{lmod_git_url}}'
@@ -36,6 +53,7 @@
     version: '{{lmod_version}}'
     clone: yes
     depth: '1'
+  when: lmod_ref_match.rc | default(1) != 0
 
 - name: Create Modulespath
   template:
